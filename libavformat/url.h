@@ -46,6 +46,8 @@ typedef struct URLContext {
     int is_connected;
     AVIOInterruptCB interrupt_callback;
     int64_t rw_timeout;         /**< maximum time to wait for (network) read/write operation completion, in mcs */
+    ffurl_read_callback mpegts_parser_injection;
+    void* mpegts_parser_injection_context;
     const char *protocol_whitelist;
     const char *protocol_blacklist;
 } URLContext;

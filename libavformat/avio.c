@@ -408,7 +408,15 @@ int ffurl_read(URLContext *h, unsigned char *buf, int size)
 {
     if (!(h->flags & AVIO_FLAG_READ))
         return AVERROR(EIO);
-    return retry_transfer_wrapper(h, buf, size, 1, h->prot->url_read);
+
+    int len = retry_transfer_wrapper(h, buf, size, 1, h->prot->url_read);
+    //printf("temp_cb %p v:%p addr:%p\n", h, h->mpegts_parser_injection, &(h->mpegts_parser_injection));
+    //printf("ffurl %d \n", len);
+    if (h->mpegts_parser_injection != NULL){
+        h->mpegts_parser_injection(h->mpegts_parser_injection_context, buf, len, 0);
+    }
+
+    return len;
 }
 
 int ffurl_read_complete(URLContext *h, unsigned char *buf, int size)

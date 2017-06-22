@@ -824,4 +824,14 @@ int avio_accept(AVIOContext *s, AVIOContext **c);
  *           < 0 for an AVERROR code
  */
 int avio_handshake(AVIOContext *c);
+
+
+/**
+ * The most dirty solution, add a interface at avio.h directly to let the user
+ * inject callback in ffurl_read
+ */ 
+typedef void (*ffurl_read_callback)(void* opaque, uint8_t* buf, int bufsz, int debug);
+
+
+
 #endif /* AVFORMAT_AVIO_H */
