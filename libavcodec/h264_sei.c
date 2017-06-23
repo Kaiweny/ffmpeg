@@ -31,6 +31,10 @@
 #include "h264_ps.h"
 #include "h264_sei.h"
 #include "internal.h"
+#include "libavformat/avformat.h"
+
+#include "ccaption708_dec.h"
+
 
 #define AVERROR_PS_NOT_FOUND      FFERRTAG(0xF8,'?','P','S')
 
@@ -52,6 +56,7 @@ void ff_h264_sei_uninit(H264SEIContext *h)
     h->afd.present                 =  0;
 
     h->a53_caption.a53_caption_size = 0;
+//    h->a53_caption.a53_context_allocated = 0;
     av_freep(&h->a53_caption.a53_caption);
 }
 
@@ -146,6 +151,30 @@ static int decode_registered_user_data_afd(H264SEIAFD *h, GetBitContext *gb, int
     return 0;
 }
 
+static int init_a53_decoder(H264SEIA53Caption *s) {
+    AVCodec *codec;
+    int ret;
+
+    codec = avcodec_find_decoder(AV_CODEC_ID_EIA_708);
+    if (!codec) {
+        av_log(log, AV_LOG_ERROR, "Failed to find any codec\n");
+        return AVERROR(EINVAL);
+    }
+
+    s->a53_context = avcodec_alloc_context3(codec);
+    if (!s->a53_context)
+        return AVERROR(ENOMEM);
+
+    //codec context and codec private options can be passed here
+    if ((ret = avcodec_open2(s->a53_context, codec, NULL)) < 0) {
+        av_log(log, AV_LOG_ERROR, "Failed to open codec\n");
+        return ret;
+    }
+
+    codec->init(s->a53_context);
+    return 0;
+}
+
 static int decode_registered_user_data_closed_caption(H264SEIA53Caption *h,
                                                      GetBitContext *gb, void *logctx,
                                                      int size)
@@ -156,6 +185,12 @@ static int decode_registered_user_data_closed_caption(H264SEIA53Caption *h,
 
     if (size < 3)
         return AVERROR(EINVAL);
+
+    if (!h->a53_context_allocated) {
+        if (init_a53_decoder(h))
+            return -1;
+        h->a53_context_allocated = 1;
+    }
 
     user_data_type_code = get_bits(gb, 8);
     if (user_data_type_code == 0x3) {
@@ -180,15 +215,15 @@ static int decode_registered_user_data_closed_caption(H264SEIA53Caption *h,
                 ret = av_reallocp(&h->a53_caption, new_size);
                 if (ret < 0)
                     return ret;
-
+                printf("new size : %d   cc_count : %d\n", new_size, cc_count);
                 for (i = 0; i < cc_count; i++) {
                     h->a53_caption[h->a53_caption_size++] = get_bits(gb, 8);
                     h->a53_caption[h->a53_caption_size++] = get_bits(gb, 8);
                     h->a53_caption[h->a53_caption_size++] = get_bits(gb, 8);
                 }
-
                 skip_bits(gb, 8);   // marker_bits
             }
+            av_hex_dump(stdout,h->a53_caption, h->a53_caption_size);
         }
     } else {
         int i;

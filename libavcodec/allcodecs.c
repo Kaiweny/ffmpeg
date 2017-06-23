@@ -570,6 +570,7 @@ static void register_all(void)
     REGISTER_ENCDEC (SSA,               ssa);
     REGISTER_ENCDEC (ASS,               ass);
     REGISTER_DECODER(CCAPTION,          ccaption);
+    REGISTER_DECODER(CCAPTION708,       ccaption708);
     REGISTER_ENCDEC (DVBSUB,            dvbsub);
     REGISTER_ENCDEC (DVDSUB,            dvdsub);
     REGISTER_DECODER(JACOSUB,           jacosub);
