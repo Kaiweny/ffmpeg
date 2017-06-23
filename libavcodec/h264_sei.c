@@ -56,7 +56,6 @@ void ff_h264_sei_uninit(H264SEIContext *h)
     h->afd.present                 =  0;
 
     h->a53_caption.a53_caption_size = 0;
-//    h->a53_caption.a53_context_allocated = 0;
     av_freep(&h->a53_caption.a53_caption);
 }
 
@@ -215,7 +214,7 @@ static int decode_registered_user_data_closed_caption(H264SEIA53Caption *h,
                 ret = av_reallocp(&h->a53_caption, new_size);
                 if (ret < 0)
                     return ret;
-                printf("new size : %d   cc_count : %d\n", new_size, cc_count);
+
                 for (i = 0; i < cc_count; i++) {
                     h->a53_caption[h->a53_caption_size++] = get_bits(gb, 8);
                     h->a53_caption[h->a53_caption_size++] = get_bits(gb, 8);
@@ -223,7 +222,6 @@ static int decode_registered_user_data_closed_caption(H264SEIA53Caption *h,
                 }
                 skip_bits(gb, 8);   // marker_bits
             }
-            av_hex_dump(stdout,h->a53_caption, h->a53_caption_size);
         }
     } else {
         int i;

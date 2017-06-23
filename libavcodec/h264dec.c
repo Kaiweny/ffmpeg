@@ -1039,8 +1039,7 @@ static int h264_decode_frame(AVCodecContext *avctx, void *data,
     av_assert0(pict->buf[0] || !*got_frame);
 
     ff_h264_unref_picture(h, &h->last_pic_for_ec);
-    
-   // avctx->codec->decode_cc(avctx, pict, avpkt);
+
 
     return get_consumed_bytes(buf_index, buf_size);
 }
@@ -1055,8 +1054,6 @@ static int h264_decode_cc(AVCodecContext *avctx, void *data,
     
     set_current_pts(timing, pict->pkt_pts);
     set_fts(timing, avctx->framerate);
-    printf("Frame rate num : %d  den : %d \n", avctx->framerate.num, avctx->framerate.den);
-    printf("Interlaced : %d \n", pict->interlaced_frame);
     
     //logic to set expected cc_count
     //TODO: Also account for display repetition
@@ -1099,7 +1096,7 @@ AVCodec ff_h264_decoder = {
     .init                  = h264_decode_init,
     .close                 = h264_decode_end,
     .decode                = h264_decode_frame,
-	.decode_cc 			   = h264_decode_cc,
+    .decode_cc 			   = h264_decode_cc,
     .capabilities          = /*AV_CODEC_CAP_DRAW_HORIZ_BAND |*/ AV_CODEC_CAP_DR1 |
                              AV_CODEC_CAP_DELAY | AV_CODEC_CAP_SLICE_THREADS |
                              AV_CODEC_CAP_FRAME_THREADS,
