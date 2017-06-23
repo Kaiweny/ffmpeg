@@ -139,6 +139,26 @@ enum AVActiveFormatDescription {
     AV_AFD_SP_4_3       = 15,
 };
 
+typedef struct cc_708_channel_datapoints {
+    int dtvcc_packing_matched;
+    int sequence_continuity;
+} cc_708_channel_datapoints;
+
+enum  service_type {None_SVC, Primary_SVC, Secondary_SVC};
+
+typedef struct service_data_points {
+    enum service_type svc_type;
+    int abnormal_window_size;
+    int abnormal_window_position;
+    int abnormal_control_codes;
+    int abnormal_characters;
+} service_data_points;
+
+typedef struct cc_708_services {
+    service_data_points svc_dps[2];
+    int service_number[2];
+    int abnormal_service_block;
+} cc_708_services;
 
 /**
  * Structure to hold side data for an AVFrame.
@@ -152,6 +172,8 @@ typedef struct AVFrameSideData {
     int      size;
     AVDictionary *metadata;
     AVBufferRef *buf;
+    cc_708_channel_datapoints channel_dp_708;
+    cc_708_services svcs_dp_708;
 } AVFrameSideData;
 
 /**
