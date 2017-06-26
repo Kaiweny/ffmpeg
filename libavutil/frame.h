@@ -139,25 +139,28 @@ enum AVActiveFormatDescription {
     AV_AFD_SP_4_3       = 15,
 };
 
+
+#define CC_708_MAX_SERVICES 63
+
 typedef struct cc_708_channel_datapoints {
-    int dtvcc_packing_matched;
-    int sequence_continuity;
+    int dtvcc_packing_matched; //boolean : default value 1 else 0 
+    int sequence_continuity;    //boolean : default value 1 else 0 
 } cc_708_channel_datapoints;
 
 enum  service_type {None_SVC, Primary_SVC, Secondary_SVC};
 
 typedef struct service_data_points {
     enum service_type svc_type;
-    int abnormal_window_size;
-    int abnormal_window_position;
-    int abnormal_control_codes;
-    int abnormal_characters;
+    int abnormal_window_size;      //boolean : default value 0 else 1         
+    int abnormal_window_position;  //boolean : default value 0 else 1 
+    int abnormal_control_codes;    //boolean : default value 0 else 1 
+    int abnormal_characters;       //boolean : default value 0 else 1 
 } service_data_points;
 
 typedef struct cc_708_services {
-    service_data_points svc_dps[2];
-    int service_number[2];
-    int abnormal_service_block;
+    service_data_points svc_dps[CC_708_MAX_SERVICES];
+    int service_number[CC_708_MAX_SERVICES]; //active service has value 1 else 0 
+    int abnormal_service_block;   ////boolean : default value 0 else 1 
 } cc_708_services;
 
 /**
