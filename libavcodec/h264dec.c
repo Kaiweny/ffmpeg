@@ -1057,20 +1057,23 @@ static int h264_decode_cc(AVCodecContext *avctx, void *data,
     AVPacket *avpkt) {
     AVFrame *pict      = data;
     H264Context *h     = avctx->priv_data;
-    CCaption708SubContext *cc = (CCaption708SubContext*)h->sei.a53_caption.a53_context->priv_data;
-    cc_common_timing_ctx *timing =  cc->cc708ctx->timing;
-
-    set_current_pts(timing, pict->pkt_pts);
-    set_fts(timing, avctx->framerate);
-
-    //logic to set expected cc_count
-    //TODO: Also account for display repetition
-    if (!pict->interlaced_frame && (avctx->framerate.num == 30000 || avctx->framerate.num == 60000))
-        cc->expected_cc_count = 20;
+    CCaption708SubContext *cc; 
+    
 
     AVFrameSideData *fsd = av_frame_get_side_data(pict, AV_FRAME_DATA_A53_CC);
     if (fsd) {
+        cc = (CCaption708SubContext*)h->sei.a53_caption.a53_context->priv_data;
+        cc_common_timing_ctx *timing =  cc->cc708ctx->timing;
+        set_current_pts(timing, pict->pkt_pts);
+        set_fts(timing, avctx->framerate);
+
+        //logic to set expected cc_count
+        //TODO: Also account for display repetition
+        if (!pict->interlaced_frame && (avctx->framerate.num == 30000 || avctx->framerate.num == 60000))
+            cc->expected_cc_count = 20;
+        
         cc->cc708ctx->fsd = fsd;
+        
         h->sei.a53_caption.a53_context->codec->decode(h->sei.a53_caption.a53_context,
             fsd, NULL, NULL);
     }
