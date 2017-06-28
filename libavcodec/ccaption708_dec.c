@@ -1035,11 +1035,9 @@ static void init_data_points(AVFrameSideData *fsd) {
     chan_dp->sequence_continuity = 1;
 
     svc_dp->abnormal_service_block = 0;
-    svc_dp->service_number[0] = -1;
-    svc_dp->service_number[1] = -1;
 
-
-    for(; k<2; k++) {
+    for(; k < CC_708_MAX_SERVICES; k++) {
+        svc_dp->service_number[k] = 0;
         svc_dp->svc_dps[k].svc_type = None_SVC;
         svc_dp->svc_dps[k].abnormal_window_size = 0;
         svc_dp->svc_dps[k].abnormal_window_position = 0;
