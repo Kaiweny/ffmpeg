@@ -756,7 +756,7 @@ static void _708_handle_DFx_DefineWindow(cc_708_ctx *dtvcc, cc_708_service_decod
 	memcpy(window->commands, data + 1, 6);
 
 	if (window->visible)
-		_708_window_update_time_show(window, timing);
+		_708_window_update_time_show(window, dtvcc->timing);
 	if (!window->memory_reserved) {
 		for (int i = 0; i < CCX_708_MAX_ROWS; i++) {
 			free(window->rows[i]);
