@@ -3,6 +3,7 @@
 #include "ccaption708_dec.h"
 #include "cc_decoder_common.h"
 #include "avcodec.h"
+#include "libavutil/frame.h"
 
 #define _CC_DEBUG
 
@@ -1752,10 +1753,9 @@ static void cc_708_process_current_data(cc_708_ctx *cc708ctx) {
 
 		if (service_number > 0 && cc708ctx->services_active[service_number - 1]) {
                     cc708ctx->fsd->svcs_dp_708.service_number[service_number - 1] = service_number;
-                    if (service_number == 1)
-                     (&cc708ctx->fsd->svcs_dp_708.svc_dps[service_number - 1])->svc_type = Primary_SVC;
-                    else
-                      (&cc708ctx->fsd->svcs_dp_708.svc_dps[service_number - 1])->svc_type = Secondary_SVC;
+                    if (service_number == 0)
+                     (&cc708ctx->fsd->svcs_dp_708.svc_dps[service_number - 1])->svc_type = (SVC_TYPE)service_number;
+    
                     cc_708_process_service_block(cc708ctx,
                         &cc708ctx->decoders[service_number - 1], pos, block_length);
 
