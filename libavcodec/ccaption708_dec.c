@@ -1034,7 +1034,9 @@ static void init_data_points(AVFrameSideData *fsd) {
     int k = 0;
     chan_dp->dtvcc_packing_matched = 1;
     chan_dp->sequence_continuity = 1;
-
+    chan_dp->packet_errors = 0;
+    chan_dp->packet_loss = 0;
+    
     svc_dp->abnormal_service_block = 0;
 
     for(; k < CC_708_MAX_SERVICES; k++) {
@@ -1052,15 +1054,19 @@ static int cc_708_init(AVCodecContext *avctx) {
     CCaption708SubContext *ccsubctxt = (CCaption708SubContext*)avctx->priv_data;
     cc_708_service_decoder *decoder;
     cc_708_ctx *ctx = (cc_708_ctx *)malloc(sizeof(cc_708_ctx));
+    
+    if (!ctx)
+        return -1;
+    
     ccsubctxt->cc_decode = init_cc_decode();
     ctx->timing = ccsubctxt->cc_decode->timing;
     size_t k = 0;
     ccsubctxt->end_of_channel_pkt = 0;
     ctx->prev_seq = -1;
 
-    if (!ctx)
-        return -1;
-
+    
+    ctx->seq_mask = 0;
+    ctx->seqcnt = 0;
     ccsubctxt->cc708ctx = ctx;
 
     //ctx->report = opts->report;
@@ -1701,6 +1707,16 @@ static void cc_708_process_current_data(cc_708_ctx *cc708ctx) {
             cc708ctx->fsd->channel_dp_708.sequence_continuity = 0;
         }
         cc708ctx->prev_seq = seq;
+        
+        ++cc708ctx->seqcnt;
+        cc708ctx->seq_mask |= 1 << seq;
+        
+        if (cc708ctx->seqcnt == 4) {
+            cc708ctx->seqcnt = 0;
+            if (cc708ctx->seq_mask != 0x0F)
+                ++cc708ctx->fsd->channel_dp_708.packet_loss;
+            cc708ctx->seq_mask = 0;
+        }
     // Is this possible?
 	if (cc708ctx->current_packet_length != len) {
 		_708_decoders_reset(cc708ctx);
@@ -1769,6 +1785,7 @@ static void cc_708_process_current_data(cc_708_ctx *cc708ctx) {
 	if (pos != cc708ctx->current_packet + len) {
 		//"[CEA-708] ccx_708_process_current_packet:"
 		//" There was a problem with this packet, reseting\n");
+        ++cc708ctx->fsd->channel_dp_708.packet_errors;
 		_708_decoders_reset(cc708ctx);
 	}
 

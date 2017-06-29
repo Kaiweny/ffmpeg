@@ -329,6 +329,10 @@ typedef struct cc_708_ctx {
     AVFrameSideData *fsd;
     int prev_seq;
     int cur_service_number;
+    
+        
+    unsigned char seq_mask;
+    short seqcnt;
 
 } cc_708_ctx;
 

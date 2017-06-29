@@ -144,7 +144,9 @@ enum AVActiveFormatDescription {
 
 typedef struct cc_708_channel_datapoints {
     int dtvcc_packing_matched; //boolean : default value 1 else 0 
-    int sequence_continuity;    //boolean : default value 1 else 0 
+    int sequence_continuity;    //boolean : default value 1 else 0
+    size_t packet_errors;       //problem parsing channel data packet
+    size_t packet_loss;
 } cc_708_channel_datapoints;
 
 typedef enum  service_type {
