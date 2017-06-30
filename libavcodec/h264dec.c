@@ -1073,6 +1073,8 @@ static int h264_decode_cc(AVCodecContext *avctx, void *data,
             cc->expected_cc_count = 20;
         
         cc->cc708ctx->fsd = fsd;
+        cc->cc608ctx1->fsd = fsd;
+        cc->cc608ctx2->font = fsd;
         
         h->sei.a53_caption.a53_context->codec->decode(h->sei.a53_caption.a53_context,
             fsd, NULL, NULL);
