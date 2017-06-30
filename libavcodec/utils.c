@@ -2316,7 +2316,8 @@ fail:
                                                guess_correct_pts(avctx,
                                                                  picture->pts,
                                                                  picture->pkt_dts));
-            avctx->codec->decode_cc(avctx, picture, NULL);
+            if (avctx->codec->decode_cc)
+            	avctx->codec->decode_cc(avctx, picture, NULL);
 
         } else
             av_frame_unref(picture);
