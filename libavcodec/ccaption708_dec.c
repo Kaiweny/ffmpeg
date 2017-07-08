@@ -840,12 +840,11 @@ static void cc_708_clear_packet(cc_708_ctx *ctx) {
 }
 
 static void _708_decoders_reset(cc_708_ctx *dtvcc) {
-	//ccx_common_logging.debug_ftn(CCX_DMT_708, "[CEA-708] _dtvcc_decoders_reset: Resetting all decoders\n");
 
 	for (int i = 0; i < CC_708_MAX_SERVICES; i++) {
 		if (!dtvcc->services_active[i])
 			continue;
-		cc_708_windows_reset(&dtvcc->decoders[i]);
+		cc_708_windows_reset(dtvcc->decoders[i]);
 	}
 
 	cc_708_clear_packet(dtvcc);
@@ -952,7 +951,8 @@ static int cc_708_init(AVCodecContext *avctx) {
     //For now enable all services
 
     while (k < CC_708_MAX_SERVICES) {
-       ctx->services_active[k++] = 1;
+		ctx->decoders[k] = NULL;
+       ctx->services_active[k++] = 0;
     }
 
     cc_708_clear_packet(ctx);
@@ -962,20 +962,22 @@ static int cc_708_init(AVCodecContext *avctx) {
 	//ctx->report_enabled = opts->print_file_reports;
 	//ctx->timing = opts->timing;
 
-static int summm = 0;
+
 	for (int i = 0; i < CC_708_MAX_SERVICES; i++) {
 		if (!ctx->services_active[i])
 			continue;
 
-		decoder = &ctx->decoders[i];
+		/* // the following part init cc_decoder, 
+		   // move this part to where malloc decoder
+		decoder = ctx->decoders[i];
 		decoder->cc_count = 0;
 
 		for (int j = 0; j < CC_708_MAX_WINDOWS; j++)
 			decoder->windows[j].memory_reserved = 0;
 
 		cc_708_windows_reset(decoder);
+		*/
 	}
-	printf(" ++++++++++++++ sum alloc %d max bytes ------------------\n", summm);
 
     //pass option or something to enable it.
     ctx->is_active = 1;//setting->settings_dtvcc->enabled;
@@ -1235,7 +1237,7 @@ static void _708_process_ff(cc_708_service_decoder *decoder) {
 }
 
 static void _708_process_etx(cc_708_service_decoder *decoder) {
-	//it can help decoders with screen output, but could it help us?
+	
 }
 
 static void _708_window_rollup(cc_708_service_decoder *decoder,
@@ -1661,15 +1663,29 @@ static void cc_708_process_current_data(cc_708_ctx *cc708ctx) {
 			break;
 		}
 
-		if (service_number > 0 && cc708ctx->services_active[service_number - 1]) {
-                    cc708ctx->fsd->svcs_dp_708.service_number[service_number - 1] = service_number;
-                    if (service_number != 0)
-                     (&cc708ctx->fsd->svcs_dp_708.svc_dps[service_number - 1])->svc_type = (SVC_TYPE)service_number;
-    
-                    cc_708_process_service_block(cc708ctx,
-                        &cc708ctx->decoders[service_number - 1], pos, block_length);
+		if (service_number > 0 ) {
+			cc708ctx->fsd->svcs_dp_708.service_number[service_number - 1] = service_number;
+			
+			(&cc708ctx->fsd->svcs_dp_708.svc_dps[service_number - 1])->svc_type = (SVC_TYPE)service_number;
+			cc708ctx->services_active[service_number - 1] = 1;
+			
+			if(cc708ctx->decoders[service_number - 1] = NULL){
+				cc708ctx->decoders[service_number - 1] = (cc_708_service_decoder*)malloc(sizeof(cc_708_service_decoder));
 
-                }
+				// init this decoder
+				cc_708_service_decoder* decoder = cc708ctx->decoders[service_number - 1];
+				decoder->cc_count = 0;
+
+				for (int j = 0; j < CC_708_MAX_WINDOWS; j++)
+					decoder->windows[j].memory_reserved = 0;
+
+				cc_708_windows_reset(decoder);
+			}
+
+			cc_708_process_service_block(cc708ctx,
+				cc708ctx->decoders[service_number - 1], pos, block_length);
+
+		}
 		pos += block_length; // Skip data
 	}
 

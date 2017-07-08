@@ -317,7 +317,7 @@ typedef struct cc_708_ctx {
 
     //ccx_decoder_dtvcc_report *report;
 
-    cc_708_service_decoder decoders[CC_708_MAX_SERVICES];
+    cc_708_service_decoder *decoders[CC_708_MAX_SERVICES];
 
     unsigned char current_packet[CCX_708_MAX_PACKET_LENGTH];
     int current_packet_length;
