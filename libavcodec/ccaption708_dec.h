@@ -285,6 +285,7 @@ typedef struct cc_708_window {
     int64_t time_ms_hide;
 } cc_708_window;
 
+/*
 typedef struct tv_screen {
     cc_708_symbol chars[CCX_708_SCREENGRID_ROWS][CCX_708_SCREENGRID_COLUMNS];
     cc_708_pen_color pen_colors[CCX_708_SCREENGRID_ROWS][CCX_708_SCREENGRID_COLUMNS];
@@ -294,6 +295,7 @@ typedef struct tv_screen {
     unsigned int cc_count;
     int service_number;
 } tv_screen;
+*/
 
 typedef struct  cc_708_service_datapoints {
 
@@ -302,7 +304,7 @@ typedef struct  cc_708_service_datapoints {
 typedef struct cc_708_service_decoder {
     cc_708_window windows[CC_708_MAX_WINDOWS];
     int current_window;
-    tv_screen *tv;
+    //tv_screen *tv;
     int cc_count;
 } cc_708_service_decoder;
 
@@ -315,7 +317,7 @@ typedef struct cc_708_ctx {
 
     //ccx_decoder_dtvcc_report *report;
 
-    cc_708_service_decoder decoders[CC_708_MAX_SERVICES];
+    cc_708_service_decoder *decoders[CC_708_MAX_SERVICES];
 
     unsigned char current_packet[CCX_708_MAX_PACKET_LENGTH];
     int current_packet_length;
