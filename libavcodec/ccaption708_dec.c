@@ -486,7 +486,7 @@ static void _708_check_window_position(cc_708_ctx *dtvcc, cc_708_window *window)
 
 static void _708_handle_DFx_DefineWindow(cc_708_ctx *dtvcc, cc_708_service_decoder *decoder,
     int window_id, unsigned char *data, struct cc_common_timing_ctx *timing) {
-	/*
+	
 	//ccx_common_logging.debug_ftn(CCX_DMT_708, "[CEA-708] dtvcc_handle_DFx_DefineWindow: "
 	//		"W[%d], attributes: \n", window_id);
         service_data_points *dp = &dtvcc->fsd->svcs_dp_708.svc_dps[dtvcc->cur_service_number];
@@ -624,7 +624,7 @@ static void _708_handle_DFx_DefineWindow(cc_708_ctx *dtvcc, cc_708_service_decod
 			free(window->rows[i]);
 		}
 	}
-	*/
+	
 }
 
 static void _708_handle_SWA_SetWindowAttributes(cc_708_service_decoder *decoder,
@@ -1533,7 +1533,7 @@ static int _708_handle_C1(cc_708_ctx *dtvcc,
 		case C1_DF6:
 		case C1_DF7:
 			//_708_handle_DFx_DefineWindow(decoder, com.code - C1_DF0, data, dtvcc->timing); /* Window 0 to 7 */
-			//_708_handle_DFx_DefineWindow(dtvcc, decoder, com.code - C1_DF0, data, NULL);
+			_708_handle_DFx_DefineWindow(dtvcc, decoder, com.code - C1_DF0, data, NULL);
             break;
 		default:
                     dp->abnormal_control_codes = 1;
@@ -1669,7 +1669,7 @@ static void cc_708_process_current_data(cc_708_ctx *cc708ctx) {
 			(&cc708ctx->fsd->svcs_dp_708.svc_dps[service_number - 1])->svc_type = (SVC_TYPE)service_number;
 			cc708ctx->services_active[service_number - 1] = 1;
 			
-			if(cc708ctx->decoders[service_number - 1] = NULL){
+			if(cc708ctx->decoders[service_number - 1] == NULL){
 				cc708ctx->decoders[service_number - 1] = (cc_708_service_decoder*)malloc(sizeof(cc_708_service_decoder));
 
 				// init this decoder
