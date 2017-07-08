@@ -1195,6 +1195,7 @@ int process608(const unsigned char *data, int length, void *private_data, struct
 				// Ignore only the first repetition
 				context->last_c1=-1;
 				context->last_c2 = -1;
+                                context->fsd->cc608_dp.dual_control_command_check = 1;
 				continue;
 			}
 			context->last_c1 = hi;

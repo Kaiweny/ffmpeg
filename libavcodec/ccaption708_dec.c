@@ -1054,8 +1054,8 @@ static void init_data_points(AVFrameSideData *fsd) {
     fsd->cc608_dp.abnormal_pac = 0;
     fsd->cc608_dp.invalid_character = 0;
     fsd->cc608_dp.invalid_extended_character = 0;
-    
-    
+    fsd->cc608_dp.dual_control_command_check = 0;
+    fsd->cc608_dp.popon_presentation_error = 0;    
 }
 
 ////
