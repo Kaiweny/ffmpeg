@@ -584,8 +584,6 @@ static void _708_handle_DFx_DefineWindow(cc_708_ctx *dtvcc, cc_708_service_decod
 		window->pen_row = 0;
 		if (!window->memory_reserved) {
 			for (int i = 0; i < CCX_708_MAX_ROWS; i++) {
-				int temp =  CCX_708_MAX_COLUMNS * sizeof(cc_708_symbol);
-				printf("------------- alloc %d bytes ------------------\n", temp);
 				window->rows[i] = (cc_708_symbol *) malloc(CCX_708_MAX_COLUMNS * sizeof(cc_708_symbol));
 				if (!window->rows[i])
 					;//ccx_common_logging.fatal_ftn(EXIT_NOT_ENOUGH_MEMORY, "[CEA-708] dtvcc_handle_DFx_DefineWindow");
