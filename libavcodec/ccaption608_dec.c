@@ -1143,8 +1143,10 @@ int process608(const unsigned char *data, int length, void *private_data, struct
 
                 parity1 = BitsSetTable256[data[i] & 0xff];
                 parity2 = BitsSetTable256[data[i+1] & 0xff];
-                if (context)
-                    context->fsd->cc608_dp.parity_error = ~((parity1 & 1) && (parity2 & 1)); 
+                if (context){
+                    if (!(parity1 & 1) || !(parity2 & 1))
+                    context->fsd->cc608_dp.parity_error = 1;
+                }
 
 
 		hi = data[i] & 0x7F; // Get rid of parity bit
