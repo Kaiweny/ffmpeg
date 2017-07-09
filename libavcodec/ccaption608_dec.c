@@ -1099,13 +1099,21 @@ static int disCommand(unsigned char hi, unsigned char lo, cc_608_ctx *context, s
 	return wrote_to_screen;
 }
 
+static const unsigned char BitsSetTable256[256] = 
+{
+#   define B2(n) n,     n+1,     n+1,     n+2
+#   define B4(n) B2(n), B2(n+1), B2(n+1), B2(n+2)
+#   define B6(n) B4(n), B4(n+1), B4(n+1), B4(n+2)
+    B6(0), B6(1), B6(1), B6(2)
+};
+
 /* If private data is NULL, then only XDS will be processed */
 int process608(const unsigned char *data, int length, void *private_data, struct cc_subtitle *sub)
 {
 	struct ccx_decoder_608_report  *report = NULL;
 	CCaption708SubContext *dec_ctx = private_data;
 	struct cc_608_ctx *context;
-	int i;
+	int i, parity1, parity2;
 
 	if(dec_ctx->current_field == 1)
 	{
@@ -1132,6 +1140,12 @@ int process608(const unsigned char *data, int length, void *private_data, struct
 	{
 		unsigned char hi, lo;
 		int wrote_to_screen=0;
+
+                parity1 = BitsSetTable256[data[i] & 0xff];
+                parity2 = BitsSetTable256[data[i+1] & 0xff];
+                if (context)
+                    context->fsd->cc608_dp.parity_error = ~((parity1 & 1) && (parity2 & 1)); 
+
 
 		hi = data[i] & 0x7F; // Get rid of parity bit
 		lo = data[i+1] & 0x7F; // Get rid of parity bit

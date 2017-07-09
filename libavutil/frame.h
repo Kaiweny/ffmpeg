@@ -239,6 +239,7 @@ typedef struct cc_608_data_points {
     int invalid_extended_character; //bool default 0 else 1 
     int dual_control_command_check; //bool default 0 else 1
     int popon_presentation_error; //bool default 0 else 1
+    int parity_error; //bool deafult  0 else 1
 } cc_608_data_points;
 
 
