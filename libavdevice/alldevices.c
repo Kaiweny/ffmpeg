@@ -65,6 +65,7 @@ static void register_all(void)
     REGISTER_INDEV   (VFWCAP,           vfwcap);
     REGISTER_INDEV   (XCBGRAB,          xcbgrab);
     REGISTER_OUTDEV  (XV,               xv);
+    REGISTER_INDEV   (DELTACAST,        deltacast);
 
     /* external libraries */
     REGISTER_INDEV   (LIBCDIO,          libcdio);

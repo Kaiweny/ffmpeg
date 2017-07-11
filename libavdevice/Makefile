@@ -49,6 +49,7 @@ OBJS-$(CONFIG_V4L_INDEV)                 += v4l.o
 OBJS-$(CONFIG_VFWCAP_INDEV)              += vfwcap.o
 OBJS-$(CONFIG_XCBGRAB_INDEV)             += xcbgrab.o
 OBJS-$(CONFIG_XV_OUTDEV)                 += xv.o
+OBJS-$(CONFIG_DELTACAST_INDEV)           += deltacast_dec.o deltacast/Tools.o
 
 # external libraries
 OBJS-$(CONFIG_LIBCDIO_INDEV)             += libcdio.o
