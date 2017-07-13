@@ -29,6 +29,8 @@
 
 #define INITIAL_BUFFER_SIZE 32768
 
+//#define TESTING
+
 char *av_strreplace(const char *str, const char *from, const char *to);
 
 struct fragment {
@@ -124,6 +126,8 @@ struct representation {
 typedef struct DASHContext {
     const AVClass *class;
     char *base_url;
+    int nb_representations;
+    struct representation **representations;
     struct representation *cur_video;
     struct representation *cur_audio;
     uint64_t media_presentation_duration_sec;
@@ -142,6 +146,7 @@ typedef struct DASHContext {
     char *cookies;                       ///< holds HTTP cookie values set in either the initial response or as an AVOption to the HTTP protocol context
     char *headers;                       ///< holds HTTP headers set as an AVOption to the HTTP protocol context
     AVDictionary *avio_opts;
+    int rep_index;
 } DASHContext;
 
 char *av_strreplace(const char *str, const char *from, const char *to)
@@ -654,7 +659,8 @@ static int parse_manifest_representation(AVFormatContext *s, const char *url,
         type = get_content_type(adaptionset_node);
     if (type == AVMEDIA_TYPE_UNKNOWN) {
         av_log(s, AV_LOG_VERBOSE, "Parsing '%s' - skipp not supported representation type\n", url);
-    } else if ((type == AVMEDIA_TYPE_VIDEO && !c->cur_video) || (type == AVMEDIA_TYPE_AUDIO && !c->cur_audio)) {
+    //} else if ((type == AVMEDIA_TYPE_VIDEO && !c->cur_video) || (type == AVMEDIA_TYPE_AUDIO && !c->cur_audio)) {
+	} else if ((type == AVMEDIA_TYPE_VIDEO) || (type == AVMEDIA_TYPE_AUDIO)) {
         // convert selected representation to our internal struct
         rep = av_mallocz(sizeof(struct representation));
         if (!rep) {
@@ -715,6 +721,7 @@ static int parse_manifest_representation(AVFormatContext *s, const char *url,
                         check_full_number(rep);
                     } else if (av_stristr(temp_string, "$Time")) {
                         rep->tmp_url_type = TMP_URL_TYPE_TIME; /* Time-Based. */
+                        check_full_number(rep);
                     } else {
                         temp_string = NULL;
                     }
@@ -803,6 +810,10 @@ static int parse_manifest_representation(AVFormatContext *s, const char *url,
                 rep->rep_idx = audio_rep_idx;
                 c->cur_audio = rep;
             }
+            #ifdef TESTING
+            av_log(NULL, AV_LOG_ERROR, "Adding One Representation\n");
+            #endif
+            dynarray_add(&c->representations, &c->nb_representations, rep);
         }
     }
 
@@ -821,7 +832,7 @@ end:
 static int parse_manifest_adaptationset(AVFormatContext *s, const char *url,
                                         xmlNodePtr adaptionset_node,
                                         xmlNodePtr mpd_baseurl_node,
-                                        xmlNodePtr period_baseurl_node)
+                                        xmlNodePtr period_baseurl_node, int repIndex)
 {
     int ret = 0;
     xmlNodePtr fragment_template_node = NULL;
@@ -830,6 +841,7 @@ static int parse_manifest_adaptationset(AVFormatContext *s, const char *url,
     xmlNodePtr node = NULL;
 
     node = xmlFirstElementChild(adaptionset_node);
+    int nb_representation = 0;
     while (node) {
         if (!xmlStrcmp(node->name, (const xmlChar *)"SegmentTemplate")) {
             fragment_template_node = node;
@@ -838,6 +850,12 @@ static int parse_manifest_adaptationset(AVFormatContext *s, const char *url,
         } else if (!xmlStrcmp(node->name, (const xmlChar *)"BaseURL")) {
             adaptionset_baseurl_node = node;
         } else if (!xmlStrcmp(node->name, (const xmlChar *)"Representation")) {
+			#ifdef TESTING
+			av_log(NULL, AV_LOG_ERROR, "Representation: %d\n", ++nb_representation);
+			#endif
+			//av_log(NULL, AV_LOG_WARNING, "AB: Parsing Representation\n");
+			//for (int i = 0; i < repIndex; i++)
+			//	node = xmlNextElementSibling(node);
             ret = parse_manifest_representation(s, url, node,
                                                 adaptionset_node,
                                                 mpd_baseurl_node,
@@ -858,6 +876,10 @@ static int parse_manifest_adaptationset(AVFormatContext *s, const char *url,
 static int parse_manifest(AVFormatContext *s, const char *url, AVIOContext *in)
 {
     DASHContext *c = s->priv_data;
+    int repIndex = c->rep_index;
+    #ifdef TESTING
+    av_log(NULL, AV_LOG_ERROR, "(repIndex, rep_index) = (%d, %d)\n", repIndex, c->rep_index);
+    #endif
     int ret = 0;
     int close_in = 0;
     uint8_t *new_url = NULL;
@@ -967,8 +989,12 @@ static int parse_manifest(AVFormatContext *s, const char *url, AVIOContext *in)
 
         // at now we can handle only one period, with the longest duration
         node = xmlFirstElementChild(node);
+        int nb_periods = 0;
         while (node) {
             if (!xmlStrcmp(node->name, (const xmlChar *)"Period")) {
+				#ifdef TESTING
+				av_log(NULL, AV_LOG_ERROR, "Period: %d\n", ++nb_periods);
+				#endif
                 perdiod_duration_sec = 0;
                 perdiod_start_sec = 0;
                 attr = node->properties;
@@ -999,11 +1025,15 @@ static int parse_manifest(AVFormatContext *s, const char *url, AVIOContext *in)
         }
 
         adaptionset_node = xmlFirstElementChild(period_node);
+        int nb_adaptationsets = 0;
         while (adaptionset_node) {
             if (!xmlStrcmp(adaptionset_node->name, (const xmlChar *)"BaseURL")) {
                 period_baseurl_node = adaptionset_node;
             } else if (!xmlStrcmp(adaptionset_node->name, (const xmlChar *)"AdaptationSet")) {
-                parse_manifest_adaptationset(s, url, adaptionset_node, mpd_baseurl_node, period_baseurl_node);
+				#ifdef TESTING
+				av_log(NULL, AV_LOG_ERROR, "Adaptaion Set: %d\n", ++nb_adaptationsets);
+				#endif
+                parse_manifest_adaptationset(s, url, adaptionset_node, mpd_baseurl_node, period_baseurl_node, repIndex);
             }
             adaptionset_node = xmlNextElementSibling(adaptionset_node);
         }
@@ -1601,6 +1631,21 @@ static int dash_read_header(AVFormatContext *s)
     }
 
     /* Open the demuxer for curent video and current audio components if available */
+    int repIndex;
+    for (repIndex = 0; repIndex < c->nb_representations; repIndex++) {
+		if (!ret && c->representations[repIndex]) {
+			ret = open_demux_for_component(s, c->representations[repIndex]);
+			if (!ret) {
+				c->representations[repIndex]->stream_index = stream_index;
+				++stream_index;
+			} else {
+				free_representation(c->representations[repIndex]);
+				c->representations[repIndex] = NULL;
+			}
+		}
+	}
+    
+    /*
     if (!ret && c->cur_video) {
         ret = open_demux_for_component(s, c->cur_video);
         if (!ret) {
@@ -1611,7 +1656,9 @@ static int dash_read_header(AVFormatContext *s)
             c->cur_video = NULL;
         }
     }
+    */
 
+	/*
     if (!ret && c->cur_audio) {
         ret = open_demux_for_component(s, c->cur_audio);
         if (!ret) {
@@ -1622,6 +1669,7 @@ static int dash_read_header(AVFormatContext *s)
             c->cur_audio = NULL;
         }
     }
+    */
 
     if (!stream_index) {
         ret = AVERROR_INVALIDDATA;
@@ -1636,13 +1684,23 @@ static int dash_read_header(AVFormatContext *s)
             goto fail;
         }
 
+		int repIndex;
+		for (repIndex = 0; repIndex < c->nb_representations; repIndex++) {
+			if (c->representations[repIndex])
+				av_program_add_stream_index(s, 0, c->representations[repIndex]->stream_index);
+		}
+
+		/*
         if (c->cur_video) {
             av_program_add_stream_index(s, 0, c->cur_video->stream_index);
         }
+        */
 
+		/*
         if (c->cur_audio) {
             av_program_add_stream_index(s, 0, c->cur_audio->stream_index);
         }
+        */
     }
 
     return 0;
@@ -1804,8 +1862,13 @@ static int dash_probe(AVProbeData *p)
 
 #define OFFSET(x) offsetof(DASHContext, x)
 #define FLAGS AV_OPT_FLAG_DECODING_PARAM
+//static const AVOption dash_options[] = {
+//    {NULL}
+//};
+
 static const AVOption dash_options[] = {
-    {NULL}
+    { "rep_index", "representation index"  , OFFSET(rep_index), AV_OPT_TYPE_INT, { .i64 = 0   }, INT_MIN, INT_MAX, FLAGS },
+    { NULL },
 };
 
 static const AVClass dash_class = {
