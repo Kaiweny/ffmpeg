@@ -28,6 +28,7 @@
 #include "avio_internal.h"
 
 #define INITIAL_BUFFER_SIZE 32768
+#define MAX_FIELD_LEN 64
 
 //#define TESTING
 
@@ -121,6 +122,14 @@ struct representation {
     uint32_t init_sec_buf_read_offset;
     int fix_multiple_stsd_order;
     int64_t cur_timestamp;
+    
+    char id[MAX_FIELD_LEN];
+    char codecs[MAX_FIELD_LEN]; 
+    int height;
+    int width;
+    int frameRate;
+    char scanType[MAX_FIELD_LEN];
+    int bandwidth;
 };
 
 typedef struct DASHContext {
@@ -646,6 +655,11 @@ static int parse_manifest_representation(AVFormatContext *s, const char *url,
     xmlNodePtr representation_node = node;
     xmlChar *rep_id_val = xmlGetProp(representation_node, "id");
     xmlChar *rep_bandwidth_val = xmlGetProp(representation_node, "bandwidth");
+    xmlChar *rep_codecs_val = xmlGetProp(representation_node, "codecs");
+    xmlChar *rep_height_val = xmlGetProp(representation_node, "height");
+    xmlChar *rep_width_val = xmlGetProp(representation_node, "width");
+    xmlChar *rep_frameRate_val = xmlGetProp(representation_node, "frameRate");
+    xmlChar *rep_scanType_val = xmlGetProp(representation_node, "scanType");
     enum AVMediaType type = AVMEDIA_TYPE_UNKNOWN;
 
     // try get information from representation
@@ -667,6 +681,40 @@ static int parse_manifest_representation(AVFormatContext *s, const char *url,
             ret = AVERROR(ENOMEM);
             goto end;
         }
+        
+        #ifdef TESTING
+        av_log(NULL, AV_LOG_ERROR, "rep(%s,%s,%s,%s,%s,%s,%s)\n", (char *)rep_id_val, (char *)rep_codecs_val, (char *)rep_height_val, (char *)rep_width_val, (char *)rep_frameRate_val, (char *)rep_scanType_val, (char *)rep_bandwidth_val);
+        #endif //TESTING
+        //rep->id[] = "";
+        if (rep_id_val)
+			strcpy(rep->id, rep_id_val);
+			//rep->id[0] = rep_id_val;
+		//rep->codecs[] = "";
+		if (rep_codecs_val)
+			strcpy(rep->codecs, rep_codecs_val);
+			//rep->codecs[0] = rep_codecs_val;
+		rep->height = 0;
+		if (rep_height_val)
+			rep->height = strtol((char *)rep_height_val, NULL, 0);
+		rep->width = 0;
+		if (rep_width_val)
+			rep->width = strtol((char *)rep_width_val, NULL, 0);
+		rep->frameRate = 0;
+		if (rep_frameRate_val)
+			rep->frameRate = strtol((char *)rep_frameRate_val, NULL, 0);
+		//rep->scanType[] = "";
+		if (rep_scanType_val)
+			strcpy(rep->scanType, rep_scanType_val);
+			//rep->scanType[0] = rep_scanType_val;
+		rep->bandwidth = 0;
+		if (rep_bandwidth_val)
+			rep->bandwidth = strtol((char *)rep_bandwidth_val, NULL, 0);
+		#ifdef TESTING
+		av_log(NULL, AV_LOG_ERROR, "rep(%s,%s,%d,%d,%d,%s,%d)\n", rep->id, rep->codecs, rep->height, rep->width, rep->frameRate, rep->scanType, rep->bandwidth);
+		#endif //TESTING
+		
+        
+       
         representation_segmenttemplate_node = find_child_node_by_name(representation_node, "SegmentTemplate");
         representation_baseurl_node = find_child_node_by_name(representation_node, "BaseURL");
         representation_segmentlist_node = find_child_node_by_name(representation_node, "SegmentList");
@@ -721,7 +769,9 @@ static int parse_manifest_representation(AVFormatContext *s, const char *url,
                         check_full_number(rep);
                     } else if (av_stristr(temp_string, "$Time")) {
                         rep->tmp_url_type = TMP_URL_TYPE_TIME; /* Time-Based. */
+                        printf("rep->url_template: %s\n", rep->url_template);
                         check_full_number(rep);
+                        printf("rep->url_template: %s\n", rep->url_template);
                     } else {
                         temp_string = NULL;
                     }
@@ -1172,6 +1222,7 @@ static struct fragment *get_current_fragment(struct representation *pls)
         }
     }
     if (c->is_live) {
+		printf("get_current_fragment (is_live)\n");
         while (1) {
             min_seq_no = calc_min_seg_no(pls->parent, pls);
             max_seq_no = calc_max_seg_no(pls->parent, pls);
@@ -1630,9 +1681,12 @@ static int dash_read_header(AVFormatContext *s)
         s->duration = (int64_t) c->media_presentation_duration_sec * AV_TIME_BASE;
     }
 
-    /* Open the demuxer for curent video and current audio components if available */
+    /* Open the demuxer for all video and audio components if available */
     int repIndex;
     for (repIndex = 0; repIndex < c->nb_representations; repIndex++) {
+		#ifdef TESTING
+		av_log(NULL, AV_LOG_ERROR, "rep[%d]->bandwidth = %d\n", repIndex, c->representations[repIndex]->bandwidth);
+		#endif //TESTING
 		if (!ret && c->representations[repIndex]) {
 			ret = open_demux_for_component(s, c->representations[repIndex]);
 			if (!ret) {
