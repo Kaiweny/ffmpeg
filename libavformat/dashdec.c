@@ -30,6 +30,18 @@
 #define INITIAL_BUFFER_SIZE 32768
 #define MAX_FIELD_LEN 64
 
+// Defines to assist in printing in different colors. 
+// Note: Important to have %s where you want to initiate the color change
+// Example: printf( "%sHello, Shahzad\n", blue_str );
+#define normal_str  "\x1B[0m"
+#define red_str  "\x1B[31m"
+#define green_str  "\x1B[32m"
+#define yellow_str  "\x1B[33m"
+#define blue_str  "\x1B[34m"
+#define mag_str  "\x1B[35m"
+#define cyan_str  "\x1B[36m"
+#define white_str  "\x1B[37m"
+
 //#define TESTING
 
 char *av_strreplace(const char *str, const char *from, const char *to);
@@ -169,6 +181,52 @@ typedef struct DASHContext {
     AVDictionary *avio_opts;
     int rep_index;
 } DASHContext;
+
+
+// prints the representation structure in green. @Shahzad for help!
+static void print_rep_struct( struct representation *v ) {
+    // For testing
+    printf( "\n\n%sstruct representation *v {\n", green_str );
+
+    printf( "%s    char *url_template = %s,\n", green_str, v->url_template );
+    printf( "%s    AVIOContext *input = %d,\n", green_str, v->input );
+    printf( "%s    enum DASHTmplUrlType tmp_url_type = %d,\n", green_str, v->tmp_url_type );
+    printf( "%s    int rep_idx = %d,\n", green_str, v->rep_idx );
+    printf( "%s    int rep_count = %d,\n", green_str, v->rep_count );
+    printf( "%s    int stream_index = %d,\n", green_str, v->stream_index );
+    printf( "%s    enum AVMediaType type = %d,\n", green_str, v->type );
+    printf( "%s    int64_t target_duration = %d,\n", green_str, v->target_duration );
+    printf( "%s    int n_fragments = %d,\n", green_str, v->n_fragments );
+    printf( "%s    int n_timelines = %d,\n", green_str, v->n_timelines );
+    //printf("%s    int64_t first_seq_no_in_representation = %d,\n", green_str, v->first_seq_no_in_representation );
+    printf( "%s    int64_t first_seq_no = %d,\n", green_str, v->first_seq_no );
+    printf( "%s    int64_t last_seq_no = %d,\n", green_str, v->last_seq_no );
+    printf( "%s    int64_t fragment_duration = %d,\n", green_str, v->fragment_duration );
+    printf( "%s    int64_t fragment_timescale = %d,\n", green_str, v->fragment_timescale );
+    printf( "%s    int64_t cur_seq_no = %d,\n", green_str, v->cur_seq_no );
+    printf( "%s    int64_t cur_seg_offset = %d,\n", green_str, v->cur_seg_offset );
+    printf( "%s    int64_t cur_seg_size = %d,\n", green_str, v->cur_seg_size );
+    printf( "%s    uint32_t init_sec_buf_size = %d,\n", green_str, v->init_sec_buf_size );
+    printf( "%s    uint32_t init_sec_data_len = %d,\n", green_str, v->init_sec_data_len );
+    printf( "%s    uint32_t init_sec_buf_read_offset = %d,\n", green_str, v->init_sec_buf_read_offset );
+    printf( "%s    int fix_multiple_stsd_order = %d,\n", green_str, v->fix_multiple_stsd_order );
+    printf( "%s    int64_t cur_timestamp = %d\n", green_str, v->cur_timestamp );
+
+    //if ( (v->cur_seg_size) != -1 ) 
+    { // Print the cur_seg within
+        printf( "\n\n%s    struct fragment *cur_seg; {\n", green_str );
+
+        printf( "%s        int64_t url_offset = %d,\n", green_str, v->url_template );
+        printf( "%s        int64_t size = %d,\n", green_str, v->tmp_url_type );
+        printf( "%s        char *url = %s,\n", green_str, v->rep_idx );
+
+        printf( "%s    }\n", green_str );
+    }
+
+    printf( "%s}\n\n", green_str );
+    // End for testing prints
+}
+
 
 char *av_strreplace(const char *str, const char *from, const char *to)
 {
@@ -1266,18 +1324,23 @@ static struct fragment *get_current_fragment(struct representation *pls)
 
     if (pls->n_fragments > 0) {
         if (pls->cur_seq_no < pls->n_fragments) {
+            
             seg_ptr = pls->fragments[pls->cur_seq_no];
             seg = av_mallocz(sizeof(struct fragment));
+            
             if (!seg) {
                 return NULL;
             }
+            
             seg->url = av_strdup(seg_ptr->url);
             if (!seg->url) {
                 av_free(seg);
                 return NULL;
             }
+            
             seg->size = seg_ptr->size;
             seg->url_offset = seg_ptr->url_offset;
+            
             return seg;
         }
     }
@@ -1291,18 +1354,25 @@ static struct fragment *get_current_fragment(struct representation *pls)
 
             if (pls->cur_seq_no <= min_seq_no) {
                 av_log(pls->parent, AV_LOG_VERBOSE, "old fragment: cur[%"PRId64"] min[%"PRId64"] max[%"PRId64"], playlist %d\n",
-                       (int64_t)pls->cur_seq_no, min_seq_no, max_seq_no, (int)pls->rep_idx);
+                (int64_t)pls->cur_seq_no, min_seq_no, max_seq_no, (int)pls->rep_idx);
                 pls->cur_seq_no = calc_cur_seg_no(pls->parent, pls);
             //} else if (pls->cur_seq_no > max_seq_no) {
-            } else if ( ( (pls->tmp_url_type == TMP_URL_TYPE_NUMBER) && (pls->cur_seq_no >= max_seq_no ) ) ||
-                      ( (pls->tmp_url_type == TMP_URL_TYPE_TIME) && (pls->cur_seq_no > max_seq_no ) ) ) {
+            } 
+
+            else if ( // Hack to make both cases work @ShahzadLone for info! 
+                      ( ( pls->tmp_url_type == TMP_URL_TYPE_NUMBER ) && ( pls->cur_seq_no >= max_seq_no ) ) ||
+                      ( ( pls->tmp_url_type == TMP_URL_TYPE_TIME ) && ( pls->cur_seq_no > max_seq_no ) ) 
+                      ) {
                 av_log(pls->parent, AV_LOG_VERBOSE, "new fragment: min[%"PRId64"] max[%"PRId64"], playlist %d\n",
-                       min_seq_no, max_seq_no, (int)pls->rep_idx);
+                min_seq_no, max_seq_no, (int)pls->rep_idx);
                 av_usleep(1000);
                 continue;
-            }
+            } // End of Hack case
+
             break;
-        }
+        
+        } // End of while(1) loop.
+
         seg = av_mallocz(sizeof(struct fragment));
         if (!seg) {
             return NULL;
@@ -1540,13 +1610,8 @@ restart:
     if (!v->input) {
         free_fragment(&v->cur_seg);
 
-
-
-
 		// step1. get reload interval
-		int64_t reload_interval = v->n_timelines > 0 ?
-							v->timelines[v->n_timelines-1]->d :
-							v->target_duration;
+		int64_t reload_interval = (v->n_timelines > 0) ? ( v->timelines[v->n_timelines-1]->d ) : ( v->target_duration ) ;
 		//int repeat_time = v->timelines[v->n_timelines-1]->r;
 		//printf("reload: %" PRId64 "\n", reload_interval);
 
@@ -1559,15 +1624,15 @@ reload:
 
 
 		if ( //v->type == AVMEDIA_TYPE_VIDEO &&
-        //repeat_time &&
-         v->first_seq_no_in_representation &&
-         v->cur_seq_no - v->first_seq_no_in_representation > 10 ) {
+             //repeat_time &&
+             v->first_seq_no_in_representation &&
+             v->cur_seq_no - v->first_seq_no_in_representation > 10 ) {
 
-			AVFormatContext* fmtctx = v->parent;
-			printf("require reload-------------------------------\n");
-			if ((ret = parse_manifest(fmtctx, fmtctx->filename, NULL)) < 0) {
-				printf("failed: &&&&&&&&&&&& %d\n", ret);
-				return ret;
+			    AVFormatContext* fmtctx = v->parent;
+			    printf("require reload-------------------------------\n");
+			    if ( ( ret = parse_manifest(fmtctx, fmtctx->filename, NULL ) ) < 0 ) {
+				    printf("failed: &&&&&&&&&&&& %d\n", ret);
+				    return ret;
 			}
 
 			c->cur_video->first_seq_no_in_representation =
