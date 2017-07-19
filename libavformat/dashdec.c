@@ -122,21 +122,21 @@ struct representation {
     uint32_t init_sec_buf_read_offset;
     int fix_multiple_stsd_order;
     int64_t cur_timestamp;
-    
+
     /**
 	 *  record the sequence number of the first segment
-	 *  in current timeline. 
-	 *  Since the problem mpd availabilityStartTime is UTC epoch 
+	 *  in current timeline.
+	 *  Since the problem mpd availabilityStartTime is UTC epoch
 	 *  starting time, the cur_seq_no is already big number
-	 *  get_fragment_start_time use local counter to compare 
-	 *  with cur_seq_no which then blow up the result, it always 
+	 *  get_fragment_start_time use local counter to compare
+	 *  with cur_seq_no which then blow up the result, it always
 	 *  return the last segment timestamp in the timeline.
 	 *  Use this temporary variable to track the first seq_no.
-	 */ 
+	 */
     int64_t first_seq_no_in_representation;
-    
+
     char id[MAX_FIELD_LEN];
-    char codecs[MAX_FIELD_LEN]; 
+    char codecs[MAX_FIELD_LEN];
     int height;
     int width;
     int frameRate;
@@ -688,24 +688,24 @@ static int parse_manifest_representation(AVFormatContext *s, const char *url,
     //} else if ((type == AVMEDIA_TYPE_VIDEO && !c->cur_video) || (type == AVMEDIA_TYPE_AUDIO && !c->cur_audio)) {
 	} else if ((type == AVMEDIA_TYPE_VIDEO) || (type == AVMEDIA_TYPE_AUDIO)) {
         // convert selected representation to our internal struct
-        
+
         char temp_rep_id[MAX_FIELD_LEN];
         strcpy(temp_rep_id, rep_id_val);
         for (int i_rep = 0; i_rep < c->nb_representations; i_rep++){
-			if (strcmp(c->representations[i_rep]->id, temp_rep_id) == 0){ // Representation already exists (Just a reload)
-				av_log(NULL, AV_LOG_ERROR, "Representation Already Exists\n");
-				rep = c->representations[i_rep];
-			}
-		}
+          if (strcmp(c->representations[i_rep]->id, temp_rep_id) == 0){ // Representation already exists (Just a reload)
+			            av_log(NULL, AV_LOG_ERROR, "Representation Already Exists\n");
+                  rep = c->representations[i_rep];
+          }
+        }
 		if (!rep) // New Representation
 			rep = av_mallocz(sizeof(struct representation));
-        
+
         //rep = av_mallocz(sizeof(struct representation));
         if (!rep) {
             ret = AVERROR(ENOMEM);
             goto end;
         }
-        
+
         #ifdef TESTING
         av_log(NULL, AV_LOG_ERROR, "rep(%s,%s,%s,%s,%s,%s,%s)\n", (char *)rep_id_val, (char *)rep_codecs_val, (char *)rep_height_val, (char *)rep_width_val, (char *)rep_frameRate_val, (char *)rep_scanType_val, (char *)rep_bandwidth_val);
         #endif //TESTING
@@ -736,9 +736,9 @@ static int parse_manifest_representation(AVFormatContext *s, const char *url,
 		#ifdef TESTING
 		av_log(NULL, AV_LOG_ERROR, "rep(%s,%s,%d,%d,%d,%s,%d)\n", rep->id, rep->codecs, rep->height, rep->width, rep->frameRate, rep->scanType, rep->bandwidth);
 		#endif //TESTING
-		
-        
-       
+
+
+
         representation_segmenttemplate_node = find_child_node_by_name(representation_node, "SegmentTemplate");
         representation_baseurl_node = find_child_node_by_name(representation_node, "BaseURL");
         representation_segmentlist_node = find_child_node_by_name(representation_node, "SegmentList");
@@ -820,13 +820,13 @@ static int parse_manifest_representation(AVFormatContext *s, const char *url,
             if (!fragment_timeline_node)
                 fragment_timeline_node = find_child_node_by_name(fragment_template_node, "SegmentTimeline");
             if (fragment_timeline_node) {
-				
+
 				// On reload, if the new MPD contain segmetntimeline node, clean up the existing
 				// timeline by set the array size counter to 0.
-				if (rep->n_timelines){
+				if (rep->n_timelines && c->is_live){
 					rep->n_timelines = 0;
 				}
-				
+
                 fragment_timeline_node = xmlFirstElementChild(fragment_timeline_node);
                 while (fragment_timeline_node) {
                     ret = parse_manifest_segmenttimeline(s, rep, fragment_timeline_node);
@@ -1193,6 +1193,7 @@ static int64_t calc_max_seg_no(AVFormatContext *s, struct representation *pls)
 
     if (c->is_live) {
         num = pls->first_seq_no + (((get_current_time_in_sec() - c->availability_start_time_sec)) * pls->fragment_timescale)  / pls->fragment_duration;
+        //num = pls->cur_seq_no + (((get_current_time_in_sec() - c->availability_start_time_sec)) * pls->fragment_timescale)  / pls->fragment_duration;
     } else {
         if (pls->n_fragments) {
             num = pls->first_seq_no + pls->n_fragments - 1;
@@ -1216,14 +1217,15 @@ static int64_t get_fragment_start_time(struct representation *pls, int64_t cur_s
     int64_t num = 0;
     int64_t startTime = 0;
 
-	// dirty hack to initial,
-	// For unknown reason, either debug build or ffmpeg init the field 
-	// to 0. 
-	if (!pls->first_seq_no_in_representation){
-		pls->first_seq_no_in_representation = (((get_current_time_in_sec() - c->availability_start_time_sec) - c->presentation_delay_sec) * pls->fragment_timescale) / pls->fragment_duration;
-	}
-	num = pls->first_seq_no_in_representation;
-
+    if (c->is_live){
+      // dirty hack to initial,
+      // For unknown reason, either debug build or ffmpeg init the field
+      // to 0.
+      if (!pls->first_seq_no_in_representation){
+      	pls->first_seq_no_in_representation = (((get_current_time_in_sec() - c->availability_start_time_sec) - c->presentation_delay_sec) * pls->fragment_timescale) / pls->fragment_duration;
+      }
+      num = pls->first_seq_no_in_representation;
+    }
 
     if (pls->n_timelines) {
         for (i = 0; i < pls->n_timelines; ++i) {
@@ -1285,7 +1287,9 @@ static struct fragment *get_current_fragment(struct representation *pls)
                 av_log(pls->parent, AV_LOG_VERBOSE, "old fragment: cur[%"PRId64"] min[%"PRId64"] max[%"PRId64"], playlist %d\n",
                        (int64_t)pls->cur_seq_no, min_seq_no, max_seq_no, (int)pls->rep_idx);
                 pls->cur_seq_no = calc_cur_seg_no(pls->parent, pls);
-            } else if (pls->cur_seq_no > max_seq_no) {
+            //} else if (pls->cur_seq_no > max_seq_no) {
+            } else if ( ( (pls->tmp_url_type == TMP_URL_TYPE_NUMBER) && (pls->cur_seq_no >= max_seq_no ) ) ||
+                      ( (pls->tmp_url_type == TMP_URL_TYPE_TIME) && (pls->cur_seq_no > max_seq_no ) ) ) {
                 av_log(pls->parent, AV_LOG_VERBOSE, "new fragment: min[%"PRId64"] max[%"PRId64"], playlist %d\n",
                        min_seq_no, max_seq_no, (int)pls->rep_idx);
                 av_usleep(1000);
@@ -1529,15 +1533,15 @@ static int read_data(void *opaque, uint8_t *buf, int buf_size)
 restart:
     if (!v->input) {
         free_fragment(&v->cur_seg);
-        
-        
-        
-        
-		// step1. get reload interval	
+
+
+
+
+		// step1. get reload interval
 		int64_t reload_interval = v->n_timelines > 0 ?
-							v->timelines[v->n_timelines-1]->d : 
+							v->timelines[v->n_timelines-1]->d :
 							v->target_duration;
-		int repeat_time = v->timelines[v->n_timelines-1]->r; 
+		//int repeat_time = v->timelines[v->n_timelines-1]->r;
 		//printf("reload: %" PRId64 "\n", reload_interval);
 
 reload:
@@ -1547,10 +1551,11 @@ reload:
 	//			 repeat_time
 	//			);
 
-		if (v->type == AVMEDIA_TYPE_VIDEO &&
-			 repeat_time 
-			&& v->first_seq_no_in_representation
-			&& v->cur_seq_no - v->first_seq_no_in_representation > 100) {
+
+		if ( //v->type == AVMEDIA_TYPE_VIDEO &&
+        //repeat_time &&
+         v->first_seq_no_in_representation &&
+         v->cur_seq_no - v->first_seq_no_in_representation > 10 ) {
 
 			AVFormatContext* fmtctx = v->parent;
 			printf("require reload-------------------------------\n");
@@ -1559,14 +1564,14 @@ reload:
 				return ret;
 			}
 
-			c->cur_video->first_seq_no_in_representation = 
+			c->cur_video->first_seq_no_in_representation =
 				((( get_current_time_in_sec() - c->availability_start_time_sec) - c->presentation_delay_sec) * c->cur_video->fragment_timescale) / c->cur_video->fragment_duration;
 		}
-        
-        
-        
-        
-        
+
+
+
+
+
         v->cur_seg = get_current_fragment(v);
         if (!v->cur_seg) {
             ret = AVERROR_EOF;
@@ -1793,7 +1798,7 @@ static int dash_read_header(AVFormatContext *s)
 			}
 		}
 	}
-    
+
     /*
     if (!ret && c->cur_video) {
         ret = open_demux_for_component(s, c->cur_video);
