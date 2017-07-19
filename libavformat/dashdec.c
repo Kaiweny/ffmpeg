@@ -793,9 +793,13 @@ static int parse_manifest_representation(AVFormatContext *s, const char *url,
                         check_full_number(rep);
                     } else if (av_stristr(temp_string, "$Time")) {
                         rep->tmp_url_type = TMP_URL_TYPE_TIME; /* Time-Based. */
+                        #ifdef TESTING
                         printf("rep->url_template: %s\n", rep->url_template);
+                        #endif //TESTING
                         check_full_number(rep);
+                        #ifdef TESTING
                         printf("rep->url_template: %s\n", rep->url_template);
+                        #endif //TESTING
                     } else {
                         temp_string = NULL;
                     }
@@ -1278,7 +1282,9 @@ static struct fragment *get_current_fragment(struct representation *pls)
         }
     }
     if (c->is_live) {
+		#ifdef TESTING
 		printf("get_current_fragment (is_live)\n");
+		#endif //TESTING
         while (1) {
             min_seq_no = calc_min_seg_no(pls->parent, pls);
             max_seq_no = calc_max_seg_no(pls->parent, pls);
@@ -1745,7 +1751,18 @@ static int open_demux_for_component(AVFormatContext *s, struct representation *p
             goto fail;
         }
         st->id = i;
+        
+        if (pls->ctx->streams[i]->codecpar->format == AV_PIX_FMT_NONE)
+			pls->ctx->streams[i]->codecpar->format = AV_PIX_FMT_YUV420P; //DEFAULT PIX FORMAT
+		if (pls->ctx->streams[i]->codec->pix_fmt == AV_PIX_FMT_NONE)
+			pls->ctx->streams[i]->codec->pix_fmt = AV_PIX_FMT_YUV420P; //DEFAULT PIX FORMAT
         avcodec_parameters_copy(st->codecpar, pls->ctx->streams[i]->codecpar);
+        avcodec_copy_context(st->codec, pls->ctx->streams[i]->codec);
+        #ifdef TESTING
+        av_log(NULL, AV_LOG_ERROR, "st->codec->pix_fmt = %d\n", st->codec->pix_fmt);
+        av_log(NULL, AV_LOG_ERROR, "st->codecpar->format = %d\n", st->codecpar->format);
+        #endif //TESTING
+        
         avpriv_set_pts_info(st, ist->pts_wrap_bits, ist->time_base.num, ist->time_base.den);
     }
 
