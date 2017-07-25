@@ -30,8 +30,6 @@
 #define INITIAL_BUFFER_SIZE 32768
 #define MAX_FIELD_LEN 64
 
- #define TESTING
-
 // Defines to assist in printing in different colors. 
 // Note: Important to have %s where you want to initiate the color change
 // Example: printf( "%sHello, Shahzad\n", blue_str );
@@ -44,7 +42,7 @@
 #define cyan_str  "\x1B[36m"
 #define white_str  "\x1B[37m"
 
-//#define TESTING
+#define PRINTING
 
 char *av_strreplace(const char *str, const char *from, const char *to);
 
@@ -155,7 +153,10 @@ struct representation {
     int width;
     int frameRate;
     char scanType[MAX_FIELD_LEN];
+    char mimeType[MAX_FIELD_LEN];
     int bandwidth;
+
+    int needed;
 };
 
 typedef struct DASHContext {
@@ -182,7 +183,38 @@ typedef struct DASHContext {
     char *headers;                       ///< holds HTTP headers set as an AVOption to the HTTP protocol context
     AVDictionary *avio_opts;
     int rep_index;
+    char *selected_reps;
 } DASHContext;
+
+
+// checks if representation is among selected
+static int is_rep_selected(DASHContext *c, int rep_idx) {
+    if ((c->selected_reps != NULL) && (c->selected_reps[0] == '\0')) {// Default value is empty so all representations are selected
+        #ifdef PRINTING
+        av_log(NULL, AV_LOG_ERROR, " No Representations Selected\n");
+        #endif //PRINTING
+        return 1;
+    }
+
+
+    char *str = malloc(sizeof(char) * 254);
+    strncpy(str, c->selected_reps, strlen(c->selected_reps));
+    #ifdef PRINTING
+    //printf("Selected Reps: %s\n", c->selected_reps);
+    #endif //PRINTING
+    char *pt;
+    pt = strtok (str,",");
+    while (pt != NULL) {
+        int a = atoi(pt);
+        #ifdef PRINTING
+        //printf("Rep %d is being selected\n", a);
+        #endif //PRINTING
+        if (a == rep_idx)
+            return 1;
+        pt = strtok (NULL, ",");
+    }
+    return 0;
+}
 
 
 // prints the representation structure in green. @Shahzad for help!
@@ -581,23 +613,28 @@ static void check_full_number(struct representation *rep)
     }
 }
 
-static enum AVMediaType get_content_type(xmlNodePtr node)
+static enum AVMediaType get_content_type(xmlNodePtr node, xmlChar **mimeType)
 {
     enum AVMediaType type = AVMEDIA_TYPE_UNKNOWN;
+    //val = NULL;
+    xmlChar *val = NULL;
     int i = 0;
     const char *attr;
 
     if (node) {
         while (type == AVMEDIA_TYPE_UNKNOWN && i < 2) {
             attr = (i) ? "mimeType" : "contentType";
-            xmlChar *val = xmlGetProp(node, attr);
+            //xmlChar *val = xmlGetProp(node, attr);
+            val = xmlGetProp(node, attr);
             if (val) {
                 if (av_stristr((const char *)val, "video")) {
                     type = AVMEDIA_TYPE_VIDEO;
+                    *mimeType = val;
                 } else if (av_stristr((const char *)val, "audio")) {
                     type = AVMEDIA_TYPE_AUDIO;
+                    *mimeType = val;
                 }
-                xmlFree(val);
+                //xmlFree(val);
             }
             i++;
         }
@@ -727,6 +764,8 @@ static int parse_manifest_representation(AVFormatContext *s, const char *url,
     xmlNodePtr representation_node = node;
     xmlChar *rep_id_val = xmlGetProp(representation_node, "id");
     xmlChar *rep_bandwidth_val = xmlGetProp(representation_node, "bandwidth");
+    //xmlChar *rep_mimeType_val = xmlGetProp(representation_node, "mimeType");
+    xmlChar *rep_mimeType_val = NULL;
     xmlChar *rep_codecs_val = xmlGetProp(representation_node, "codecs");
     xmlChar *rep_height_val = xmlGetProp(representation_node, "height");
     xmlChar *rep_width_val = xmlGetProp(representation_node, "width");
@@ -735,30 +774,40 @@ static int parse_manifest_representation(AVFormatContext *s, const char *url,
     enum AVMediaType type = AVMEDIA_TYPE_UNKNOWN;
 
     // try get information from representation
-    if (type == AVMEDIA_TYPE_UNKNOWN)
-        type = get_content_type(representation_node);
+    if (type == AVMEDIA_TYPE_UNKNOWN) {
+        type = get_content_type(representation_node, &rep_mimeType_val);
+    }
     // try get information from contentComponen
-    if (type == AVMEDIA_TYPE_UNKNOWN)
-        type = get_content_type(content_component_node);
+    if (type == AVMEDIA_TYPE_UNKNOWN) {
+        type = get_content_type(content_component_node, &rep_mimeType_val);
+    }
     // try get information from adaption set
-    if (type == AVMEDIA_TYPE_UNKNOWN)
-        type = get_content_type(adaptionset_node);
+    if (type == AVMEDIA_TYPE_UNKNOWN) {
+        type = get_content_type(adaptionset_node, &rep_mimeType_val);
+    }
     if (type == AVMEDIA_TYPE_UNKNOWN) {
         av_log(s, AV_LOG_VERBOSE, "Parsing '%s' - skipp not supported representation type\n", url);
     //} else if ((type == AVMEDIA_TYPE_VIDEO && !c->cur_video) || (type == AVMEDIA_TYPE_AUDIO && !c->cur_audio)) {
     } else if ((type == AVMEDIA_TYPE_VIDEO) || (type == AVMEDIA_TYPE_AUDIO)) {
         // convert selected representation to our internal struct
-
         char temp_rep_id[MAX_FIELD_LEN];
         strcpy(temp_rep_id, rep_id_val);
         for (int i_rep = 0; i_rep < c->nb_representations; i_rep++){
           if (strcmp(c->representations[i_rep]->id, temp_rep_id) == 0){ // Representation already exists (Just a reload)
+                #ifdef PRINTING
                 av_log(NULL, AV_LOG_ERROR, "Representation Already Exists\n");
+                #endif //PRINTING
                 rep = c->representations[i_rep];
           }
         }
-        if (!rep) // New Representation
-            rep = av_mallocz(sizeof(struct representation));
+
+		if (!rep) {// New Representation
+			rep = av_mallocz(sizeof(struct representation));
+            #ifdef PRINTING
+            av_log(NULL, AV_LOG_ERROR, "Adding One Representation\n");
+            #endif //PRINTING
+            dynarray_add(&c->representations, &c->nb_representations, rep);
+        }
 
         //rep = av_mallocz(sizeof(struct representation));
         if (!rep) {
@@ -766,38 +815,32 @@ static int parse_manifest_representation(AVFormatContext *s, const char *url,
             goto end;
         }
 
-        #ifdef TESTING
-        av_log(NULL, AV_LOG_ERROR, "rep(%s,%s,%s,%s,%s,%s,%s)\n", (char *)rep_id_val, (char *)rep_codecs_val, (char *)rep_height_val, (char *)rep_width_val, (char *)rep_frameRate_val, (char *)rep_scanType_val, (char *)rep_bandwidth_val);
-        #endif //TESTING
-        //rep->id[] = "";
+        #ifdef PRINTING
+        av_log(NULL, AV_LOG_ERROR, "rep(%s,%s,%s,%s,%s,%s,%s,%s)\n", (char *)rep_id_val, (char *)rep_mimeType_val, (char *)rep_codecs_val, (char *)rep_height_val, (char *)rep_width_val, (char *)rep_frameRate_val, (char *)rep_scanType_val, (char *)rep_bandwidth_val);
+        #endif //PRINTING
+        if (rep_mimeType_val)
+            strcpy(rep->mimeType, rep_mimeType_val);
         if (rep_id_val)
-            strcpy(rep->id, rep_id_val);
-            //rep->id[0] = rep_id_val;
-        //rep->codecs[] = "";
-        if (rep_codecs_val)
-            strcpy(rep->codecs, rep_codecs_val);
-            //rep->codecs[0] = rep_codecs_val;
-        rep->height = 0;
-        if (rep_height_val)
-            rep->height = strtol((char *)rep_height_val, NULL, 0);
-        rep->width = 0;
-        if (rep_width_val)
-            rep->width = strtol((char *)rep_width_val, NULL, 0);
-        rep->frameRate = 0;
-        if (rep_frameRate_val)
-            rep->frameRate = strtol((char *)rep_frameRate_val, NULL, 0);
-        //rep->scanType[] = "";
-        if (rep_scanType_val)
-            strcpy(rep->scanType, rep_scanType_val);
-            //rep->scanType[0] = rep_scanType_val;
-        rep->bandwidth = 0;
-        if (rep_bandwidth_val)
-            rep->bandwidth = strtol((char *)rep_bandwidth_val, NULL, 0);
-        #ifdef TESTING
-        av_log(NULL, AV_LOG_ERROR, "rep(%s,%s,%d,%d,%d,%s,%d)\n", rep->id, rep->codecs, rep->height, rep->width, rep->frameRate, rep->scanType, rep->bandwidth);
-        #endif //TESTING
-
-
+			strcpy(rep->id, rep_id_val);
+		if (rep_codecs_val)
+			strcpy(rep->codecs, rep_codecs_val);
+		rep->height = 0;
+		if (rep_height_val)
+			rep->height = strtol((char *)rep_height_val, NULL, 0);
+		rep->width = 0;
+		if (rep_width_val)
+			rep->width = strtol((char *)rep_width_val, NULL, 0);
+		rep->frameRate = 0;
+		if (rep_frameRate_val)
+			rep->frameRate = strtol((char *)rep_frameRate_val, NULL, 0);
+		if (rep_scanType_val)
+			strcpy(rep->scanType, rep_scanType_val);
+		rep->bandwidth = 0;
+		if (rep_bandwidth_val)
+			rep->bandwidth = strtol((char *)rep_bandwidth_val, NULL, 0);
+		#ifdef PRINTING
+		av_log(NULL, AV_LOG_ERROR, "rep(%s,%s,%s,%d,%d,%d,%s,%d)\n", rep->id, rep->mimeType, rep->codecs, rep->height, rep->width, rep->frameRate, rep->scanType, rep->bandwidth);
+		#endif //PRINTING
 
         representation_segmenttemplate_node = find_child_node_by_name(representation_node, "SegmentTemplate");
         representation_baseurl_node = find_child_node_by_name(representation_node, "BaseURL");
@@ -853,13 +896,13 @@ static int parse_manifest_representation(AVFormatContext *s, const char *url,
                         check_full_number(rep);
                     } else if (av_stristr(temp_string, "$Time")) {
                         rep->tmp_url_type = TMP_URL_TYPE_TIME; /* Time-Based. */
-                        #ifdef TESTING
+                        #ifdef PRINTING
                         printf("rep->url_template: %s\n", rep->url_template);
-                        #endif //TESTING
+                        #endif //PRINTING
                         check_full_number(rep);
-                        #ifdef TESTING
+                        #ifdef PRINTING
                         printf("rep->url_template: %s\n", rep->url_template);
-                        #endif //TESTING
+                        #endif //PRINTING
                     } else {
                         temp_string = NULL;
                     }
@@ -969,10 +1012,6 @@ static int parse_manifest_representation(AVFormatContext *s, const char *url,
                     c->cur_audio = rep;
                 }
             }
-            #ifdef TESTING
-            av_log(NULL, AV_LOG_ERROR, "Adding One Representation\n");
-            #endif
-            dynarray_add(&c->representations, &c->nb_representations, rep);
         }
     }
 
@@ -1009,12 +1048,12 @@ static int parse_manifest_adaptationset(AVFormatContext *s, const char *url,
         } else if (!xmlStrcmp(node->name, (const xmlChar *)"BaseURL")) {
             adaptionset_baseurl_node = node;
         } else if (!xmlStrcmp(node->name, (const xmlChar *)"Representation")) {
-            #ifdef TESTING
-            av_log(NULL, AV_LOG_ERROR, "Representation: %d\n", ++nb_representation);
-            #endif
-            //av_log(NULL, AV_LOG_WARNING, "AB: Parsing Representation\n");
-            //for (int i = 0; i < repIndex; i++)
-            //  node = xmlNextElementSibling(node);
+			#ifdef PRINTING
+			av_log(NULL, AV_LOG_ERROR, "Representation: %d\n", ++nb_representation);
+			#endif
+			//av_log(NULL, AV_LOG_WARNING, "AB: Parsing Representation\n");
+			//for (int i = 0; i < repIndex; i++)
+			//	node = xmlNextElementSibling(node);
             ret = parse_manifest_representation(s, url, node,
                                                 adaptionset_node,
                                                 mpd_baseurl_node,
@@ -1036,7 +1075,7 @@ static int parse_manifest(AVFormatContext *s, const char *url, AVIOContext *in)
 {
     DASHContext *c = s->priv_data;
     int repIndex = c->rep_index;
-    #ifdef TESTING
+    #ifdef PRINTING
     av_log(NULL, AV_LOG_ERROR, "(repIndex, rep_index) = (%d, %d)\n", repIndex, c->rep_index);
     #endif
     int ret = 0;
@@ -1151,9 +1190,9 @@ static int parse_manifest(AVFormatContext *s, const char *url, AVIOContext *in)
         int nb_periods = 0;
         while (node) {
             if (!xmlStrcmp(node->name, (const xmlChar *)"Period")) {
-                #ifdef TESTING
-                av_log(NULL, AV_LOG_ERROR, "Period: %d\n", ++nb_periods);
-                #endif
+				#ifdef PRINTING
+				av_log(NULL, AV_LOG_ERROR, "Period: %d\n", ++nb_periods);
+				#endif
                 perdiod_duration_sec = 0;
                 perdiod_start_sec = 0;
                 attr = node->properties;
@@ -1189,9 +1228,9 @@ static int parse_manifest(AVFormatContext *s, const char *url, AVIOContext *in)
             if (!xmlStrcmp(adaptionset_node->name, (const xmlChar *)"BaseURL")) {
                 period_baseurl_node = adaptionset_node;
             } else if (!xmlStrcmp(adaptionset_node->name, (const xmlChar *)"AdaptationSet")) {
-                #ifdef TESTING
-                av_log(NULL, AV_LOG_ERROR, "Adaptaion Set: %d\n", ++nb_adaptationsets);
-                #endif
+				#ifdef PRINTING
+				av_log(NULL, AV_LOG_ERROR, "Adaptaion Set: %d\n", ++nb_adaptationsets);
+				#endif
                 parse_manifest_adaptationset(s, url, adaptionset_node, mpd_baseurl_node, period_baseurl_node, repIndex);
             }
             adaptionset_node = xmlNextElementSibling(adaptionset_node);
@@ -1370,21 +1409,21 @@ static struct fragment *get_current_fragment(struct representation *pls)
         }
     }
     if (c->is_live) {
-        #ifdef TESTING
-        printf("get_current_fragment (is_live)\n");
-        #endif //TESTING
+		#ifdef PRINTING
+		printf("get_current_fragment (is_live)\n");
+		#endif //PRINTING
         while (1) {
             min_seq_no = calc_min_seg_no(pls->parent, pls);
             max_seq_no = calc_max_seg_no(pls->parent, pls);
 
-            #ifdef TESTING
+            #ifdef PRINTING
             printf("%s HIT 1(enter while) with min[%d], cur[%d], max[%d]\n", yellow_str, min_seq_no, pls->cur_seq_no, max_seq_no);
-            #endif //TESTING
+            #endif //PRINTING
 
             if (pls->cur_seq_no <= min_seq_no) {
-                #ifdef TESTING
+                #ifdef PRINTING
                 printf("%s HIT 2(if [cur <= min] case)\n", blue_str);
-                #endif //TESTING
+                #endif //PRINTING
                 av_log(pls->parent, AV_LOG_VERBOSE, "old fragment: cur[%"PRId64"] min[%"PRId64"] max[%"PRId64"], playlist %d\n",    
                 (int64_t)pls->cur_seq_no, min_seq_no, max_seq_no, (int)pls->rep_idx);
                 pls->cur_seq_no = calc_cur_seg_no(pls->parent, pls);
@@ -1396,16 +1435,16 @@ static struct fragment *get_current_fragment(struct representation *pls)
                       ( ( pls->tmp_url_type == TMP_URL_TYPE_TIME ) && ( pls->cur_seq_no > max_seq_no ) ) 
                     ) {
 
-                #ifdef TESTING
+                #ifdef PRINTING
                 printf("%s HIT 3 (Else if:Hack case)\n", blue_str);
-                #endif //TESTING
+                #endif //PRINTING
 
                 // REALLY DIRTY TRICK TO MAKE TIME CASE STABLE not sure if should be doing it. @Shahzad
                 if ( ( pls->tmp_url_type == TMP_URL_TYPE_TIME ) && ( ( pls->cur_seq_no - max_seq_no ) > 1 ) ) {
 
-                    #ifdef TESTING
+                    #ifdef PRINTING
                     printf("%s HIT Trick Case inside Hack Case with cur[%d] and max[%d] \n", cyan_str, pls->cur_seq_no, max_seq_no);
-                    #endif //TESTING
+                    #endif //PRINTING
 
                     pls->cur_seq_no = max_seq_no;
 
@@ -1417,9 +1456,9 @@ static struct fragment *get_current_fragment(struct representation *pls)
                 continue;
             } // End of Hack case
             
-            #ifdef TESTING
+            #ifdef PRINTING
             printf("%s HIT 4(break)\n", yellow_str);
-            #endif //TESTING
+            #endif //PRINTING
             break;
         
         } // End of while(1) loop.
@@ -1678,25 +1717,31 @@ reload:
              //repeat_time &&
              v->first_seq_no_in_representation &&
              v->cur_seq_no - v->first_seq_no_in_representation > 1 ) {
-
-                AVFormatContext* fmtctx = v->parent;
-                
-                #ifdef TESTING
-                printf("%s----------require reload with cur_seq_no[%d] and first_seq_no_in_representation[%d]----------\n", 
+			    AVFormatContext* fmtctx = v->parent;
+			    #ifdef PRINTING
+			    printf("%s----------require reload with cur_seq_no[%d] and first_seq_no_in_representation[%d]----------\n", 
                        green_str, v->cur_seq_no, v->first_seq_no_in_representation );
-                #endif // TESTING
-
-                if ( ( ret = parse_manifest(fmtctx, fmtctx->filename, NULL ) ) < 0 ) {
-                    #ifdef TESTING
+			    #endif //PRINTING
+			    if ( ( ret = parse_manifest(fmtctx, fmtctx->filename, NULL ) ) < 0 ) {
+				    #ifdef PRINTING
                     printf("%sfailed: &&&&&&&&&&&& %d\n", red_str, ret);
-                    #endif // TESTING
-                    
-                    return ret;
-            }
+                    #endif // PRINTING
+				    return ret;
+			}
 
-            c->cur_video->first_seq_no_in_representation =
-                ((( get_current_time_in_sec() - c->availability_start_time_sec) - c->presentation_delay_sec) * c->cur_video->fragment_timescale) / c->cur_video->fragment_duration;
-        }
+            v->first_seq_no_in_representation =
+                ((( get_current_time_in_sec() - c->availability_start_time_sec) - c->presentation_delay_sec) * v->fragment_timescale) / v->fragment_duration;
+            //for (int i = 0; i < c->nb_representations; i++)
+                //c->representations[i]->first_seq_no_in_representation = 
+                    //((( get_current_time_in_sec() - c->availability_start_time_sec) - c->presentation_delay_sec) * c->representations[i]->fragment_timescale) / c->representations[i]->fragment_duration;
+			//c->cur_video->first_seq_no_in_representation =
+				//((( get_current_time_in_sec() - c->availability_start_time_sec) - c->presentation_delay_sec) * c->cur_video->fragment_timescale) / c->cur_video->fragment_duration;
+            //c->cur_audio->first_seq_no_in_representation =
+                //((( get_current_time_in_sec() - c->availability_start_time_sec) - c->presentation_delay_sec) * c->cur_audio->fragment_timescale) / c->cur_audio->fragment_duration;
+		}
+            //c->cur_video->first_seq_no_in_representation =
+              //  ((( get_current_time_in_sec() - c->availability_start_time_sec) - c->presentation_delay_sec) * c->cur_video->fragment_timescale) / c->cur_video->fragment_duration;
+        //}
 
         v->cur_seg = get_current_fragment(v);
         if (!v->cur_seg) {
@@ -1710,10 +1755,14 @@ reload:
         if (ret)
             goto end;
 
-        printf("open input: %s \n", v->cur_seg->url);
+		#ifdef PRINTING
+		printf("open input: %s \n", v->cur_seg->url);
+		#endif //PRINTING
         ret = open_input(c, v, v->cur_seg);
         if (ret < 0) {
-            printf("failed to open input: %s \n", v->cur_seg->url);
+			#ifdef PRINTING
+			printf("failed to open input: %s \n", v->cur_seg->url);
+			#endif //PRINTING
             if (ff_check_interrupt(c->interrupt_callback)) {
                 goto end;
                 ret = AVERROR_EXIT;
@@ -1878,10 +1927,10 @@ static int open_demux_for_component(AVFormatContext *s, struct representation *p
             pls->ctx->streams[i]->codec->pix_fmt = AV_PIX_FMT_YUV420P; //DEFAULT PIX FORMAT
         avcodec_parameters_copy(st->codecpar, pls->ctx->streams[i]->codecpar);
         avcodec_copy_context(st->codec, pls->ctx->streams[i]->codec);
-        #ifdef TESTING
+        #ifdef PRINTING
         av_log(NULL, AV_LOG_ERROR, "st->codec->pix_fmt = %d\n", st->codec->pix_fmt);
         av_log(NULL, AV_LOG_ERROR, "st->codecpar->format = %d\n", st->codecpar->format);
-        #endif //TESTING
+        #endif //PRINTING
         
         avpriv_set_pts_info(st, ist->pts_wrap_bits, ist->time_base.num, ist->time_base.den);
     }
@@ -1919,22 +1968,42 @@ static int dash_read_header(AVFormatContext *s)
     }
 
     /* Open the demuxer for all video and audio components if available */
+    #ifdef PRINTING
+    printf("Selected Reps: %s\n", c->selected_reps);
+    #endif //PRINTING
     int repIndex;
     for (repIndex = 0; repIndex < c->nb_representations; repIndex++) {
-        #ifdef TESTING
-        av_log(NULL, AV_LOG_ERROR, "rep[%d]->bandwidth = %d\n", repIndex, c->representations[repIndex]->bandwidth);
-        #endif //TESTING
-        if (!ret && c->representations[repIndex]) {
-            ret = open_demux_for_component(s, c->representations[repIndex]);
-            if (!ret) {
-                c->representations[repIndex]->stream_index = stream_index;
-                ++stream_index;
-            } else {
-                free_representation(c->representations[repIndex]);
-                c->representations[repIndex] = NULL;
-            }
+        c->representations[repIndex]->needed = 0;
+        if (is_rep_selected(c, repIndex)) {
+            #ifdef PRINTING
+            printf("Representation %d is being selected\n", repIndex);
+            #endif //PRINTING
+            c->representations[repIndex]->needed = 1;
         }
-    }
+		if (!ret && c->representations[repIndex]) {
+			ret = open_demux_for_component(s, c->representations[repIndex]);
+			if (!ret) {
+				c->representations[repIndex]->stream_index = stream_index;
+				++stream_index;
+			} else {
+				free_representation(c->representations[repIndex]);
+				c->representations[repIndex] = NULL;
+			}
+		}
+
+        #ifdef PRINTING
+        av_log(NULL, AV_LOG_ERROR, "rep[%d]->id = %s\n", repIndex, c->representations[repIndex]->id);
+        av_log(NULL, AV_LOG_ERROR, "rep[%d]->codecs = %s\n", repIndex, c->representations[repIndex]->codecs);
+        av_log(NULL, AV_LOG_ERROR, "rep[%d]->height = %d\n", repIndex, c->representations[repIndex]->height);
+        av_log(NULL, AV_LOG_ERROR, "rep[%d]->width = %d\n", repIndex, c->representations[repIndex]->width);
+        av_log(NULL, AV_LOG_ERROR, "rep[%d]->frameRate = %d\n", repIndex, c->representations[repIndex]->frameRate);
+        av_log(NULL, AV_LOG_ERROR, "rep[%d]->scanType = %d\n", repIndex, c->representations[repIndex]->scanType);
+        av_log(NULL, AV_LOG_ERROR, "rep[%d]->bandwidth = %d\n", repIndex, c->representations[repIndex]->bandwidth);
+        av_log(NULL, AV_LOG_ERROR, "rep[%d]->needed = %d\n", repIndex, c->representations[repIndex]->needed);
+        printf("Selected Reps: %s\n", c->selected_reps);
+        #endif //PRINTING
+
+	}
 
     /*
     if (!ret && c->cur_video) {
@@ -1999,6 +2068,52 @@ fail:
     return ret;
 }
 
+static struct representation *get_rep_with_min_timestamp(DASHContext *c) {
+    int ret = -1;
+    int64_t min_timestamp;
+    int rep_idx;
+    for (rep_idx = 0; rep_idx < c->nb_representations; rep_idx++) {
+        if (c->representations[rep_idx]->needed) {
+            if (ret < 0) {
+                min_timestamp = c->representations[rep_idx]->cur_timestamp;
+                ret = rep_idx;
+            }
+            if ((c->representations[rep_idx]->cur_timestamp < min_timestamp)) {
+                min_timestamp = c->representations[rep_idx]->cur_timestamp;
+                ret = rep_idx;
+            }
+        }
+    }
+    if (ret == -1)
+        return NULL;
+    return c->representations[ret];
+}
+
+static int dash_read_packet(AVFormatContext *s, AVPacket *pkt)
+{
+    DASHContext *c = s->priv_data;
+    int ret = 0;
+    struct representation *cur = NULL;
+    cur = get_rep_with_min_timestamp(c);
+    if (!cur)
+        return 0;
+    if (cur->ctx) {
+        ret = av_read_frame(cur->ctx, &cur->pkt);
+        if (ret < 0) {
+            av_packet_unref(&cur->pkt);
+        } else {
+            /* If we got a packet, return it */
+            *pkt = cur->pkt;
+            cur->cur_timestamp = av_rescale(pkt->pts, (int64_t)cur->ctx->streams[0]->time_base.num * 90000, cur->ctx->streams[0]->time_base.den);
+            pkt->stream_index = cur->stream_index;
+            reset_packet(&cur->pkt);
+            return 0;
+        }
+    }
+    return AVERROR_EOF;
+}
+
+/*
 static int dash_read_packet(AVFormatContext *s, AVPacket *pkt)
 {
     DASHContext *c = s->priv_data;
@@ -2023,7 +2138,7 @@ static int dash_read_packet(AVFormatContext *s, AVPacket *pkt)
         if (ret < 0) {
             av_packet_unref(&cur->pkt);
         } else {
-            /* If we got a packet, return it */
+            // If we got a packet, return it
             *pkt = cur->pkt;
             cur->cur_timestamp = av_rescale(pkt->pts, (int64_t)cur->ctx->streams[0]->time_base.num * 90000, cur->ctx->streams[0]->time_base.den);
             pkt->stream_index = cur->stream_index;
@@ -2033,6 +2148,7 @@ static int dash_read_packet(AVFormatContext *s, AVPacket *pkt)
     }
     return AVERROR_EOF;
 }
+*/
 
 static int dash_close(AVFormatContext *s)
 {
@@ -2159,6 +2275,7 @@ static int dash_probe(AVProbeData *p)
 
 static const AVOption dash_options[] = {
     { "rep_index", "representation index"  , OFFSET(rep_index), AV_OPT_TYPE_INT, { .i64 = 0   }, INT_MIN, INT_MAX, FLAGS },
+    { "selected_reps", "selected representations"  , OFFSET(selected_reps), AV_OPT_TYPE_STRING, { .str = "" }, INT_MIN, INT_MAX, FLAGS },
     { NULL },
 };
 
