@@ -154,6 +154,7 @@ struct representation {
     int frameRate;
     char scanType[MAX_FIELD_LEN];
     char mimeType[MAX_FIELD_LEN];
+    char contentType[MAX_FIELD_LEN];
     int bandwidth;
 
     int needed;
@@ -610,7 +611,7 @@ static void check_full_number(struct representation *rep)
     }
 }
 
-static enum AVMediaType get_content_type(xmlNodePtr node, xmlChar **mimeType)
+static enum AVMediaType get_content_type(xmlNodePtr node, xmlChar **mimeType, xmlChar **contentType)
 {
     enum AVMediaType type = AVMEDIA_TYPE_UNKNOWN;
     //val = NULL;
@@ -619,17 +620,20 @@ static enum AVMediaType get_content_type(xmlNodePtr node, xmlChar **mimeType)
     const char *attr;
 
     if (node) {
-        while (type == AVMEDIA_TYPE_UNKNOWN && i < 2) {
+        //while (type == AVMEDIA_TYPE_UNKNOWN && i < 2) {
+        while (i < 2) {
             attr = (i) ? "mimeType" : "contentType";
             //xmlChar *val = xmlGetProp(node, attr);
             val = xmlGetProp(node, attr);
             if (val) {
                 if (av_stristr((const char *)val, "video")) {
                     type = AVMEDIA_TYPE_VIDEO;
-                    *mimeType = val;
+                    if (i == 0) *contentType = val;
+                    if (i == 1) *mimeType = val;
                 } else if (av_stristr((const char *)val, "audio")) {
                     type = AVMEDIA_TYPE_AUDIO;
-                    *mimeType = val;
+                    if (i == 0) *contentType = val;
+                    if (i == 1) *mimeType = val;
                 }
                 //xmlFree(val);
             }
@@ -763,6 +767,7 @@ static int parse_manifest_representation(AVFormatContext *s, const char *url,
     xmlChar *rep_bandwidth_val = xmlGetProp(representation_node, "bandwidth");
     //xmlChar *rep_mimeType_val = xmlGetProp(representation_node, "mimeType");
     xmlChar *rep_mimeType_val = NULL;
+    xmlChar *rep_contentType_val = NULL;
     xmlChar *rep_codecs_val = xmlGetProp(representation_node, "codecs");
     xmlChar *rep_height_val = xmlGetProp(representation_node, "height");
     xmlChar *rep_width_val = xmlGetProp(representation_node, "width");
@@ -772,15 +777,15 @@ static int parse_manifest_representation(AVFormatContext *s, const char *url,
 
     // try get information from representation
     if (type == AVMEDIA_TYPE_UNKNOWN) {
-        type = get_content_type(representation_node, &rep_mimeType_val);
+        type = get_content_type(representation_node, &rep_mimeType_val, &rep_contentType_val);
     }
     // try get information from contentComponen
     if (type == AVMEDIA_TYPE_UNKNOWN) {
-        type = get_content_type(content_component_node, &rep_mimeType_val);
+        type = get_content_type(content_component_node, &rep_mimeType_val, &rep_contentType_val);
     }
     // try get information from adaption set
     if (type == AVMEDIA_TYPE_UNKNOWN) {
-        type = get_content_type(adaptionset_node, &rep_mimeType_val);
+        type = get_content_type(adaptionset_node, &rep_mimeType_val, &rep_contentType_val);
     }
     if (type == AVMEDIA_TYPE_UNKNOWN) {
         av_log(s, AV_LOG_VERBOSE, "Parsing '%s' - skipp not supported representation type\n", url);
@@ -817,6 +822,8 @@ static int parse_manifest_representation(AVFormatContext *s, const char *url,
 
         if (rep_mimeType_val)
             strcpy(rep->mimeType, rep_mimeType_val);
+        if (rep_contentType_val)
+            strcpy(rep->contentType, rep_contentType_val);
         if (rep_id_val)
 			strcpy(rep->id, rep_id_val);
 		if (rep_codecs_val)
@@ -1263,7 +1270,6 @@ static int64_t calc_cur_seg_no(AVFormatContext *s, struct representation *pls)
     int64_t num = 0;
 
     if ( c->is_live ) {
-
         num = pls->first_seq_no + 
               (((get_current_time_in_sec() - c->availability_start_time_sec) - c->presentation_delay_sec) * pls->fragment_timescale) / pls->fragment_duration;
         
@@ -1454,6 +1460,10 @@ static struct fragment *get_current_fragment(struct representation *pls)
                     pls->cur_seq_no = max_seq_no;
 
                 } // End of trick 
+
+                //if ( ( pls->tmp_url_type == TMP_URL_TYPE_NUMBER ) && ( ( pls->cur_seq_no - max_seq_no ) > 0 ) ) {
+                    //pls->cur_seq_no = max_seq_no - 1;
+                //}
 
 
                 av_log(pls->parent, AV_LOG_VERBOSE, "new fragment: min[%"PRId64"] max[%"PRId64"], playlist %d\n", min_seq_no, max_seq_no, (int)pls->rep_idx);
@@ -2054,6 +2064,8 @@ static int dash_read_header(AVFormatContext *s)
 		}
 
         av_log(NULL, AV_LOG_VERBOSE, "rep[%d]->id = %s\n", repIndex, c->representations[repIndex]->id);
+        av_log(NULL, AV_LOG_VERBOSE, "rep[%d]->mimeType = %s\n", repIndex, c->representations[repIndex]->mimeType);
+        av_log(NULL, AV_LOG_VERBOSE, "rep[%d]->contentType = %s\n", repIndex, c->representations[repIndex]->contentType);
         av_log(NULL, AV_LOG_VERBOSE, "rep[%d]->codecs = %s\n", repIndex, c->representations[repIndex]->codecs);
         av_log(NULL, AV_LOG_VERBOSE, "rep[%d]->height = %d\n", repIndex, c->representations[repIndex]->height);
         av_log(NULL, AV_LOG_VERBOSE, "rep[%d]->width = %d\n", repIndex, c->representations[repIndex]->width);
@@ -2062,7 +2074,6 @@ static int dash_read_header(AVFormatContext *s)
         av_log(NULL, AV_LOG_VERBOSE, "rep[%d]->bandwidth = %d\n", repIndex, c->representations[repIndex]->bandwidth);
         av_log(NULL, AV_LOG_VERBOSE, "rep[%d]->needed = %d\n", repIndex, c->representations[repIndex]->needed);
         av_log(NULL, AV_LOG_INFO, "Selected Reps: %s\n", c->selected_reps);
-
         #ifdef PRINTING
         printf("Selected Reps: %s\n", c->selected_reps);
         #endif //PRINTING
