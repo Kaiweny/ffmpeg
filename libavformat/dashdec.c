@@ -30,7 +30,7 @@
 #define INITIAL_BUFFER_SIZE 32768
 #define MAX_FIELD_LEN 64
 
- #define TESTING
+//#define TESTING
 
 // Defines to assist in printing in different colors. 
 // Note: Important to have %s where you want to initiate the color change
@@ -156,6 +156,9 @@ struct representation {
     int frameRate;
     char scanType[MAX_FIELD_LEN];
     int bandwidth;
+
+    ffurl_read_callback mpegts_parser_input_backup;
+    void* mpegts_parser_input_context_backup;
 };
 
 typedef struct DASHContext {
@@ -1651,11 +1654,25 @@ static int64_t seek_data(void *opaque, int64_t offset, int whence)
     return AVERROR(ENOSYS);
 }
 
+struct AVIOInternal {
+    URLContext *h;
+};
+
 static int read_data(void *opaque, uint8_t *buf, int buf_size)
 {
     int ret = 0;
     struct representation *v = opaque;
     DASHContext *c = v->parent->priv_data;
+    struct AVIOInternal* interal = NULL;
+    URLContext* urlc = NULL;
+
+    // keep reference of mpegts parser callback mechanism
+    if(!v->input) {
+        interal = (struct AVIOInternal*)v->input->opaque;
+        urlc = (URLContext*)interal->h;
+        v->mpegts_parser_input_backup = urlc->mpegts_parser_injection;
+        v->mpegts_parser_input_context_backup = urlc->mpegts_parser_injection_context;
+    }
 
 restart:
     if (!v->input) {
@@ -1744,11 +1761,19 @@ reload:
     ret = read_from_url(v, v->cur_seg, buf, buf_size, READ_NORMAL);
     if (ret > 0)
         goto end;
+
     ff_format_io_close(v->parent, &v->input);
     v->cur_seq_no++;
     goto restart;
 
 end:
+    // replace mpegts parser callback mechanism
+    if(interal && urlc && v->input) {
+        interal = (struct AVIOInternal*)v->input->opaque;
+        urlc = (URLContext*)interal->h;
+        urlc->mpegts_parser_injection = v->mpegts_parser_input_backup;
+        urlc->mpegts_parser_injection_context = v->mpegts_parser_input_context_backup;
+    }
     return ret;
 }
 
