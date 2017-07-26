@@ -42,7 +42,7 @@
 #define cyan_str  "\x1B[36m"
 #define white_str  "\x1B[37m"
 
-#define PRINTING
+// #define PRINTING // Only for temporary printfs rest should all be av_log
 
 char *av_strreplace(const char *str, const char *from, const char *to);
 
@@ -193,25 +193,19 @@ typedef struct DASHContext {
 // checks if representation is among selected
 static int is_rep_selected(DASHContext *c, int rep_idx) {
     if ((c->selected_reps != NULL) && (c->selected_reps[0] == '\0')) {// Default value is empty so all representations are selected
-        #ifdef PRINTING
-        av_log(NULL, AV_LOG_ERROR, " No Representations Selected\n");
-        #endif //PRINTING
+        
+        av_log(NULL, AV_LOG_WARNING, "No Representations Selected\n");
         return 1;
     }
 
-
     char *str = malloc(sizeof(char) * 254);
     strncpy(str, c->selected_reps, strlen(c->selected_reps));
-    #ifdef PRINTING
-    //printf("Selected Reps: %s\n", c->selected_reps);
-    #endif //PRINTING
     char *pt;
     pt = strtok (str,",");
+
     while (pt != NULL) {
         int a = atoi(pt);
-        #ifdef PRINTING
-        //printf("Rep %d is being selected\n", a);
-        #endif //PRINTING
+
         if (a == rep_idx)
             return 1;
         pt = strtok (NULL, ",");
@@ -797,18 +791,18 @@ static int parse_manifest_representation(AVFormatContext *s, const char *url,
         strcpy(temp_rep_id, rep_id_val);
         for (int i_rep = 0; i_rep < c->nb_representations; i_rep++){
           if (strcmp(c->representations[i_rep]->id, temp_rep_id) == 0){ // Representation already exists (Just a reload)
-                #ifdef PRINTING
-                av_log(NULL, AV_LOG_ERROR, "Representation Already Exists\n");
-                #endif //PRINTING
+
+                av_log(NULL, AV_LOG_INFO, "Representation Already Exists\n");
+
                 rep = c->representations[i_rep];
           }
         }
 
 		if (!rep) {// New Representation
 			rep = av_mallocz(sizeof(struct representation));
-            #ifdef PRINTING
-            av_log(NULL, AV_LOG_ERROR, "Adding One Representation\n");
-            #endif //PRINTING
+
+            av_log(NULL, AV_LOG_INFO, "Adding One Representation\n");
+
             dynarray_add(&c->representations, &c->nb_representations, rep);
         }
 
@@ -818,9 +812,9 @@ static int parse_manifest_representation(AVFormatContext *s, const char *url,
             goto end;
         }
 
-        #ifdef PRINTING
-        av_log(NULL, AV_LOG_ERROR, "rep(%s,%s,%s,%s,%s,%s,%s,%s)\n", (char *)rep_id_val, (char *)rep_mimeType_val, (char *)rep_codecs_val, (char *)rep_height_val, (char *)rep_width_val, (char *)rep_frameRate_val, (char *)rep_scanType_val, (char *)rep_bandwidth_val);
-        #endif //PRINTING
+
+        av_log(NULL, AV_LOG_VERBOSE, "rep(%s,%s,%s,%s,%s,%s,%s,%s)\n", (char *)rep_id_val, (char *)rep_mimeType_val, (char *)rep_codecs_val, (char *)rep_height_val, (char *)rep_width_val, (char *)rep_frameRate_val, (char *)rep_scanType_val, (char *)rep_bandwidth_val);
+
         if (rep_mimeType_val)
             strcpy(rep->mimeType, rep_mimeType_val);
         if (rep_id_val)
@@ -841,9 +835,9 @@ static int parse_manifest_representation(AVFormatContext *s, const char *url,
 		rep->bandwidth = 0;
 		if (rep_bandwidth_val)
 			rep->bandwidth = strtol((char *)rep_bandwidth_val, NULL, 0);
-		#ifdef PRINTING
-		av_log(NULL, AV_LOG_ERROR, "rep(%s,%s,%s,%d,%d,%d,%s,%d)\n", rep->id, rep->mimeType, rep->codecs, rep->height, rep->width, rep->frameRate, rep->scanType, rep->bandwidth);
-		#endif //PRINTING
+
+		av_log(NULL, AV_LOG_VERBOSE, "rep(%s,%s,%s,%d,%d,%d,%s,%d)\n", rep->id, rep->mimeType, rep->codecs, rep->height, rep->width, rep->frameRate, rep->scanType, rep->bandwidth);
+
 
         representation_segmenttemplate_node = find_child_node_by_name(representation_node, "SegmentTemplate");
         representation_baseurl_node = find_child_node_by_name(representation_node, "BaseURL");
@@ -899,13 +893,12 @@ static int parse_manifest_representation(AVFormatContext *s, const char *url,
                         check_full_number(rep);
                     } else if (av_stristr(temp_string, "$Time")) {
                         rep->tmp_url_type = TMP_URL_TYPE_TIME; /* Time-Based. */
-                        #ifdef PRINTING
-                        printf("rep->url_template: %s\n", rep->url_template);
-                        #endif //PRINTING
+                        
+                        av_log( s, AV_LOG_VERBOSE, "rep->url_template: %s\n", rep->url_template);
+
                         check_full_number(rep);
-                        #ifdef PRINTING
-                        printf("rep->url_template: %s\n", rep->url_template);
-                        #endif //PRINTING
+ 
+                        av_log( s, AV_LOG_VERBOSE,"rep->url_template: %s\n", rep->url_template);
                     } else {
                         temp_string = NULL;
                     }
@@ -1051,9 +1044,8 @@ static int parse_manifest_adaptationset(AVFormatContext *s, const char *url,
         } else if (!xmlStrcmp(node->name, (const xmlChar *)"BaseURL")) {
             adaptionset_baseurl_node = node;
         } else if (!xmlStrcmp(node->name, (const xmlChar *)"Representation")) {
-			#ifdef PRINTING
-			av_log(NULL, AV_LOG_ERROR, "Representation: %d\n", ++nb_representation);
-			#endif
+			av_log(NULL, AV_LOG_INFO, "Representation: %d\n", ++nb_representation);
+
 			//av_log(NULL, AV_LOG_WARNING, "AB: Parsing Representation\n");
 			//for (int i = 0; i < repIndex; i++)
 			//	node = xmlNextElementSibling(node);
@@ -1078,9 +1070,9 @@ static int parse_manifest(AVFormatContext *s, const char *url, AVIOContext *in)
 {
     DASHContext *c = s->priv_data;
     int repIndex = c->rep_index;
-    #ifdef PRINTING
-    av_log(NULL, AV_LOG_ERROR, "(repIndex, rep_index) = (%d, %d)\n", repIndex, c->rep_index);
-    #endif
+
+    av_log(NULL, AV_LOG_VERBOSE, "(repIndex, rep_index) = (%d, %d)\n", repIndex, c->rep_index);
+
     int ret = 0;
     int close_in = 0;
     uint8_t *new_url = NULL;
@@ -1193,9 +1185,9 @@ static int parse_manifest(AVFormatContext *s, const char *url, AVIOContext *in)
         int nb_periods = 0;
         while (node) {
             if (!xmlStrcmp(node->name, (const xmlChar *)"Period")) {
-				#ifdef PRINTING
-				av_log(NULL, AV_LOG_ERROR, "Period: %d\n", ++nb_periods);
-				#endif
+
+				av_log(NULL, AV_LOG_INFO, "Period: %d\n", ++nb_periods);
+
                 perdiod_duration_sec = 0;
                 perdiod_start_sec = 0;
                 attr = node->properties;
@@ -1231,9 +1223,9 @@ static int parse_manifest(AVFormatContext *s, const char *url, AVIOContext *in)
             if (!xmlStrcmp(adaptionset_node->name, (const xmlChar *)"BaseURL")) {
                 period_baseurl_node = adaptionset_node;
             } else if (!xmlStrcmp(adaptionset_node->name, (const xmlChar *)"AdaptationSet")) {
-				#ifdef PRINTING
-				av_log(NULL, AV_LOG_ERROR, "Adaptaion Set: %d\n", ++nb_adaptationsets);
-				#endif
+
+				av_log(NULL, AV_LOG_INFO, "Adaptaion Set: %d\n", ++nb_adaptationsets);
+
                 parse_manifest_adaptationset(s, url, adaptionset_node, mpd_baseurl_node, period_baseurl_node, repIndex);
             }
             adaptionset_node = xmlNextElementSibling(adaptionset_node);
@@ -1412,21 +1404,27 @@ static struct fragment *get_current_fragment(struct representation *pls)
         }
     }
     if (c->is_live) {
-		#ifdef PRINTING
-		printf("get_current_fragment (is_live)\n");
-		#endif //PRINTING
+
+		av_log( pls->parent, AV_LOG_VERBOSE, "get_current_fragment (is_live)\n" );
+
         while (1) {
             min_seq_no = calc_min_seg_no(pls->parent, pls);
             max_seq_no = calc_max_seg_no(pls->parent, pls);
 
+            av_log( pls->parent, AV_LOG_DEBUG, "HIT 1(enter while) with min[%d], cur[%d], max[%d]\n", min_seq_no, pls->cur_seq_no, max_seq_no );
+
             #ifdef PRINTING
-            printf("%s HIT 1(enter while) with min[%d], cur[%d], max[%d]\n", yellow_str, min_seq_no, pls->cur_seq_no, max_seq_no);
+            printf( "%s HIT 1(enter while) with min[%d], cur[%d], max[%d]\n", yellow_str, min_seq_no, pls->cur_seq_no, max_seq_no);
             #endif //PRINTING
 
             if (pls->cur_seq_no <= min_seq_no) {
+
+                av_log( pls->parent, AV_LOG_DEBUG, "HIT 2(if [cur <= min] case)\n" );
+
                 #ifdef PRINTING
-                printf("%s HIT 2(if [cur <= min] case)\n", blue_str);
+                printf( "%s HIT 2(if [cur <= min] case)\n", blue_str );
                 #endif //PRINTING
+                
                 av_log(pls->parent, AV_LOG_VERBOSE, "old fragment: cur[%"PRId64"] min[%"PRId64"] max[%"PRId64"], playlist %d\n",    
                 (int64_t)pls->cur_seq_no, min_seq_no, max_seq_no, (int)pls->rep_idx);
                 pls->cur_seq_no = calc_cur_seg_no(pls->parent, pls);
@@ -1438,6 +1436,8 @@ static struct fragment *get_current_fragment(struct representation *pls)
                       ( ( pls->tmp_url_type == TMP_URL_TYPE_TIME ) && ( pls->cur_seq_no > max_seq_no ) ) 
                     ) {
 
+                av_log( pls->parent, AV_LOG_DEBUG, "HIT 3 (Else if:Hack case)\n" );
+
                 #ifdef PRINTING
                 printf("%s HIT 3 (Else if:Hack case)\n", blue_str);
                 #endif //PRINTING
@@ -1445,8 +1445,10 @@ static struct fragment *get_current_fragment(struct representation *pls)
                 // REALLY DIRTY TRICK TO MAKE TIME CASE STABLE not sure if should be doing it. @Shahzad
                 if ( ( pls->tmp_url_type == TMP_URL_TYPE_TIME ) && ( ( pls->cur_seq_no - max_seq_no ) > 1 ) ) {
 
+                    av_log( pls->parent, AV_LOG_INFO, "HIT Trick Case inside Hack Case with cur[%d] and max[%d]\n", pls->cur_seq_no, max_seq_no );
+
                     #ifdef PRINTING
-                    printf("%s HIT Trick Case inside Hack Case with cur[%d] and max[%d] \n", cyan_str, pls->cur_seq_no, max_seq_no);
+                    printf( "%s HIT Trick Case inside Hack Case with cur[%d] and max[%d]\n", cyan_str, pls->cur_seq_no, max_seq_no );
                     #endif //PRINTING
 
                     pls->cur_seq_no = max_seq_no;
@@ -1459,9 +1461,12 @@ static struct fragment *get_current_fragment(struct representation *pls)
                 continue;
             } // End of Hack case
             
+            av_log( pls->parent, AV_LOG_DEBUG, "HIT 4 (break)\n" );
+
             #ifdef PRINTING
-            printf("%s HIT 4(break)\n", yellow_str);
+            printf( "%s HIT 4 (break)\n", yellow_str);
             #endif //PRINTING
+           
             break;
         
         } // End of while(1) loop.
@@ -1735,14 +1740,22 @@ reload:
              v->first_seq_no_in_representation &&
              v->cur_seq_no - v->first_seq_no_in_representation > 1 ) {
 			    AVFormatContext* fmtctx = v->parent;
-			    #ifdef PRINTING
-			    printf("%s----------require reload with cur_seq_no[%d] and first_seq_no_in_representation[%d]----------\n", 
-                       green_str, v->cur_seq_no, v->first_seq_no_in_representation );
-			    #endif //PRINTING
-			    if ( ( ret = parse_manifest(fmtctx, fmtctx->filename, NULL ) ) < 0 ) {
-				    #ifdef PRINTING
-                    printf("%sfailed: &&&&&&&&&&&& %d\n", red_str, ret);
+			    
+                av_log( v->parent, AV_LOG_INFO, 
+                        "----------require reload with cur_seq_no[%d] and first_seq_no_in_representation[%d]----------\n", v->cur_seq_no, v->first_seq_no_in_representation );
+			    
+                #ifdef PRINTING
+                printf( "%s----------require reload with cur_seq_no[%d] and first_seq_no_in_representation[%d]----------\n", green_str, v->cur_seq_no, v->first_seq_no_in_representation );
+                #endif //PRINTING
+
+                if ( ( ret = parse_manifest(fmtctx, fmtctx->filename, NULL ) ) < 0 ) {
+
+                    av_log( v->parent, AV_LOG_WARNING, "Failed: To Parse Manifest (parse_manifest) with ret[%d]\n", ret );
+
+                    #ifdef PRINTING
+                    printf( "%sFailed: To Parse Manifest (parse_manifest) with ret[%d]\n", red_str, ret );
                     #endif // PRINTING
+
 				    return ret;
 			}
 
@@ -1772,19 +1785,32 @@ reload:
         if (ret)
             goto end;
 
-		#ifdef PRINTING
-		printf("open input: %s \n", v->cur_seg->url);
-		#endif //PRINTING
+        av_log( v->parent, AV_LOG_INFO, "Open input: %s \n", v->cur_seg->url);
+
+        #ifdef PRINTING
+        printf("%sOpen input: %s \n", green_str, v->cur_seg->url);
+        #endif // PRINTING
+
         ret = open_input(c, v, v->cur_seg);
         if (ret < 0) {
-			#ifdef PRINTING
-			printf("failed to open input: %s \n", v->cur_seg->url);
-			#endif //PRINTING
+
+			av_log( v->parent, AV_LOG_WARNING, "Failed to open input by (open_input): %s \n", v->cur_seg->url);
+
+            #ifdef PRINTING
+            printf( "%sFailed to open input by (open_input): %s \n", red_str, v->cur_seg->url);
+            #endif // PRINTING
+
             if (ff_check_interrupt(c->interrupt_callback)) {
                 goto end;
                 ret = AVERROR_EXIT;
             }
+           
             av_log(v->parent, AV_LOG_WARNING, "Failed to open fragment of playlist %d\n", v->rep_idx);
+
+            #ifdef PRINTING
+            printf( "%sFailed to open fragment of playlist %d\n", red_str, v->rep_idx );
+            #endif // PRINTING
+
             v->cur_seq_no++;
             goto restart;
         }
@@ -1948,16 +1974,19 @@ static int open_demux_for_component(AVFormatContext *s, struct representation *p
         
         if (pls->ctx->streams[i]->codecpar->format == AV_PIX_FMT_NONE)
             pls->ctx->streams[i]->codecpar->format = AV_PIX_FMT_YUV420P; //DEFAULT PIX FORMAT
+        
         if (pls->ctx->streams[i]->codec->pix_fmt == AV_PIX_FMT_NONE)
             pls->ctx->streams[i]->codec->pix_fmt = AV_PIX_FMT_YUV420P; //DEFAULT PIX FORMAT
+
         avcodec_parameters_copy(st->codecpar, pls->ctx->streams[i]->codecpar);
         avcodec_copy_context(st->codec, pls->ctx->streams[i]->codec);
+
         // Make stream Indices same as Rep Indices (for uniqueness). TODO: what if multiple streams per representation
         st->id = rep_idx;
-        #ifdef PRINTING
-        av_log(NULL, AV_LOG_ERROR, "st->codec->pix_fmt = %d\n", st->codec->pix_fmt);
-        av_log(NULL, AV_LOG_ERROR, "st->codecpar->format = %d\n", st->codecpar->format);
-        #endif //PRINTING
+
+        av_log(NULL, AV_LOG_VERBOSE, "st->codec->pix_fmt = %d\n", st->codec->pix_fmt);
+        av_log(NULL, AV_LOG_VERBOSE, "st->codecpar->format = %d\n", st->codecpar->format);
+
         
         avpriv_set_pts_info(st, ist->pts_wrap_bits, ist->time_base.num, ist->time_base.den);
     }
@@ -1982,11 +2011,9 @@ static int dash_read_header(AVFormatContext *s)
         update_options(&c->headers, "headers", u);
     }
 
-    if ((ret = parse_manifest(s, s->filename, s->pb)) < 0)
-        goto fail;
+    if ((ret = parse_manifest(s, s->filename, s->pb)) < 0) {goto fail;}
 
-    if ((ret = save_avio_options(s)) < 0)
-        goto fail;
+    if ((ret = save_avio_options(s)) < 0) {goto fail;}
 
     /* If this isn't a live stream, fill the total duration of the
      * stream. */
@@ -1995,16 +2022,24 @@ static int dash_read_header(AVFormatContext *s)
     }
 
     /* Open the demuxer for all video and audio components if available */
+    
+    av_log(NULL, AV_LOG_INFO, "Selected Reps: %s\n", c->selected_reps);    
+    
     #ifdef PRINTING
     printf("Selected Reps: %s\n", c->selected_reps);
     #endif //PRINTING
+
     int repIndex;
     for (repIndex = 0; repIndex < c->nb_representations; repIndex++) {
         c->representations[repIndex]->needed = 0;
         if (is_rep_selected(c, repIndex)) {
+            
+            av_log( NULL, AV_LOG_INFO,"Representation %d is being selected\n", repIndex);
+
             #ifdef PRINTING
-            printf("Representation %d is being selected\n", repIndex);
+             printf("Representation %d is being selected\n", repIndex);
             #endif //PRINTING
+
             c->representations[repIndex]->needed = 1;
         }
 		if (!ret && c->representations[repIndex]) {
@@ -2018,16 +2053,17 @@ static int dash_read_header(AVFormatContext *s)
 			}
 		}
 
+        av_log(NULL, AV_LOG_VERBOSE, "rep[%d]->id = %s\n", repIndex, c->representations[repIndex]->id);
+        av_log(NULL, AV_LOG_VERBOSE, "rep[%d]->codecs = %s\n", repIndex, c->representations[repIndex]->codecs);
+        av_log(NULL, AV_LOG_VERBOSE, "rep[%d]->height = %d\n", repIndex, c->representations[repIndex]->height);
+        av_log(NULL, AV_LOG_VERBOSE, "rep[%d]->width = %d\n", repIndex, c->representations[repIndex]->width);
+        av_log(NULL, AV_LOG_VERBOSE, "rep[%d]->frameRate = %d\n", repIndex, c->representations[repIndex]->frameRate);
+        av_log(NULL, AV_LOG_VERBOSE, "rep[%d]->scanType = %d\n", repIndex, c->representations[repIndex]->scanType);
+        av_log(NULL, AV_LOG_VERBOSE, "rep[%d]->bandwidth = %d\n", repIndex, c->representations[repIndex]->bandwidth);
+        av_log(NULL, AV_LOG_VERBOSE, "rep[%d]->needed = %d\n", repIndex, c->representations[repIndex]->needed);
+        av_log(NULL, AV_LOG_INFO, "Selected Reps: %s\n", c->selected_reps);
+
         #ifdef PRINTING
-        av_log(NULL, AV_LOG_ERROR, "rep[%d]->id = %s\n", repIndex, c->representations[repIndex]->id);
-        av_log(NULL, AV_LOG_ERROR, "rep[%d]->mimeType = %s\n", repIndex, c->representations[repIndex]->mimeType);
-        av_log(NULL, AV_LOG_ERROR, "rep[%d]->codecs = %s\n", repIndex, c->representations[repIndex]->codecs);
-        av_log(NULL, AV_LOG_ERROR, "rep[%d]->height = %d\n", repIndex, c->representations[repIndex]->height);
-        av_log(NULL, AV_LOG_ERROR, "rep[%d]->width = %d\n", repIndex, c->representations[repIndex]->width);
-        av_log(NULL, AV_LOG_ERROR, "rep[%d]->frameRate = %d\n", repIndex, c->representations[repIndex]->frameRate);
-        av_log(NULL, AV_LOG_ERROR, "rep[%d]->scanType = %d\n", repIndex, c->representations[repIndex]->scanType);
-        av_log(NULL, AV_LOG_ERROR, "rep[%d]->bandwidth = %d\n", repIndex, c->representations[repIndex]->bandwidth);
-        av_log(NULL, AV_LOG_ERROR, "rep[%d]->needed = %d\n", repIndex, c->representations[repIndex]->needed);
         printf("Selected Reps: %s\n", c->selected_reps);
         #endif //PRINTING
 
