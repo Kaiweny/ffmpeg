@@ -1434,7 +1434,7 @@ static struct fragment *get_current_fragment(struct representation *pls)
 
             //} else if (pls->cur_seq_no > max_seq_no) {
             else if ( // Hack to make both cases work @ShahzadLone for info! 
-                      ( ( pls->tmp_url_type == TMP_URL_TYPE_NUMBER ) && ( pls->cur_seq_no >= max_seq_no ) ) ||
+                      ( ( pls->tmp_url_type == TMP_URL_TYPE_NUMBER ) && ( pls->cur_seq_no > max_seq_no ) ) ||
                       ( ( pls->tmp_url_type == TMP_URL_TYPE_TIME ) && ( pls->cur_seq_no > max_seq_no ) ) 
                     ) {
 
