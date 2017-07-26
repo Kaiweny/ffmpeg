@@ -1924,7 +1924,7 @@ fail:
     return ret;
 }
 
-static int open_demux_for_component(AVFormatContext *s, struct representation *pls)
+static int open_demux_for_component(AVFormatContext *s, struct representation *pls, int rep_idx)
 {
     int ret = 0;
     int i;
@@ -1952,6 +1952,8 @@ static int open_demux_for_component(AVFormatContext *s, struct representation *p
             pls->ctx->streams[i]->codec->pix_fmt = AV_PIX_FMT_YUV420P; //DEFAULT PIX FORMAT
         avcodec_parameters_copy(st->codecpar, pls->ctx->streams[i]->codecpar);
         avcodec_copy_context(st->codec, pls->ctx->streams[i]->codec);
+        // Make stream Indices same as Rep Indices (for uniqueness). TODO: what if multiple streams per representation
+        st->id = rep_idx;
         #ifdef PRINTING
         av_log(NULL, AV_LOG_ERROR, "st->codec->pix_fmt = %d\n", st->codec->pix_fmt);
         av_log(NULL, AV_LOG_ERROR, "st->codecpar->format = %d\n", st->codecpar->format);
@@ -2006,7 +2008,7 @@ static int dash_read_header(AVFormatContext *s)
             c->representations[repIndex]->needed = 1;
         }
 		if (!ret && c->representations[repIndex]) {
-			ret = open_demux_for_component(s, c->representations[repIndex]);
+			ret = open_demux_for_component(s, c->representations[repIndex], repIndex);
 			if (!ret) {
 				c->representations[repIndex]->stream_index = stream_index;
 				++stream_index;
@@ -2018,6 +2020,7 @@ static int dash_read_header(AVFormatContext *s)
 
         #ifdef PRINTING
         av_log(NULL, AV_LOG_ERROR, "rep[%d]->id = %s\n", repIndex, c->representations[repIndex]->id);
+        av_log(NULL, AV_LOG_ERROR, "rep[%d]->mimeType = %s\n", repIndex, c->representations[repIndex]->mimeType);
         av_log(NULL, AV_LOG_ERROR, "rep[%d]->codecs = %s\n", repIndex, c->representations[repIndex]->codecs);
         av_log(NULL, AV_LOG_ERROR, "rep[%d]->height = %d\n", repIndex, c->representations[repIndex]->height);
         av_log(NULL, AV_LOG_ERROR, "rep[%d]->width = %d\n", repIndex, c->representations[repIndex]->width);
