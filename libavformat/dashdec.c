@@ -43,6 +43,7 @@
 #define white_str  "\x1B[37m"
 
 // #define PRINTING // Only for temporary printfs rest should all be av_log
+// #define HTTPS // replace https in BaseURL with http
 
 char *av_strreplace(const char *str, const char *from, const char *to);
 
@@ -513,6 +514,19 @@ finish:
     return tmp_url;
 }
 
+#ifdef HTTPS
+static void delete_char(char *str, int i) {
+    int len = strlen(str);
+
+    for (; i < len - 1 ; i++)
+    {
+       str[i] = str[i+1];
+    }
+
+    str[i] = '\0';
+}
+#endif //HTTPS
+
 static char *get_content_url(xmlNodePtr *baseurl_nodes,
                              int n_baseurl_nodes,
                              xmlChar *rep_id_val,
@@ -540,6 +554,10 @@ static char *get_content_url(xmlNodePtr *baseurl_nodes,
                     return NULL;
                 }
                 ff_make_absolute_url(tmp_str_2, MAX_URL_SIZE, tmp_str, text);
+                #ifdef HTTPS
+                if (strstr(tmp_str_2, "https") != NULL)
+                    delete_char(tmp_str_2, 4);
+                #endif //HTTPS
                 av_free(tmp_str);
                 tmp_str = tmp_str_2;
                 xmlFree(text);
@@ -1435,7 +1453,6 @@ static struct fragment *get_current_fragment(struct representation *pls)
                 (int64_t)pls->cur_seq_no, min_seq_no, max_seq_no, (int)pls->rep_idx);
                 pls->cur_seq_no = calc_cur_seg_no(pls->parent, pls);
             } 
-
             //} else if (pls->cur_seq_no > max_seq_no) {
             else if ( // Hack to make both cases work @ShahzadLone for info! 
                       ( ( pls->tmp_url_type == TMP_URL_TYPE_NUMBER ) && ( pls->cur_seq_no > max_seq_no ) ) ||
@@ -1461,10 +1478,11 @@ static struct fragment *get_current_fragment(struct representation *pls)
 
                 } // End of trick 
 
-                //if ( ( pls->tmp_url_type == TMP_URL_TYPE_NUMBER ) && ( ( pls->cur_seq_no - max_seq_no ) > 0 ) ) {
-                    //pls->cur_seq_no = max_seq_no - 1;
-                //}
-
+                /*if ( ( pls->tmp_url_type == TMP_URL_TYPE_NUMBER ) && ( ( pls->cur_seq_no - max_seq_no ) > 0 ) ) {
+                    pls->cur_seq_no = min_seq_no;
+                    av_usleep(10000000);
+                    break;
+                }*/
 
                 av_log(pls->parent, AV_LOG_VERBOSE, "new fragment: min[%"PRId64"] max[%"PRId64"], playlist %d\n", min_seq_no, max_seq_no, (int)pls->rep_idx);
                 av_usleep(1000);
