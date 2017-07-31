@@ -67,6 +67,7 @@ enum KeyType {
 struct segment {
     int64_t duration;
     int64_t url_offset;
+    int64_t actual_size;
     int64_t size;
     char *url;
     char *key;
@@ -425,6 +426,7 @@ static struct segment *new_init_section(struct playlist *pls,
         return NULL;
     }
 
+    sec->actual_size = 0;
     if (info->byterange[0]) {
         sec->size = strtoll(info->byterange, NULL, 10);
         ptr = strchr(info->byterange, '@');
@@ -851,6 +853,7 @@ static int parse_playlist(HLSContext *c, const char *url,
                 dynarray_add(&pls->segments, &pls->n_segments, seg);
                 is_segment = 0;
 
+                seg->actual_size = 0;
                 seg->size = seg_size;
                 if (seg_size >= 0) {
                     seg->url_offset = seg_offset;
@@ -1242,6 +1245,9 @@ static int update_init_section(struct playlist *pls, struct segment *seg)
 
     ret = read_from_url(pls, seg->init_section, pls->init_sec_buf,
                         pls->init_sec_buf_size, READ_COMPLETE);
+    if (ret > 0)
+        seg->init_section->actual_size += ret;
+
     ff_format_io_close(pls->parent, &pls->input);
 
     if (ret < 0)
@@ -1361,6 +1367,7 @@ reload:
 
     ret = read_from_url(v, current_segment(v), buf, buf_size, READ_NORMAL);
     if (ret > 0) {
+        current_segment(v)->actual_size += ret;
         if (just_opened && v->is_id3_timestamped != 0) {
             /* Intercept ID3 tags here, elementary audio streams are required
              * to convey timestamps using them in the beginning of each segment. */
