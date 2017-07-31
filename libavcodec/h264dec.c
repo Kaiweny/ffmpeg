@@ -1062,8 +1062,23 @@ static int h264_decode_cc(AVCodecContext *avctx, void *data,
 
     AVFrameSideData *fsd = av_frame_get_side_data(pict, AV_FRAME_DATA_A53_CC);
     if (fsd) {
-        cc = (CCaption708SubContext*)h->sei.a53_caption.a53_context->priv_data;
-        cc_common_timing_ctx *timing =  cc->cc708ctx->timing;
+        AVCodecContext* h264_sei_a53_codec_ctx = h->sei.a53_caption.a53_context;
+        if (!h264_sei_a53_codec_ctx){
+            return 0;
+        }
+        cc = (CCaption708SubContext*)h264_sei_a53_codec_ctx ->priv_data;
+        if (!cc){
+            return 0;
+        }
+
+        cc_708_ctx* temp_cc_708_ctx = cc->cc708ctx;
+        if (! temp_cc_708_ctx){
+            return 0;
+        }
+        cc_common_timing_ctx *timing = temp_cc_708_ctx->timing;
+        if (!timing){
+            return 0;
+        }
         set_current_pts(timing, pict->pkt_pts);
         set_fts(timing, avctx->framerate);
 
