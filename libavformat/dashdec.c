@@ -1373,9 +1373,19 @@ static int refresh_manifest(AVFormatContext *s)
     c->cur_video = NULL;
     c->cur_audio = NULL;
     
+    #ifdef TESTING
+    printf( "%s---- Require Refreshing/Reloading with cur_seq_no[%d] trying to parse file[%s] ----\n", green_str, v->cur_seq_no, s->filename );
+    #endif // TESTING
+
     ret = parse_mainifest(s, s->filename, NULL);
-    if (ret != 0)
+    if (ret != 0) {
+        
+        #ifdef TESTING
+        printf( "%sFailed to Refresh/Reload: Parse Manifest gave non-zero ret[%d] \n", red_str, ret );
+        #endif // TESTING
+        
         goto finish;
+    }
     
     if (cur_video && cur_video->timelines || cur_audio && cur_audio->timelines)
     {
@@ -1827,10 +1837,10 @@ restart:
         if (ret)
             goto end;
 
-        printf("open input: %s \n", v->cur_seg->url);
+        printf("%sOpen input: %s \n", green_str, v->cur_seg->url);
         ret = open_input(c, v, v->cur_seg);
         if (ret < 0) {
-            printf("failed to open input: %s \n", v->cur_seg->url);
+            printf( "%sFailed to open input by (open_input): %s \n", red_str, v->cur_seg->url);
             if (ff_check_interrupt(c->interrupt_callback)) {
                 goto end;
                 ret = AVERROR_EXIT;
@@ -1906,8 +1916,7 @@ static int save_avio_options(AVFormatContext *s)
     return ret;
 }
 
-static int nested_io_open(AVFormatContext *s, AVIOContext **pb, const char *url,
-                          int flags, AVDictionary **opts)
+static int nested_io_open(AVFormatContext *s, AVIOContext **pb, const char *url, int flags, AVDictionary **opts)
 {
     av_log(s, AV_LOG_ERROR,
            "A HDS playlist item '%s' referred to an external file '%s'. "
