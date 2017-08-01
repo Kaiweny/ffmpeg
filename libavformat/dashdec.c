@@ -31,10 +31,13 @@
 // #define ALL_TOGETHER_REPS // If defined we store all representations together. (Currently we haven't integrated the refreshing/reloading if this is defined)
 
 // #define PRINTING // Only for temporary printfs rest should all be av_log
+// #define HTTPS // If Defined we replace https in BaseURL with http @Ahmed
+
 
 /**
  * @file
  */
+
 #include "libavutil/avstring.h"
 #include "libavutil/avassert.h"
 #include "libavutil/intreadwrite.h"
@@ -311,6 +314,7 @@ typedef struct DASHContext {
     char *selected_reps;
 } DASHContext;
 
+
 // ASK AHMED
 // checks if representation is among selected
 static int is_rep_selected(DASHContext *c, int rep_idx) {
@@ -394,8 +398,7 @@ static void free_segment(struct segment **seg)
 
 static void free_segment_list(struct representation *pls)
 {
-    int i;
-    for (i = 0; i < pls->n_segments; i++) {
+    for (int i = 0; i < pls->n_segments; ++i) {
         av_freep(&pls->segments[i]->url);
         av_freep(&pls->segments[i]);
     }
@@ -405,8 +408,7 @@ static void free_segment_list(struct representation *pls)
 
 static void free_timelines_list(struct representation *pls)
 {
-    int i;
-    for (i = 0; i < pls->n_timelines; i++) {
+    for (int i = 0; i < pls->n_timelines; ++i) {
         av_freep(&pls->timelines[i]);
     }
     av_freep(&pls->timelines);
@@ -522,7 +524,7 @@ static char *repl_str(const char *str, const char *from, const char *to)
 
     char *pret, *ret = NULL;
     const char *pstr2, *pstr = str;
-    size_t i, count = 0;
+    size_t count = 0;
     #if (__STDC_VERSION__ >= 199901L)
     uintptr_t *pos_cache_tmp, *pos_cache = NULL;
     #else
@@ -533,7 +535,7 @@ static char *repl_str(const char *str, const char *from, const char *to)
 
     /* Find all matches and cache their positions. */
     while ((pstr2 = strstr(pstr, from)) != NULL) {
-        count++;
+        ++count;
 
         /* Increase the cache size when necessary. */
         if (cache_sz < count) {
@@ -573,7 +575,7 @@ static char *repl_str(const char *str, const char *from, const char *to)
         pret = ret;
         memcpy(pret, str, pos_cache[0]);
         pret += pos_cache[0];
-        for (i = 0; i < count; i++) {
+        for ( size_t i = 0; i < count; ++i ) {
             memcpy(pret, to, tolen);
             pret += tolen;
             pstr = str + pos_cache[i] + fromlen;
@@ -629,17 +631,37 @@ finish:
     return new_url;
 }
 
+
+#ifdef HTTPS // @Ahmed
+static void delete_char(char *str, int i) {
+    int len = strlen(str);
+
+    for (; i < len - 1 ; ++i)
+    {
+       str[i] = str[i+1];
+    }
+
+    str[i] = '\0';
+}
+#endif //HTTPS
+
+
 static char * get_content_url(xmlNodePtr *baseUrlNodes, int n_baseUrlNodes, xmlChar *rep_id_val, xmlChar *rep_bandwidth_val, xmlChar *val)
 {
     char *tmp_str = av_mallocz(MAX_URL_SIZE);
     char *url = NULL;
-    int i;
-    for (i = 0; i < n_baseUrlNodes; ++i) {
+
+    for (int i = 0; i < n_baseUrlNodes; ++i) {
         if (baseUrlNodes[i] && baseUrlNodes[i]->children && baseUrlNodes[i]->children->type == XML_TEXT_NODE) {
             xmlChar *text = xmlNodeGetContent(baseUrlNodes[i]->children);
             if (text) {
                 char *tmp_str_2 = av_mallocz(MAX_URL_SIZE);
                 ff_make_absolute_url(tmp_str_2, MAX_URL_SIZE, tmp_str, text);
+
+                #ifdef HTTPS
+                if (strstr(tmp_str_2, "https") != NULL) { delete_char( tmp_str_2, 4 ); }
+                #endif //HTTPS
+
                 av_free(tmp_str);
                 tmp_str = tmp_str_2;
                 xmlFree(text);
@@ -667,8 +689,7 @@ static char * get_content_url(xmlNodePtr *baseUrlNodes, int n_baseUrlNodes, xmlC
 
 static xmlChar * get_val_from_nodes_tab(xmlNodePtr *nodes, const int n_nodes, const xmlChar *attrName)
 {
-    int i;
-    for (i = 0; i < n_nodes; ++i) {
+    for (int i = 0; i < n_nodes; ++i) {
         if (nodes[i]) {
             xmlChar *val = xmlGetProp(nodes[i], attrName);
             if (val)
@@ -973,7 +994,7 @@ static int parse_mainifest(AVFormatContext *s, const char *url, AVIOContext *in)
                             
                             char temp_rep_id[MAX_FIELD_LEN];
                             strcpy(temp_rep_id, rep_id_val);
-                            for (int i_rep = 0; i_rep < c->nb_representations; i_rep++){
+                            for (int i_rep = 0; i_rep < c->nb_representations; ++i_rep){
                                 if (strcmp(c->representations[i_rep]->id, temp_rep_id) == 0){ // Representation already exists (Just a reload)
                                     
                                     av_log(NULL, AV_LOG_INFO, "Representation id[%d] Already Exists. \n", c->representations[i_rep]->id);
@@ -1279,8 +1300,6 @@ cleanup:
 //#ifdef OLD_PATCH  // For Reference if we need to look at what we did before in the old patch
 static int64_t get_segment_start_time(struct representation *pls, int64_t cur_seq_no, DASHContext* c) {
         
-    int64_t i = 0;
-    int64_t j = 0;
     int64_t num = 0;
     int64_t startTime = 0;
 
@@ -1295,20 +1314,20 @@ static int64_t get_segment_start_time(struct representation *pls, int64_t cur_se
     }
 
     if (pls->n_timelines) {
-        for (i = 0; i < pls->n_timelines; ++i) {
+        for ( int64_t i = 0; i < pls->n_timelines; ++i ) {
             if (pls->timelines[i]->t > 0) {
                 startTime = pls->timelines[i]->t;
             }
             if (num == cur_seq_no)
                 goto finish;
             startTime += pls->timelines[i]->d;
-            for (j = 0; j < pls->timelines[i]->r; ++j) {
+            for ( int64_t j = 0; j < pls->timelines[i]->r; ++j ) {
                 num++;
                 if (num == cur_seq_no)
                     goto finish;
                 startTime += pls->timelines[i]->d;
             }
-            num++;
+            ++num;
         }
     }
 
@@ -1323,11 +1342,9 @@ static int64_t get_segment_start_time_based_on_timeline( struct representation *
     int64_t startTime = 0;
     if (pls->n_timelines) {
         
-        int64_t i = 0;
-        int64_t j = 0;
         int64_t num = 0;
 
-        for (i=0; i<pls->n_timelines; ++i) {
+        for (int64_t i = 0; i<pls->n_timelines; ++i) {
             if (pls->timelines[i]->t > 0) {
                 startTime = pls->timelines[i]->t;
             }
@@ -1337,7 +1354,7 @@ static int64_t get_segment_start_time_based_on_timeline( struct representation *
             
             startTime += pls->timelines[i]->d;
             
-            for (j = 0; j < pls->timelines[i]->r; ++j) {
+            for (int64_t j = 0; j < pls->timelines[i]->r; ++j) {
                 num += 1;
                 if (num == cur_seq_no)
                     goto finish;
@@ -1354,12 +1371,10 @@ finish:
 
 static int64_t calc_next_seg_no_from_timelines(struct representation *pls, int64_t currentTime)
 {
-    int64_t i = 0;
-    int64_t j = 0;
     int64_t num = 0;
     int64_t startTime = 0;
     
-    for (i=0; i<pls->n_timelines; ++i) {
+    for ( int64_t i = 0; i<pls->n_timelines; ++i ) {
         if (pls->timelines[i]->t > 0) {
             startTime = pls->timelines[i]->t;
 
@@ -1370,7 +1385,7 @@ static int64_t calc_next_seg_no_from_timelines(struct representation *pls, int64
         
         startTime += pls->timelines[i]->d;
         
-        for (j = 0; j < pls->timelines[i]->r; ++j) {
+        for ( int64_t j = 0; j < pls->timelines[i]->r; ++j ) {
             num += 1;
             if (startTime > currentTime)
                 goto finish;
@@ -1560,9 +1575,8 @@ static int64_t calc_max_seg_no(struct representation *pls, DASHContext *c) {
     if (pls->n_segments) {
         num = pls->first_seq_no + pls->n_segments - 1;
     } else if (pls->n_timelines) {
-        int i = 0;
         num = pls->first_seq_no + pls->n_timelines - 1;
-        for (i=0; i<pls->n_timelines; ++i) {
+        for ( int i = 0; i < pls->n_timelines; ++i ) {
             num += pls->timelines[i]->r;
         }
     }
@@ -1865,7 +1879,7 @@ static int update_init_section(struct representation *pls)
                 // find all stsd entries
                 stsd_entries = av_mallocz_array(stsd_count, sizeof(*stsd_entries));
                 stsd_entries_size = av_mallocz_array(stsd_count, sizeof(*stsd_entries_size));
-                for (j=0; j<stsd_count; ++j) {
+                for ( j = 0; j < stsd_count; ++j) {
                     // 4B - size
                     // 4B - format
                     stsd_entries_size[j] = AV_RB32(pls->init_sec_buf + stsd_first_offset + stsd_offset);
@@ -1881,7 +1895,7 @@ static int update_init_section(struct representation *pls)
                 memcpy(pls->init_sec_buf + stsd_offset, stsd_entries[j], stsd_entries_size[j]);
                 stsd_offset += stsd_entries_size[j];
                 
-                for (j=0; j<stsd_count; ++j) {
+                for ( j = 0; j < stsd_count; ++j) {
                     if (j != pls->rep_idx) {
                         memcpy(pls->init_sec_buf + stsd_offset, stsd_entries[j], stsd_entries_size[j]);
                         stsd_offset += stsd_entries_size[j];
@@ -2261,7 +2275,7 @@ static int dash_read_header(AVFormatContext *s)
     printf("%sStart Selecting Reps: [%s] \n", mag_str, c->selected_reps);
     #endif //PRINTING
     
-    for (int repIndex = 0; repIndex < c->nb_representations; repIndex++) {
+    for (int repIndex = 0; repIndex < c->nb_representations; ++repIndex) {
         
         c->representations[repIndex]->needed = 0;
         
@@ -2352,7 +2366,7 @@ static int dash_read_header(AVFormatContext *s)
 
 #ifdef ALL_TOGETHER_REPS
         // Our Method @ShahzadLone for info!
-        for (int repIndex = 0; repIndex < c->nb_representations; repIndex++) {
+        for (int repIndex = 0; repIndex < c->nb_representations; ++repIndex) {
             if (c->representations[repIndex])
                 av_program_add_stream_index(s, 0, c->representations[repIndex]->stream_index);
         }
@@ -2522,12 +2536,13 @@ static int dash_seek(AVFormatContext *s, struct representation *pls, int64_t see
     
     // find the nearest segment
     if (pls->n_timelines > 0 && pls->segmentTimescalce > 0) {
-        int64_t duration = 0;
-        int i;
-        int j;
-        int64_t num = pls->first_seq_no;
+
         av_log(pls->parent, AV_LOG_VERBOSE, "dash_seek with SegmentTimeline start n_timelines[%d] last_seq_no[%"PRId64"], playlist %d.\n", (int)pls->n_timelines, (int64_t)pls->last_seq_no, (int)pls->rep_idx);
-        for (i = 0; i < pls->n_timelines; ++i) {
+        
+        int64_t duration = 0;
+        int64_t num = pls->first_seq_no;
+
+        for ( int i = 0; i < pls->n_timelines; ++i ) {
             if (pls->timelines[i]->t > 0) {
                 duration = pls->timelines[i]->t;
             }
@@ -2537,7 +2552,7 @@ static int dash_seek(AVFormatContext *s, struct representation *pls, int64_t see
                 goto set_seq_num;
             }
             
-            for (j = 0; j < pls->timelines[i]->r; ++j) {
+            for ( int j = 0; j < pls->timelines[i]->r; ++j ) {
                 duration += pls->timelines[i]->d;
                 num += 1;
                 if (seekPosMSec < ((duration * 1000) /  pls->segmentTimescalce)) {
