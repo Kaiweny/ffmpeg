@@ -237,10 +237,11 @@ struct representation {
      *  return the last segment timestamp in the timeline.
      *  Use this temporary variable to track the first seq_no.
      */ 
+
     int64_t first_seq_no_in_representation;
-    
+
     char id[MAX_FIELD_LEN];
-    char codecs[MAX_FIELD_LEN]; 
+    char codecs[MAX_FIELD_LEN];
     int height;
     int width;
     int frameRate;
@@ -1423,7 +1424,6 @@ static int64_t calc_max_seg_no(struct representation *pls, DASHContext *c) {
         num = pls->first_seq_no + pls->n_timelines - 1;
         for (i=0; i<pls->n_timelines; ++i) {
             num += pls->timelines[i]->r;
-
         }
     }
     else if (c->is_live) {
@@ -1435,7 +1435,6 @@ static int64_t calc_max_seg_no(struct representation *pls, DASHContext *c) {
 
     return num;
 }
-
 
 static struct segment *get_current_segment(struct representation *pls)
 {
@@ -1462,7 +1461,6 @@ static struct segment *get_current_segment(struct representation *pls)
 
         printf("get_current_segment (is_live)\n");
 
-
         while ( !( ff_check_interrupt( c->interrupt_callback ) ) )  { // Updated Patch's Loop @ShahzadLone
         /* USED IN OLD PATCH
         while (1) {
@@ -1473,6 +1471,7 @@ static struct segment *get_current_segment(struct representation *pls)
             int64_t max_seq_no = calc_max_seg_no(pls, c);
 
             if (pls->cur_seq_no <= min_seq_no) {
+
                 av_log(pls->parent, AV_LOG_VERBOSE, "%s to old segment: cur[%"PRId64"] min[%"PRId64"] max[%"PRId64"], playlist %d\n", __FUNCTION__, (int64_t)pls->cur_seq_no, min_seq_no, max_seq_no, (int)pls->rep_idx);
                 if (c->is_live && (pls->timelines || pls->segments)) {
                     refresh_manifest(pls->parent);
@@ -1745,7 +1744,7 @@ restart:
         //int64_t reload_interval = v->n_timelines > 0 ? v->timelines[v->n_timelines-1]->d : v->target_duration;
         //reload:
         //if ( ( v->first_seq_no_in_representation ) && 
-        //     ( ( v->cur_seq_no - v->first_seq_no_in_representation ) > 100 ) ) {
+        //     ( ( v->cur_seq_no - v->first_seq_no_in_representation ) > 10 ) ) {
         //    AVFormatContext* fmtctx = v->parent;
         //    printf("require reload-------------------------------\n");
         //    if ((ret = parse_manifest(fmtctx, fmtctx->filename, NULL)) < 0) {
@@ -1969,7 +1968,21 @@ static int open_demux_for_component(AVFormatContext *s, struct representation *p
         st->id = i;
 
         // avcodec_copy_context(st->codec, pls->ctx->streams[i]->codec);
+        
+        // Added default Pixel Format of YUV420P in case not initialized. 
+        if (pls->ctx->streams[i]->codecpar->format == AV_PIX_FMT_NONE)
+            pls->ctx->streams[i]->codecpar->format = AV_PIX_FMT_YUV420P; //DEFAULT PIX FORMAT
+        if (pls->ctx->streams[i]->codec->pix_fmt == AV_PIX_FMT_NONE)
+            pls->ctx->streams[i]->codec->pix_fmt = AV_PIX_FMT_YUV420P; //DEFAULT PIX FORMAT
+
         avcodec_parameters_copy(st->codecpar, pls->ctx->streams[i]->codecpar);
+        avcodec_copy_context(st->codec, pls->ctx->streams[i]->codec);
+        
+        #ifdef TESTING
+        av_log(NULL, AV_LOG_ERROR, "st->codec->pix_fmt = %d\n", st->codec->pix_fmt);
+        av_log(NULL, AV_LOG_ERROR, "st->codecpar->format = %d\n", st->codecpar->format);
+        #endif //TESTING
+        
         avpriv_set_pts_info(st, ist->pts_wrap_bits, ist->time_base.num, ist->time_base.den);
     }   
     
