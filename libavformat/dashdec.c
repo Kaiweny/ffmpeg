@@ -261,6 +261,7 @@ struct representation {
     int frameRate;
     char scanType[MAX_FIELD_LEN];
     char mimeType[MAX_FIELD_LEN];
+    char contentType[MAX_FIELD_LEN];
     int bandwidth;
 
     int needed;
@@ -695,7 +696,7 @@ static xmlNodePtr findChildNodeByName(xmlNodePtr rootnode, const xmlChar *nodena
     return NULL;
 }
 
-static enum RepType get_content_type(xmlNodePtr node, xmlChar **mimeType) 
+static enum RepType get_content_type(xmlNodePtr node, xmlChar **mimeType, xmlChar **contentType) 
 {
     enum RepType type = REP_TYPE_UNSPECIFIED;
 
@@ -703,7 +704,8 @@ static enum RepType get_content_type(xmlNodePtr node, xmlChar **mimeType)
 
     if (node) {
         
-        for ( int i = 0; ( (type == REP_TYPE_UNSPECIFIED) && (i < 2) ); ++i ) {
+        //for ( int i = 0; ( (type == REP_TYPE_UNSPECIFIED) && (i < 2) ); ++i ) {    
+        for ( int i = 0; i < 2; ++i ) {
             
             const char *attr = (i == 0) ? "contentType" : "mimeType"; 
             
@@ -711,12 +713,16 @@ static enum RepType get_content_type(xmlNodePtr node, xmlChar **mimeType)
             val = xmlGetProp(node, attr);
 
             if (val) {
+
                 if (strstr((const char *) val, "video")) {
                     type = REP_TYPE_VIDEO;
-                    *mimeType = val;
+                    if (i == 0) { *contentType = val; }
+                    if (i == 1) { *mimeType = val; }
                 } else if (strstr((const char *) val, "audio")) {
                     type = REP_TYPE_AUDIO;
-                    *mimeType = val;
+                    if (i == 0) { *contentType = val; }
+                    if (i == 1) { *mimeType = val; }
+
                 }
                 //xmlFree(val); ASK AHMED WHY COMMENTED
             }
@@ -732,6 +738,7 @@ static enum RepType get_content_type(xmlNodePtr node, xmlChar **mimeType)
 static int parse_mainifest(AVFormatContext *s, const char *url, AVIOContext *in)
 {
     DASHContext *c = s->priv_data;
+
     int repIndex = c->rep_index;
 
     av_log(NULL, AV_LOG_VERBOSE, "(repIndex, rep_index) = (%d, %d)\n", repIndex, c->rep_index);
@@ -919,9 +926,7 @@ static int parse_mainifest(AVFormatContext *s, const char *url, AVIOContext *in)
                         adaptionSetBaseUrlNode = node;
                     } else if (!xmlStrcmp(node->name, (const xmlChar *)"Representation")) {
 
-                        #ifdef PRINTING
                         av_log(NULL, AV_LOG_INFO, "Representation: [%d] \n", ++nb_representation);
-                        #endif // PRINTING
 
                         xmlNodePtr representationNode = node;
                         
@@ -929,6 +934,7 @@ static int parse_mainifest(AVFormatContext *s, const char *url, AVIOContext *in)
                         xmlChar *rep_bandwidth_val = xmlGetProp(representationNode, "bandwidth");
                         //xmlChar *rep_mimeType_val = xmlGetProp(representation_node, "mimeType");
                         xmlChar *rep_mimeType_val = NULL;
+                        xmlChar *rep_contentType_val = NULL;
                         xmlChar *rep_codecs_val = xmlGetProp(representationNode, "codecs");
                         xmlChar *rep_height_val = xmlGetProp(representationNode, "height");
                         xmlChar *rep_width_val = xmlGetProp(representationNode, "width");
@@ -940,15 +946,15 @@ static int parse_mainifest(AVFormatContext *s, const char *url, AVIOContext *in)
                         
                         // try get information from representation
                         if (type == REP_TYPE_UNSPECIFIED) {
-                            type = get_content_type(representationNode, &rep_mimeType_val);
+                            type = get_content_type(representationNode, &rep_mimeType_val, &rep_contentType_val);
                         }
                         // try get information from contentComponen
                         if (type == REP_TYPE_UNSPECIFIED) {
-                            type = get_content_type(contentComponentNode, &rep_mimeType_val);
+                            type = get_content_type(contentComponentNode, &rep_mimeType_val, &rep_contentType_val);
                         }
                         // try get information from adaption set
                         if (type == REP_TYPE_UNSPECIFIED) {
-                            type = get_content_type(adaptionSetNode, &rep_mimeType_val);
+                            type = get_content_type(adaptionSetNode, &rep_mimeType_val, &rep_contentType_val);
                         }
                         
                         if (type == REP_TYPE_UNSPECIFIED) {
@@ -994,11 +1000,14 @@ static int parse_mainifest(AVFormatContext *s, const char *url, AVIOContext *in)
                             #endif // ALL_TOGETHER_REPS
 
                             // Added to read more metadata from manifest and expand Representation structure. @ShahzadLone for info!
-                            #ifdef PRINTING
-                            av_log(NULL, AV_LOG_VERBOSE, "rep(%s,%s,%s,%s,%s,%s,%s,%s)\n", (char *)rep_id_val, (char *)rep_mimeType_val, (char *)rep_codecs_val, (char *)rep_height_val, (char *)rep_width_val, (char *)rep_frameRate_val, (char *)rep_scanType_val, (char *)rep_bandwidth_val);
-                            #endif //PRINTING
+                            av_log(NULL, AV_LOG_VERBOSE, "rep(id[%s],mimeType[%s],contentType[%s],codecs[%s],height[%s],width[%s],frameRate[%s],scanType[%s],bandwidth[%s]) -- before \n", 
+                                   (char *)rep_id_val, (char *)rep_mimeType_val, (char *)rep_contentType_val, (char *)rep_codecs_val, (char *)rep_height_val, (char *)rep_width_val, (char *)rep_frameRate_val, (char *)rep_scanType_val, (char *)rep_bandwidth_val);
                             
                             if (rep_id_val) { strcpy(rep->id, rep_id_val); }
+
+                            if (rep_mimeType_val) { strcpy(rep->mimeType, rep_mimeType_val); }
+
+                            if (rep_contentType_val) { strcpy(rep->contentType, rep_contentType_val); }
 
                             if (rep_codecs_val) { strcpy(rep->codecs, rep_codecs_val); }
   
@@ -1016,10 +1025,9 @@ static int parse_mainifest(AVFormatContext *s, const char *url, AVIOContext *in)
                             rep->bandwidth = 0;
                             if (rep_bandwidth_val) { rep->bandwidth = strtol((char *)rep_bandwidth_val, NULL, 0); }
 
-                            #ifdef PRINTING
-                            av_log(NULL, AV_LOG_VERBOSE, "rep(%s,%s,%s,%d,%d,%d,%s,%d)\n", rep->id, rep->mimeType, rep->codecs, rep->height, rep->width, rep->frameRate, rep->scanType, rep->bandwidth);
-                            #endif //PRINTING
-
+                            av_log(NULL, AV_LOG_VERBOSE, "rep(id[%s],mimeType[%s],contentType[%s],codecs[%s],height[%d],width[%d],frameRate[%d],scanType[%s],bandwidth[%d]) -- after \n",
+                                   rep->id, rep->mimeType, rep->contentType, rep->codecs, rep->height, rep->width, rep->frameRate, rep->scanType, rep->bandwidth);
+                            
                             xmlNodePtr representationSegmentTemplateNode = findChildNodeByName(representationNode, "SegmentTemplate");
                             xmlNodePtr representationBaseUrlNode = findChildNodeByName(representationNode, "BaseURL");
                             xmlNodePtr representationSegmentListNode = findChildNodeByName(representationNode, "SegmentList");
@@ -1612,7 +1620,7 @@ static struct segment *get_current_segment(struct representation *pls)
             av_log( c, AV_LOG_DEBUG, "[HIT 1](enter while) with min[%d], cur[%d], max[%d]\n", min_seq_no, pls->cur_seq_no, max_seq_no );
 
             #ifdef PRINTING
-            printf( "%s [HIT 1](enter while) with min[%d], cur[%d], max[%d]\n", yellow_str, min_seq_no, pls->cur_seq_no, max_seq_no);
+            printf( "%s[HIT 1](enter while) with min[%d], cur[%d], max[%d]\n", yellow_str, min_seq_no, pls->cur_seq_no, max_seq_no);
             #endif //PRINTING
 
             if (pls->cur_seq_no <= min_seq_no) {
@@ -1620,7 +1628,7 @@ static struct segment *get_current_segment(struct representation *pls)
                 av_log( c, AV_LOG_DEBUG, "[HIT 2](if [cur <= min] case)\n" );
                
                 #ifdef PRINTING
-                printf("%s [HIT 2](if [cur <= min] case)\n", cyan_str);
+                printf("%s[HIT 2](if [cur <= min] case)\n", cyan_str);
                 #endif //PRINTING
 
                 av_log(pls->parent, AV_LOG_VERBOSE, "%s to old segment: cur[%"PRId64"] min[%"PRId64"] max[%"PRId64"], playlist %d\n", __FUNCTION__, (int64_t)pls->cur_seq_no, min_seq_no, max_seq_no, (int)pls->rep_idx);
@@ -1635,7 +1643,7 @@ static struct segment *get_current_segment(struct representation *pls)
                 av_log( pls->parent, AV_LOG_DEBUG, "[HIT 3](Else if [cur > max] case)\n" );
 
                 #ifdef PRINTING
-                printf("%s [HIT 3](Else if [cur > max] case)\n", cyan_str);
+                printf("%s[HIT 3](Else if [cur > max] case)\n", cyan_str);
                 #endif //PRINTING
 
                 av_log(c, AV_LOG_VERBOSE, "%s wait for new segment: min[%"PRId64"] max[%"PRId64"], playlist %d\n", __FUNCTION__, min_seq_no, max_seq_no, (int)pls->rep_idx);
@@ -1644,13 +1652,14 @@ static struct segment *get_current_segment(struct representation *pls)
                 if (c->is_live && (pls->timelines || pls->segments)) {
                     refresh_manifest(pls->parent);
                 }
+
                 continue;
             }
 
-            av_log( c, AV_LOG_DEBUG, "HIT 4 (break)\n" );
+            av_log( c, AV_LOG_DEBUG, "[HIT 4](break)\n" );
 
             #ifdef PRINTING
-            printf( "%s HIT 4 (break)\n", yellow_str);
+            printf( "%s[HIT 4](break)\n", yellow_str);
             #endif //PRINTING
 
             break;
@@ -2280,6 +2289,7 @@ static int dash_read_header(AVFormatContext *s)
 
         av_log(NULL, AV_LOG_VERBOSE, "rep[%d]->id = (%s) \n", repIndex, c->representations[repIndex]->id);
         av_log(NULL, AV_LOG_VERBOSE, "rep[%d]->mimeType = (%s) \n", repIndex, c->representations[repIndex]->mimeType);
+        av_log(NULL, AV_LOG_VERBOSE, "rep[%d]->contentType = (%s) \n", repIndex, c->representations[repIndex]->contentType);
         av_log(NULL, AV_LOG_VERBOSE, "rep[%d]->codecs = (%s) \n", repIndex, c->representations[repIndex]->codecs);
         av_log(NULL, AV_LOG_VERBOSE, "rep[%d]->height = (%d) \n", repIndex, c->representations[repIndex]->height);
         av_log(NULL, AV_LOG_VERBOSE, "rep[%d]->width = (%d) \n", repIndex, c->representations[repIndex]->width);
@@ -2287,7 +2297,7 @@ static int dash_read_header(AVFormatContext *s)
         av_log(NULL, AV_LOG_VERBOSE, "rep[%d]->scanType = (%d) \n", repIndex, c->representations[repIndex]->scanType);
         av_log(NULL, AV_LOG_VERBOSE, "rep[%d]->bandwidth = (%d) \n", repIndex, c->representations[repIndex]->bandwidth);
         av_log(NULL, AV_LOG_VERBOSE, "rep[%d]->needed = (%d) \n", repIndex, c->representations[repIndex]->needed);
-        
+
         av_log(NULL, AV_LOG_INFO, "Selected these Reps: [%s] \n", c->selected_reps);
 
         #ifdef PRINTING
