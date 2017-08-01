@@ -30,7 +30,6 @@
 // #define AHMED_READ_PACKET // If defined then use ahmed's new read packet function. (Probably should be used with ALL_TOGETHER_REPS)
 // #define ALL_TOGETHER_REPS // If defined we store all representations together. (Currently we haven't integrated the refreshing/reloading if this is defined)
 
-
 /**
  * @file
  */
@@ -263,7 +262,11 @@ struct representation {
     char mimeType[MAX_FIELD_LEN];
     int bandwidth;
 
-    int needed; // ASK AHMED
+
+    int needed;
+
+    ffurl_read_callback mpegts_parser_input_backup;
+    void* mpegts_parser_input_context_backup;
 
 };
 
@@ -1437,7 +1440,7 @@ static int refresh_manifest(AVFormatContext *s)
     c->cur_audio = NULL;
     
     #ifdef PRINTING
-    printf( "%s---- Require Refreshing/Reloading with cur_seq_no[%d] trying to parse file[%s] ----\n", green_str, v->cur_seq_no, s->filename );
+    printf( "%s---- Require Refreshing/Reloading so try to parse file with name[%s] ----\n", green_str, s->filename );
     #endif // PRINTING
 
     ret = parse_mainifest(s, s->filename, NULL);
@@ -1615,7 +1618,7 @@ static struct segment *get_current_segment(struct representation *pls)
             if (pls->cur_seq_no <= min_seq_no) {
 
                 #ifdef PRINTING
-                printf("%s HIT 2(if [cur <= min] case)\n", blue_str);
+                printf("%s HIT 2(if [cur <= min] case)\n", cyan_str);
                 #endif //PRINTING
 
                 av_log(pls->parent, AV_LOG_VERBOSE, "%s to old segment: cur[%"PRId64"] min[%"PRId64"] max[%"PRId64"], playlist %d\n", __FUNCTION__, (int64_t)pls->cur_seq_no, min_seq_no, max_seq_no, (int)pls->rep_idx);
@@ -1628,7 +1631,7 @@ static struct segment *get_current_segment(struct representation *pls)
             else if (pls->cur_seq_no > max_seq_no) {
 
                 #ifdef PRINTING
-                printf("%s HIT 3 (Else if [cur > max] case)\n", blue_str);
+                printf("%s HIT 3 (Else if [cur > max] case)\n", cyan_str);
                 #endif //PRINTING
 
                 av_log(pls->parent, AV_LOG_VERBOSE, "%s wait for new segment: min[%"PRId64"] max[%"PRId64"], playlist %d\n", __FUNCTION__, min_seq_no, max_seq_no, (int)pls->rep_idx);
@@ -1895,11 +1898,26 @@ static int64_t seek_data(void *opaque, int64_t offset, int whence)
     return AVERROR(ENOSYS);
 }
 
+struct AVIOInternal {
+    URLContext *h;
+};
+
 static int read_data(void *opaque, uint8_t *buf, int buf_size)
 {
+    int ret = 0;
     struct representation *v = opaque;
     DASHContext *c = v->parent->priv_data;
-    int ret = 0;
+    struct AVIOInternal* interal = NULL;
+    URLContext* urlc = NULL;
+
+    // keep reference of mpegts parser callback mechanism
+    if(v->input) { 
+        interal = (struct AVIOInternal*)v->input->opaque;
+        urlc = (URLContext*)interal->h;
+        v->mpegts_parser_input_backup = urlc->mpegts_parser_injection;
+        v->mpegts_parser_input_context_backup = urlc->mpegts_parser_injection_context;
+    }
+
 restart:
     if (!v->input) {
 
@@ -1990,10 +2008,21 @@ restart:
         v->cur_seq_no += 1;
     v->is_restart_needed = 1;
     
-    // ff_format_io_close(v->parent, &v->input);
+    // ??? Commented out in the upgraded patch from before not sure why.
+    // ff_format_io_close(v->parent, &v->input); 
     // v->cur_seq_no += 1;
     // goto restart;
+
 end:
+
+    // replace mpegts parser callback mechanism
+    if(interal && urlc && v->input) {
+        interal = (struct AVIOInternal*)v->input->opaque;
+        urlc = (URLContext*)interal->h;
+        urlc->mpegts_parser_injection = v->mpegts_parser_input_backup;
+        urlc->mpegts_parser_injection_context = v->mpegts_parser_input_context_backup;
+    }
+
     return ret;
 }
 
