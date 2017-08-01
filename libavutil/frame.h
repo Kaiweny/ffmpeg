@@ -240,7 +240,13 @@ typedef struct cc_608_data_points {
     int dual_control_command_check; //bool default 0 else 1
     int popon_presentation_error; //bool default 0 else 1
     int parity_error; //bool deafult  0 else 1
-} cc_608_data_points;
+    //oos - out of sequence command error
+    int popon_oos_error; //bool default 0 else 1
+    //missing command error
+    int popon_missing_error; //bool default 0 else 1
+    int rollup_oos_error; //bool default 0 else 1
+    int rollup_missing_error; //bool default 0 else 1    
+} cc_608_data_points; 
 
 
 /**
