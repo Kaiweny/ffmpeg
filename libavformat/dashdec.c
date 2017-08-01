@@ -262,7 +262,6 @@ struct representation {
     char mimeType[MAX_FIELD_LEN];
     int bandwidth;
 
-
     int needed;
 
     ffurl_read_callback mpegts_parser_input_backup;
@@ -1911,7 +1910,9 @@ static int read_data(void *opaque, uint8_t *buf, int buf_size)
     URLContext* urlc = NULL;
 
     // keep reference of mpegts parser callback mechanism
-    if(v->input) { 
+
+    if(v->input) {
+
         interal = (struct AVIOInternal*)v->input->opaque;
         urlc = (URLContext*)interal->h;
         v->mpegts_parser_input_backup = urlc->mpegts_parser_injection;
@@ -2143,22 +2144,20 @@ fail:
     return ret;
 }
 
-static int open_demux_for_component(AVFormatContext *s, struct representation *pls)
+static int open_demux_for_component(AVFormatContext *s, struct representation *pls, int rep_idx)
 {
     int ret = 0;
-    int i;
     
     pls->parent = s;
     pls->cur_seq_no  = calc_cur_seg_no(pls, s->priv_data);
     pls->last_seq_no = calc_max_seg_no(pls, s->priv_data);
-
 
     ret = reopen_demux_for_component(s, pls);
     if (ret < 0) {
         goto fail;
     }
     
-    for (i = 0; i < pls->ctx->nb_streams; i++) {
+    for (int i = 0; i < pls->ctx->nb_streams; ++i) {
         AVStream *st = avformat_new_stream(s, NULL);
         AVStream *ist = pls->ctx->streams[i];
         if (!st) {
@@ -2172,12 +2171,16 @@ static int open_demux_for_component(AVFormatContext *s, struct representation *p
         // Added default Pixel Format of YUV420P in case not initialized. 
         if (pls->ctx->streams[i]->codecpar->format == AV_PIX_FMT_NONE)
             pls->ctx->streams[i]->codecpar->format = AV_PIX_FMT_YUV420P; //DEFAULT PIX FORMAT
+
         if (pls->ctx->streams[i]->codec->pix_fmt == AV_PIX_FMT_NONE)
             pls->ctx->streams[i]->codec->pix_fmt = AV_PIX_FMT_YUV420P; //DEFAULT PIX FORMAT
 
         avcodec_parameters_copy(st->codecpar, pls->ctx->streams[i]->codecpar);
         avcodec_copy_context(st->codec, pls->ctx->streams[i]->codec);
-        
+
+        // Make stream Indices same as Rep Indices (for uniqueness). TODO: what if multiple streams per representation
+        st->id = rep_idx;
+
         #ifdef PRINTING
         av_log(NULL, AV_LOG_ERROR, "st->codec->pix_fmt = %d\n", st->codec->pix_fmt);
         av_log(NULL, AV_LOG_ERROR, "st->codecpar->format = %d\n", st->codecpar->format);
@@ -2238,9 +2241,10 @@ static int dash_read_header(AVFormatContext *s)
             
             c->representations[repIndex]->needed = 1;
         }
+
         if ( (ret == 0) && c->representations[repIndex]) {
-            ret = open_demux_for_component(s, c->representations[repIndex]);
-            if (!ret) {
+            ret = open_demux_for_component(s, c->representations[repIndex], repIndex);
+            if (ret == 0) {
                 c->representations[repIndex]->stream_index = stream_index;
                 ++stream_index;
             } else {
@@ -2251,6 +2255,7 @@ static int dash_read_header(AVFormatContext *s)
 
         #ifdef PRINTING
         av_log(NULL, AV_LOG_ERROR, "rep[%d]->id = %s\n", repIndex, c->representations[repIndex]->id);
+        av_log(NULL, AV_LOG_ERROR, "rep[%d]->mimeType = %s\n", repIndex, c->representations[repIndex]->mimeType);
         av_log(NULL, AV_LOG_ERROR, "rep[%d]->codecs = %s\n", repIndex, c->representations[repIndex]->codecs);
         av_log(NULL, AV_LOG_ERROR, "rep[%d]->height = %d\n", repIndex, c->representations[repIndex]->height);
         av_log(NULL, AV_LOG_ERROR, "rep[%d]->width = %d\n", repIndex, c->representations[repIndex]->width);
@@ -2267,7 +2272,7 @@ static int dash_read_header(AVFormatContext *s)
     /* Open the demuxer for curent video and current audio components if available "UPGRADED PATCH WAY" */
     if ( ( 0 == ret ) && ( c->cur_video ) ) {
 
-        ret = open_demux_for_component(s, c->cur_video);
+        ret = open_demux_for_component(s, c->cur_video, c->cur_video->rep_idx);
         if (ret == 0) {
             c->cur_video->stream_index = stream_index;
             ++stream_index;
@@ -2279,7 +2284,7 @@ static int dash_read_header(AVFormatContext *s)
     
     if ( ( 0 == ret ) && ( c->cur_audio ) ) {
 
-        ret = open_demux_for_component(s, c->cur_audio);
+        ret = open_demux_for_component(s, c->cur_audio, c->cur_audio->rep_idx);
         if (ret == 0) {
             c->cur_audio->stream_index = stream_index;
             ++stream_index;
@@ -2601,3 +2606,4 @@ AVInputFormat ff_dash_demuxer = {
     .read_seek      = dash_read_seek,
     .flags          = AVFMT_NO_BYTE_SEEK,
 };
+
