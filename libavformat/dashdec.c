@@ -24,6 +24,9 @@
   * 
   */
 
+// @ShahzadLone for more information!
+// #define ALL_TOGETHER_REPS // If defined we store all representations together.
+
 /**
  * @file
  */
@@ -225,7 +228,10 @@ typedef struct DASHContext {
     AVClass *class;
 
     char *base_url;
-    
+
+    int nb_representations;
+    struct representation **representations;
+
     struct representation *cur_video;
     struct representation *cur_audio;
     
@@ -252,6 +258,7 @@ typedef struct DASHContext {
     char *cookies;                       ///< holds HTTP cookie values set in either the initial response or as an AVOption to the HTTP protocol context
     char *headers;                       ///< holds HTTP headers set as an AVOption to the HTTP protocol context
     AVDictionary *avio_opts;
+    int rep_index;
 } DASHContext;
 
 
@@ -590,9 +597,14 @@ static enum RepType get_content_type(xmlNodePtr node)
     return type;
 }
 
+
 static int parse_mainifest(AVFormatContext *s, const char *url, AVIOContext *in)
 {
     DASHContext *c = s->priv_data;
+    int repIndex = c->rep_index;
+    #ifdef TESTING
+    av_log(NULL, AV_LOG_ERROR, "(repIndex, rep_index) = (%d, %d)\n", repIndex, c->rep_index);
+    #endif
     int ret = 0;
     int close_in = 0;
     uint8_t *new_url = NULL;
@@ -709,10 +721,17 @@ static int parse_mainifest(AVFormatContext *s, const char *url, AVIOContext *in)
         
         // at now we can handle only one period, with the longest duration
         node = xmlFirstElementChild(node);
+        int nb_periods = 0;
         while (node) {
             if (!xmlStrcmp(node->name, (const xmlChar *)"Period")) {
+
                 perdiodDurationSec = 0;
                 perdiodStartSec = 0;
+
+                #ifdef TESTING
+                av_log(NULL, AV_LOG_ERROR, "Period: %d\n", ++nb_periods);
+                #endif
+
                 attr = node->properties;
                 while(attr) {
                     val = xmlGetProp(node, attr->name);
@@ -743,18 +762,26 @@ static int parse_mainifest(AVFormatContext *s, const char *url, AVIOContext *in)
             ret = AVERROR_INVALIDDATA;
             goto cleanup;
         }
-        
+       
         // explore AdaptationSet
         adaptionSetNode = xmlFirstElementChild(periodNode);
+        int nb_adaptationsets = 0;
         while (adaptionSetNode) {
             if (!xmlStrcmp(adaptionSetNode->name, (const xmlChar *)"BaseURL")) {
                 periodBaseUrlNode = adaptionSetNode;
             } else if (!xmlStrcmp(adaptionSetNode->name, (const xmlChar *)"AdaptationSet")) {
+
+                #ifdef TESTING
+                av_log(NULL, AV_LOG_ERROR, "Adaptaion Set: %d\n", ++nb_adaptationsets);
+                #endif
+
                 xmlNodePtr segmentTemplateNode = NULL;
                 xmlNodePtr contentComponentNode = NULL;
                 xmlNodePtr adaptionSetBaseUrlNode = NULL;
                 
                 node = xmlFirstElementChild(adaptionSetNode);
+
+                int nb_representation = 0;
                 while (node) {
                     if (!xmlStrcmp(node->name, (const xmlChar *)"SegmentTemplate")) {
                         segmentTemplateNode = node;
@@ -763,6 +790,11 @@ static int parse_mainifest(AVFormatContext *s, const char *url, AVIOContext *in)
                     } else if (!xmlStrcmp(node->name, (const xmlChar *)"BaseURL")) {
                         adaptionSetBaseUrlNode = node;
                     } else if (!xmlStrcmp(node->name, (const xmlChar *)"Representation")) {
+
+                        #ifdef TESTING  
+                        av_log(NULL, AV_LOG_ERROR, "Representation: %d\n", ++nb_representation);
+                        #endif
+
                         xmlNodePtr representationNode = node;
                         xmlChar *rep_id_val = xmlGetProp(representationNode, "id");
                         xmlChar *rep_bandwidth_val = xmlGetProp(representationNode, "bandwidth");
@@ -781,8 +813,13 @@ static int parse_mainifest(AVFormatContext *s, const char *url, AVIOContext *in)
                         
                         if (type == REP_TYPE_UNSPECIFIED) {
                             av_log(s, AV_LOG_VERBOSE, "Parsing '%s' - skipp not supported representation type\n", url);
-                        } else if ( (type == REP_TYPE_VIDEO && ((c->video_rep_index < 0 && !c->cur_video) || videoRepIdx == (int32_t)c->video_rep_index )) || 
-                                    (type == REP_TYPE_AUDIO && ((c->audio_rep_index < 0 && !c->cur_audio) || audioRepIdx == (int32_t)c->audio_rep_index )) ) {
+                        } 
+
+                        //else if ( (type == REP_TYPE_VIDEO && ((c->video_rep_index < 0 && !c->cur_video) || videoRepIdx == (int32_t)c->video_rep_index )) || 
+                        //          (type == REP_TYPE_AUDIO && ((c->audio_rep_index < 0 && !c->cur_audio) || audioRepIdx == (int32_t)c->audio_rep_index )) ) @ShahzadLone for Info.
+
+                        else if ( (type == REP_TYPE_VIDEO && ( ( c->video_rep_index < 0 ) || videoRepIdx == (int32_t)c->video_rep_index )) || 
+                                  (type == REP_TYPE_AUDIO && ( ( c->audio_rep_index < 0 ) || audioRepIdx == (int32_t)c->audio_rep_index )) ) {
                             
                             // convert selected representation to our internal struct
                             struct representation *rep = av_mallocz(sizeof(struct representation));
@@ -944,6 +981,9 @@ static int parse_mainifest(AVFormatContext *s, const char *url, AVIOContext *in)
                                     rep->rep_idx = audioRepIdx;
                                     c->cur_audio = rep;
                                 }
+
+                                av_log(NULL, AV_LOG_ERROR, "Adding One Representation\n");
+                                dynarray_add(&c->representations, &c->nb_representations, rep);
                             }
                         }
                         
@@ -961,6 +1001,7 @@ static int parse_mainifest(AVFormatContext *s, const char *url, AVIOContext *in)
                     }
                     node = xmlNextElementSibling(node);
                 }
+
             }
             adaptionSetNode = xmlNextElementSibling(adaptionSetNode);
         }
@@ -969,12 +1010,15 @@ static int parse_mainifest(AVFormatContext *s, const char *url, AVIOContext *in)
             c->cur_video->rep_count = videoRepIdx;
             c->cur_video->fix_multiple_stsd_order = 1;
             
-            av_log(s, AV_LOG_VERBOSE, "rep_idx[%d]\n", (int)c->cur_video->rep_idx);
-            av_log(s, AV_LOG_VERBOSE, "rep_count[%d]\n", (int)videoRepIdx);
+            av_log(s, AV_LOG_VERBOSE, "video_rep_idx[%d]\n", (int)c->cur_video->rep_idx);
+            av_log(s, AV_LOG_VERBOSE, "video_rep_count[%d]\n", (int)videoRepIdx);
         }
         
         if (c->cur_audio) {
             c->cur_audio->rep_count = audioRepIdx;
+
+            av_log(s, AV_LOG_VERBOSE, "audio_rep_idx[%d]\n", (int)c->cur_audio->rep_idx);
+            av_log(s, AV_LOG_VERBOSE, "audio_rep_count[%d]\n", (int)audioRepIdx);
         }
 
 cleanup:
@@ -1746,8 +1790,24 @@ static int dash_read_header(AVFormatContext *s)
         s->duration = (int64_t) c->mediaPresentationDurationSec * AV_TIME_BASE;
     }
 
-    /* Open the demuxer for curent video and current audio components if available */
-    if (0 == ret && c->cur_video) {
+#ifdef ALL_TOGETHER_REPS
+    /* Open the demuxer for curent Representation components if available "OUR WAY" @ShahzadLone*/
+    for (int repIndex = 0; repIndex < c->nb_representations; repIndex++) {
+        if ( (ret == 0) && c->representations[repIndex]) {
+            ret = open_demux_for_component(s, c->representations[repIndex]);
+            if (ret == 0) {
+                c->representations[repIndex]->stream_index = stream_index;
+                ++stream_index;
+            } else {
+                free_representation(c->representations[repIndex]);
+                c->representations[repIndex] = NULL;
+            }
+        }
+    }
+    // End of Our Method
+#else //-----------------------------------------------------------------------------------------------------------
+    /* Open the demuxer for curent video and current audio components if available "UPGRADED PATCH WAY" */
+    if ( ( 0 == ret ) && ( c->cur_video ) ) {
         ret = open_demux_for_component(s, c->cur_video);
         if (ret == 0) {
             c->cur_video->stream_index = stream_index;
@@ -1758,7 +1818,7 @@ static int dash_read_header(AVFormatContext *s)
         }
     }
     
-    if (0 == ret && c->cur_audio) {
+    if ( ( 0 == ret ) && ( c->cur_audio ) ) {
         ret = open_demux_for_component(s, c->cur_audio);
         if (ret == 0) {
             c->cur_audio->stream_index = stream_index;
@@ -1768,27 +1828,42 @@ static int dash_read_header(AVFormatContext *s)
             c->cur_audio = NULL;
         }
     }
-    
+    // End of Upgrade Patch Method
+#endif // ALL_TOGETHER_REPS
+
     if (0 == stream_index) {
+
         ret = AVERROR_INVALIDDATA;
         goto fail;
     }
     
     /* Create a program */
     if (0 == ret) {
+        
         AVProgram *program;
         program = av_new_program(s, 0);
         if (!program) {
             goto fail;
         }
-        
+
+#ifdef ALL_TOGETHER_REPS
+        // Our Method @ShahzadLone for info!
+        for (int repIndex = 0; repIndex < c->nb_representations; repIndex++) {
+            if (c->representations[repIndex])
+                av_program_add_stream_index(s, 0, c->representations[repIndex]->stream_index);
+        }
+        // End of Our Method
+#else //----------------------------------------------------------------------
+        // Upgraded Patch Method
         if (c->cur_video) {
             av_program_add_stream_index(s, 0, c->cur_video->stream_index);
         }
-        
         if (c->cur_audio) {
             av_program_add_stream_index(s, 0, c->cur_audio->stream_index);
         }
+        // End of Upgrade Patch Method
+#endif // ALL_TOGETHER_REPS
+
     }
 
     return 0;
@@ -1932,8 +2007,7 @@ set_seq_num:
     return ret;
 }
 
-static int dash_read_seek(AVFormatContext *s, int stream_index,
-                               int64_t timestamp, int flags)
+static int dash_read_seek( AVFormatContext *s, int stream_index, int64_t timestamp, int flags )
 {
     int ret = 0;
     DASHContext *c = s->priv_data;
@@ -1977,12 +2051,20 @@ static int dash_probe(AVProbeData *p)
 
 #define OFFSET(x) offsetof(DASHContext, x)
 #define FLAGS AV_OPT_FLAG_DECODING_PARAM
+
 static const AVOption dash_options[] = {
-    {"audio_rep_index", "audio representation index to be used",
-        OFFSET(audio_rep_index), AV_OPT_TYPE_INT, {.i64 = -1}, INT_MIN, INT_MAX, FLAGS},
-    {"video_rep_index", "video representation index to be used",
-        OFFSET(video_rep_index), AV_OPT_TYPE_INT, {.i64 = -1}, INT_MIN, INT_MAX, FLAGS},
+
+#ifdef ALL_TOGETHER_REPS
+    // Our Method Options. @ShahzadLone
+    { "rep_index", "representation index"  , OFFSET(rep_index), AV_OPT_TYPE_INT, {.i64 = 0}, INT_MIN, INT_MAX, FLAGS },
+#else 
+    // Updated Patch Method Options.
+    {"audio_rep_index", "audio representation index to be used", OFFSET(audio_rep_index), AV_OPT_TYPE_INT, {.i64 = -1}, INT_MIN, INT_MAX, FLAGS},
+    {"video_rep_index", "video representation index to be used", OFFSET(video_rep_index), AV_OPT_TYPE_INT, {.i64 = -1}, INT_MIN, INT_MAX, FLAGS},
+#endif // ALL_TOGETHER_REPS    
+  
     {NULL}
+
 };
 
 static const AVClass dash_class = {
