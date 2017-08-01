@@ -44,6 +44,7 @@
 #include "id3v2.h"
 
 #define INITIAL_BUFFER_SIZE 32768
+#define MAX_FIELD_LEN 64
 
 /////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////
@@ -221,7 +222,17 @@ struct representation {
     int fix_multiple_stsd_order;
 
     int64_t cur_timestamp;
+
     int is_restart_needed;
+
+    char id[MAX_FIELD_LEN];
+    char codecs[MAX_FIELD_LEN]; 
+    int height;
+    int width;
+    int frameRate;
+    char scanType[MAX_FIELD_LEN];
+    int bandwidth;
+
 };
 
 typedef struct DASHContext {
@@ -796,8 +807,15 @@ static int parse_mainifest(AVFormatContext *s, const char *url, AVIOContext *in)
                         #endif
 
                         xmlNodePtr representationNode = node;
+                        
                         xmlChar *rep_id_val = xmlGetProp(representationNode, "id");
                         xmlChar *rep_bandwidth_val = xmlGetProp(representationNode, "bandwidth");
+                        xmlChar *rep_codecs_val = xmlGetProp(representationNode, "codecs");
+                        xmlChar *rep_height_val = xmlGetProp(representationNode, "height");
+                        xmlChar *rep_width_val = xmlGetProp(representationNode, "width");
+                        xmlChar *rep_frameRate_val = xmlGetProp(representationNode, "frameRate");
+                        xmlChar *rep_scanType_val = xmlGetProp(representationNode, "scanType");
+
                         enum RepType type = REP_TYPE_UNSPECIFIED;
                         
                         
@@ -823,10 +841,40 @@ static int parse_mainifest(AVFormatContext *s, const char *url, AVIOContext *in)
                             
                             // convert selected representation to our internal struct
                             struct representation *rep = av_mallocz(sizeof(struct representation));
+
+                            // Added to read more metadata from manifest and expand Representation structure. @ShahzadLone for info!
+                            #ifdef TESTING
+                            av_log(NULL, AV_LOG_ERROR, "rep(%s,%s,%s,%s,%s,%s,%s)\n", (char *)rep_id_val, (char *)rep_codecs_val, (char *)rep_height_val, (char *)rep_width_val, (char *)rep_frameRate_val, (char *)rep_scanType_val, (char *)rep_bandwidth_val);
+                            #endif //TESTING
+                            
+                            if (rep_id_val) { strcpy(rep->id, rep_id_val); }
+
+                            if (rep_codecs_val) { strcpy(rep->codecs, rep_codecs_val); }
+  
+                            rep->height = 0;
+                            if (rep_height_val) { rep->height = strtol((char *)rep_height_val, NULL, 0); }
+
+                            rep->width = 0;
+                            if (rep_width_val) { rep->width = strtol((char *)rep_width_val, NULL, 0); }
+                           
+                            rep->frameRate = 0;
+                            if (rep_frameRate_val) { rep->frameRate = strtol((char *)rep_frameRate_val, NULL, 0); }
+   
+                            if (rep_scanType_val) { strcpy(rep->scanType, rep_scanType_val); }
+
+                            rep->bandwidth = 0;
+                            if (rep_bandwidth_val) { rep->bandwidth = strtol((char *)rep_bandwidth_val, NULL, 0); }
+
+                            #ifdef TESTING
+                            av_log(NULL, AV_LOG_ERROR, "rep(%s,%s,%d,%d,%d,%s,%d)\n", rep->id, rep->codecs, rep->height, rep->width, rep->frameRate, rep->scanType, rep->bandwidth);
+                            #endif //TESTING
+
                             xmlNodePtr representationSegmentTemplateNode = findChildNodeByName(representationNode, "SegmentTemplate");
                             xmlNodePtr representationBaseUrlNode = findChildNodeByName(representationNode, "BaseURL");
                             xmlNodePtr representationSegmentListNode = findChildNodeByName(representationNode, "SegmentList");
+                            
                             reset_packet(&rep->pkt);
+                            
                             if (representationSegmentTemplateNode || segmentTemplateNode) {
                                 xmlNodePtr segmentTimelineNode = NULL;
                                 
@@ -1277,6 +1325,7 @@ static int64_t calc_max_seg_no(struct representation *pls, DASHContext *c)
     return num;
 }
 
+
 static struct segment *get_current_segment(struct representation *pls)
 {
     char *tmp_str = NULL;
@@ -1299,10 +1348,19 @@ static struct segment *get_current_segment(struct representation *pls)
     }
     
     if (c->is_live) {
-        while (!ff_check_interrupt(c->interrupt_callback)) {
+
+        printf("get_current_fragment (is_live)\n");
+
+
+        while ( !( ff_check_interrupt( c->interrupt_callback ) ) )  { // Updated Patch's Loop @ShahzadLone
+        /* USED IN OLD PATCH
+        while (1) {
+            min_seq_no = calc_min_seg_no(pls->parent, pls);
+            max_seq_no = calc_max_seg_no(pls->parent, pls);
+        */
             int64_t min_seq_no = calc_min_seg_no(pls, c);
             int64_t max_seq_no = calc_max_seg_no(pls, c);
-            
+
             if (pls->cur_seq_no <= min_seq_no) {
                 av_log(pls->parent, AV_LOG_VERBOSE, "%s to old segment: cur[%"PRId64"] min[%"PRId64"] max[%"PRId64"], playlist %d\n", __FUNCTION__, (int64_t)pls->cur_seq_no, min_seq_no, max_seq_no, (int)pls->rep_idx);
                 if (c->is_live && (pls->timelines || pls->segments)) {
@@ -1793,6 +1851,11 @@ static int dash_read_header(AVFormatContext *s)
 #ifdef ALL_TOGETHER_REPS
     /* Open the demuxer for curent Representation components if available "OUR WAY" @ShahzadLone*/
     for (int repIndex = 0; repIndex < c->nb_representations; repIndex++) {
+        
+        #ifdef TESTING
+        av_log(NULL, AV_LOG_ERROR, "rep[%d]->bandwidth = %d\n", repIndex, c->representations[repIndex]->bandwidth);
+        #endif //TESTING
+
         if ( (ret == 0) && c->representations[repIndex]) {
             ret = open_demux_for_component(s, c->representations[repIndex]);
             if (ret == 0) {
