@@ -48,6 +48,18 @@
 #define INITIAL_BUFFER_SIZE 32768
 #define MAX_FIELD_LEN 64
 
+// Defines to assist in printing in different colors. 
+// Note: Important to have %s where you want to initiate the color change
+// Example: printf( "%sHello, Shahzad\n", blue_str );
+#define normal_str  "\x1B[0m"
+#define red_str  "\x1B[31m"
+#define green_str  "\x1B[32m"
+#define yellow_str  "\x1B[33m"
+#define blue_str  "\x1B[34m"
+#define mag_str  "\x1B[35m"
+#define cyan_str  "\x1B[36m"
+#define white_str  "\x1B[37m"
+
 /////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////
 #include <time.h>
@@ -288,6 +300,50 @@ typedef struct DASHContext {
     AVDictionary *avio_opts;
     int rep_index;
 } DASHContext;
+
+// prints the representation structure in green. @Shahzad for help!
+static void print_rep_struct( struct representation *v ) {
+    // For testing
+    printf( "\n\n%sstruct representation *v {\n", green_str );
+
+    printf( "%s    char *url_template = %s,\n", green_str, v->url_template );
+    printf( "%s    AVIOContext *input = %d,\n", green_str, ( (v->input)? 1 : 0 ) );
+    printf( "%s    enum RepType type; = %d,\n", green_str, v->tmp_url_type );
+    printf( "%s    int rep_idx = %d,\n", green_str, v->rep_idx );
+    printf( "%s    int rep_count = %d,\n", green_str, v->rep_count );
+    printf( "%s    int stream_index = %d,\n", green_str, v->stream_index );
+    printf( "%s    enum AVMediaType type = %d,\n", green_str, v->type );
+    printf( "%s    int64_t target_duration = %"PRId64",\n", green_str, v->target_duration );
+    printf( "%s    int n_segments = %d,\n", green_str, v->n_segments );
+    printf( "%s    int n_timelines = %d,\n", green_str, v->n_timelines );
+    //printf("%s    int64_t first_seq_no_in_representation = %d,\n", green_str, v->first_seq_no_in_representation );
+    printf( "%s    int64_t first_seq_no = %"PRId64",\n", green_str, v->first_seq_no );
+    printf( "%s    int64_t last_seq_no = %"PRId64",\n", green_str, v->last_seq_no );
+    printf( "%s    int64_t segmentDuration = %"PRId64",\n", green_str, v->segmentDuration );
+    printf( "%s    int64_t segmentTimescale = %"PRId64",\n", green_str, v->segmentTimescalce );
+    printf( "%s    int64_t cur_seq_no = %"PRId64",\n", green_str, v->cur_seq_no );
+    printf( "%s    int64_t cur_seg_offset = %"PRId64",\n", green_str, v->cur_seg_offset );
+    printf( "%s    int64_t cur_seg_size = %"PRId64",\n", green_str, v->cur_seg_size );
+    printf( "%s    uint32_t init_sec_buf_size = %d,\n", green_str, v->init_sec_buf_size );
+    printf( "%s    uint32_t init_sec_data_len = %d,\n", green_str, v->init_sec_data_len );
+    printf( "%s    uint32_t init_sec_buf_read_offset = %d,\n", green_str, v->init_sec_buf_read_offset );
+    printf( "%s    int fix_multiple_stsd_order = %d,\n", green_str, v->fix_multiple_stsd_order );
+    printf( "%s    int64_t cur_timestamp = %"PRId64"\n", green_str, v->cur_timestamp );
+
+    //if ( (v->cur_seg_size) != -1 ) 
+    { // Print the cur_seg within
+        printf( "\n\n%s    struct segment *cur_seg; {\n", green_str );
+
+        printf( "%s        int64_t url_offset = %s,\n", green_str, v->url_template );
+        printf( "%s        int64_t size = %d,\n", green_str, v->tmp_url_type );
+        printf( "%s        char *url = %d,\n", green_str, v->rep_idx );
+
+        printf( "%s    }\n", green_str );
+    }
+
+    printf( "%s}\n\n", green_str );
+    // End for testing prints
+}
 
 
 static void free_segment(struct segment **seg)
@@ -1447,8 +1503,10 @@ static struct segment *get_current_segment(struct representation *pls)
             struct segment *seg_ptr = pls->segments[pls->cur_seq_no];
             seg = av_mallocz(sizeof(struct segment));
             seg->url = av_strdup(seg_ptr->url);
+
             seg->size = seg_ptr->size;
             seg->url_offset = seg_ptr->url_offset;
+
             return seg;
         } else if (c->is_live) {
             sleep(2);
@@ -1488,6 +1546,7 @@ static struct segment *get_current_segment(struct representation *pls)
             break;
         }
         seg = av_mallocz(sizeof(struct segment));
+
     } else if (pls->cur_seq_no <= pls->last_seq_no) {
         seg = av_mallocz(sizeof(struct segment));
     }
@@ -1507,8 +1566,8 @@ static struct segment *get_current_segment(struct representation *pls)
 
             if ( ( snprintf( tmp_str, ( MAX_URL_SIZE - 1 ), pls->url_template, (int64_t)tmp_val ) ) < 0 ) { //@ShahzadLone for help
                 av_log(pls->parent, AV_LOG_ERROR, "Invalid Segment Filename URL Template: %s\n", pls->url_template );
-                av_free(tmp_str);
-                return( NULL );
+                av_free(tmp_str); // ?? not sure @shahzad
+                return( NULL ); // ?? not sure
             }
 
             // Check to make sure we got the right tmp_url_type and iff not then handle the errors. @ShahzadLone for help.
@@ -1518,8 +1577,8 @@ static struct segment *get_current_segment(struct representation *pls)
                 av_log(pls->parent, AV_LOG_VERBOSE, "SUPPORTED : Templete URL is of [Time] type. \n");
             } else { // @ShahzadLone for why added
                 av_log(pls->parent, AV_LOG_ERROR, "ERROR : Templete URL of this type [%u] is not supported! \n", pls->tmp_url_type);
-                av_free(tmp_str);
-                return( NULL );
+                av_free(tmp_str); // ?? not sure @shahzad
+                return( NULL ); // ?? not sure
             }
 
             seg->url = av_strdup(tmp_str);
