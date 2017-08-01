@@ -128,6 +128,170 @@ static void ccx_decoder_608_dinit_library(void **ctx)
 	freep(ctx);
 }
 
+/**
+ * Initialize Roll-up state machine
+ * 
+ * @param rsm - a pointer to roll-up state machine
+ */
+static void init_rsm(rollup_state_machine *rsm) {
+	rsm->cur_state = 0;
+	rsm->next_state = 0;
+	rsm->ru123 = 0;
+	rsm->cr = 0;
+	rsm->pac = 0;
+    rsm->oos_error = 0;
+    rsm->missing_error = 0;
+}
+
+static void update_rsm(cc_608_ctx *ctx, enum command_code cmd, int pac) {
+   rollup_state_machine *rsm =  &ctx->rollup_sm;
+   AVFrameSideData *fsd = ctx->fsd;
+   
+    if (cmd == COM_ROLLUP2 || cmd == COM_ROLLUP3 || cmd == COM_ROLLUP4)  { 
+        if (rsm->ru123) {
+            if (!(rsm->next_state & (1 << RU123))) {
+                fsd->cc608_dp.rollup_oos_error = 1;
+                fsd->cc608_dp.rollup_missing_error = 1;
+                fsd->cc608_dp.roll_up_error = 1;                
+            }
+        }
+        //Beginning of a new sequence of roll-up commands
+        init_rsm(rsm);
+        rsm->cur_state = 1 << RU123;
+        rsm->next_state = (1 << CR);
+        ++rsm->ru123;
+        return;
+   }
+
+    if (rsm->ru123) {
+        
+        if (pac) {
+            if (!(rsm->next_state & (1 << PACR)))
+                rsm->oos_error = 1;
+
+            rsm->cur_state  = 1 << PACR;
+            rsm->next_state = (1 << RU123);	;
+            ++rsm->pac;
+
+            if (!rsm->cr)
+                rsm->missing_error = 1;
+
+            fsd->cc608_dp.rollup_oos_error = rsm->oos_error;
+            fsd->cc608_dp.rollup_missing_error = rsm->missing_error;
+            if (rsm->oos_error || rsm->missing_error)
+                fsd->cc608_dp.roll_up_error = 1;
+            init_rsm(rsm);
+            return;
+        }
+        if (cmd == COM_CARRIAGERETURN) {
+            if (!(rsm->next_state & (1 << CR)))
+                rsm->oos_error = 1;
+
+            rsm->cur_state  = 1 << CR;
+            rsm->next_state = (1 << PACR);	
+            ++rsm->cr;
+        }   
+    }
+}
+
+/**
+ * Initialize pop-on state machine.
+ *   
+ * @param psm - a pointer to pop-on state machine
+ */
+static void init_psm(popon_state_machine *psm) {
+	psm->cur_state = 0;
+	psm->next_state = 0;
+	psm->rcl = 0;
+	psm->enm = 0;
+	psm->pac = 0;
+	psm->toff = 0;
+	psm->edm = 0;
+	psm->eoc = 0;
+    psm->oos_error = 0;
+    psm->missing_error = 0;
+}
+
+static void update_psm(cc_608_ctx *ctx, enum command_code cmd, int pac) {
+   popon_state_machine *psm =  &ctx->popon_sm;
+   AVFrameSideData *fsd = ctx->fsd;
+   
+    if (cmd == COM_RESUMECAPTIONLOADING) { 
+        if (psm->rcl) {
+            if (!(psm->next_state & (1 << RCL))) {
+                //if we are here we know that COM_ENDOFCAPTION is missing.
+                //Missing command automatically leads to oos error.
+                //Entering this block of code also marks the end of the previous 
+                //pop-on sequence of commands. The following errors are being 
+                //flagged for the previous sequence
+                fsd->cc608_dp.popon_oos_error = 1;
+                fsd->cc608_dp.popon_missing_error = 1;
+                fsd->cc608_dp.popon_presentation_error = 1;
+            }
+        }
+        //Beginning of a new sequence of pop-on commands
+        init_psm(psm);
+        psm->cur_state = 1 << RCL;
+        psm->next_state = (1 << ENM | 1 << PAC);
+        ++psm->rcl;
+        return;
+   }
+   //Once COM_RESUMECAPTIONLOADING is seen then we proceed with processing the 
+   //rest if the commands in the sequence  
+    if (psm->rcl) {
+        
+        if (pac) {
+            if (!(psm->next_state & (1 << PAC)))
+                psm->oos_error = 1;
+
+            psm->cur_state  = 1 << PAC;
+            psm->next_state = (1 << PAC | 1 << TOFF | 1 << EDM);	;
+            ++psm->pac;
+            return;
+        }
+        
+        switch (cmd) {
+            case COM_ERASENONDISPLAYEDMEMORY:
+            psm->cur_state = 1 << ENM;
+            psm->next_state = 1 << PAC;	
+            break;
+
+            case COM_TABOFFSET1 :
+            case COM_TABOFFSET2:
+            case COM_TABOFFSET3:
+            psm->cur_state  = 1 << TOFF;
+            psm->next_state = (1 << PAC | 1 << EDM);	
+            break;
+						
+            case COM_ERASEDISPLAYEDMEMORY:
+            if (!(psm->next_state & (1 << EDM)))
+                psm->oos_error = 1;
+
+            psm->cur_state  = 1 << EDM;
+            psm->next_state = (1 << EOC);	
+            ++psm->edm;
+            break;
+            
+            case COM_ENDOFCAPTION:
+            if (!(psm->next_state & (1 << EOC)))
+                psm->oos_error = 1;
+
+            psm->cur_state  = 1 << EOC;
+            psm->next_state = (1 << RCL);	
+            ++psm->eoc;
+            if (!psm->pac || !psm->edm)
+                psm->missing_error = 1;
+            
+            fsd->cc608_dp.popon_oos_error = psm->oos_error;
+            fsd->cc608_dp.popon_missing_error = psm->missing_error;
+            if (psm->oos_error || psm->missing_error)
+                fsd->cc608_dp.popon_presentation_error = 1;
+            init_psm(psm);
+            break;
+        }
+    }
+}
+
 cc_608_ctx* ccx_decoder_608_init_library(int channel,
 		int field, int *halt,
 		int cc_to_stdout,
@@ -175,6 +339,7 @@ cc_608_ctx* ccx_decoder_608_init_library(int channel,
 	clear_eia608_cc_buffer(data, &data->buffer1);
 	clear_eia608_cc_buffer(data, &data->buffer2);
 
+    init_psm(&data->popon_sm);
 	return data;
 }
 
@@ -657,8 +822,10 @@ static void handle_command(unsigned char c1, const unsigned char c2, cc_608_ctx 
 	if ((c1==0x14 || c1==0x1C) && c2==0x2b)
 		command = COM_RESUMETEXTDISPLAY;
     
-    if (command = COM_UNKNOWN)
+    if (command == COM_UNKNOWN)
         context->fsd->cc608_dp.unknown_command =  1;
+    
+    update_psm(context, command, 0);
 #if 0
 	if ((command == COM_ROLLUP2 || command == COM_ROLLUP3 || command == COM_ROLLUP4) && context->settings->force_rollup == 1)
 		command=COM_FAKE_RULLUP1;
@@ -673,7 +840,7 @@ static void handle_command(unsigned char c1, const unsigned char c2, cc_608_ctx 
 	//ccx_common_logging.debug_ftn(CCX_DMT_DECODER_608, "\rCommand begin: %02X %02X (%s)\n", c1, c2, command_type[command]);
 	//ccx_common_logging.debug_ftn(CCX_DMT_DECODER_608, "\rCurrent mode: %d  Position: %d,%d  VisBuf: %d\n", context->mode,
 	//	context->cursor_row, context->cursor_column, context->visible_buffer);
-
+    
 	switch (command)
 	{
 		case COM_BACKSPACE:
@@ -841,6 +1008,9 @@ static void handle_command(unsigned char c1, const unsigned char c2, cc_608_ctx 
 	//ccx_common_logging.debug_ftn(CCX_DMT_DECODER_608, "\rCurrent mode: %d  Position: %d,%d	VisBuf: %d\n", context->mode,
 	//	context->cursor_row, context->cursor_column, context->visible_buffer);
 	//ccx_common_logging.debug_ftn(CCX_DMT_DECODER_608, "\rCommand end: %02X %02X (%s)\n", c1, c2, command_type[command]);
+    
+    printf("Command begin: %02X %02X (%s)\n", c1, c2, command_type[command]);
+    printf("Current mode: %d  Position: %d,%d  VisBuf: %d\n", context->mode,context->cursor_row, context->cursor_column, context->visible_buffer);
 
 }
 
@@ -923,7 +1093,7 @@ static void handle_pac(unsigned char c1, unsigned char c2, cc_608_ctx *context)
 	int row=rowdata[((c1<<1)&14)|((c2>>5)&1)];
 
 	//ccx_common_logging.debug_ftn(CCX_DMT_DECODER_608, "\rPAC: %02X %02X", c1, c2);
-
+    printf("PAC: %02X %02X", c1, c2);
 	if (c2>=0x40 && c2<=0x5f)
 	{
 		c2=c2-0x40;
@@ -946,6 +1116,10 @@ static void handle_pac(unsigned char c1, unsigned char c2, cc_608_ctx *context)
 	int indent=pac2_attribs[c2][2];
 	//ccx_common_logging.debug_ftn(CCX_DMT_DECODER_608, "  --  Position: %d:%d, color: %s,  font: %s\n", row,
 	//	indent, color_text[context->current_color][0], font_text[context->font]);
+    
+    printf("  --  Position: %d:%d, color: %s,  font: %s\n", row,
+    indent, color_text[context->current_color][0], font_text[context->font]);
+    
     if ((context->current_color == COL_WHITE || context->current_color == COL_TRANSPARENT))
 	//if (context->settings->default_color == COL_USERDEFINED && (context->current_color == COL_WHITE || context->current_color == COL_TRANSPARENT))
 		context->current_color = COL_USERDEFINED;
@@ -1036,6 +1210,7 @@ static int check_channel(unsigned char c1, cc_608_ctx *context)
 static int disCommand(unsigned char hi, unsigned char lo, cc_608_ctx *context, struct cc_subtitle *sub)
 {
 	int wrote_to_screen=0;
+    int pac = 0;
 
 	/* Full channel changes are only allowed for "GLOBAL CODES",
 	* "OTHER POSITIONING CODES", "BACKGROUND COLOR CODES",
@@ -1053,8 +1228,10 @@ static int disCommand(unsigned char hi, unsigned char lo, cc_608_ctx *context, s
 	switch (hi)
 	{
 		case 0x10:
-			if (lo>=0x40 && lo<=0x5f)
+			if (lo>=0x40 && lo<=0x5f) {
 				handle_pac(hi, lo, context);
+                pac = 1;
+            }
 			break;
 		case 0x11:
 			if (lo>=0x20 && lo<=0x2f)
@@ -1064,8 +1241,10 @@ static int disCommand(unsigned char hi, unsigned char lo, cc_608_ctx *context, s
 				wrote_to_screen=1;
 				handle_double(hi, lo, context);
 			}
-			if (lo>=0x40 && lo<=0x7f)
+			if (lo>=0x40 && lo<=0x7f) {
 				handle_pac(hi, lo, context);
+                pac = 1;
+            }
 			break;
 		case 0x12:
 		case 0x13:
@@ -1073,29 +1252,43 @@ static int disCommand(unsigned char hi, unsigned char lo, cc_608_ctx *context, s
 			{
 				wrote_to_screen = handle_extended(hi, lo, context);
 			}
-			if (lo>=0x40 && lo<=0x7f)
+			if (lo>=0x40 && lo<=0x7f) {
 				handle_pac(hi, lo, context);
+                pac = 1;
+            }
 			break;
 		case 0x14:
 		case 0x15:
 			if (lo>=0x20 && lo<=0x2f)
 				handle_command(hi, lo, context, sub);
-			if (lo>=0x40 && lo<=0x7f)
+			if (lo>=0x40 && lo<=0x7f) {
 				handle_pac(hi, lo, context);
+                pac = 1;
+            }
 			break;
 		case 0x16:
-			if (lo>=0x40 && lo<=0x7f)
+			if (lo>=0x40 && lo<=0x7f) {
 				handle_pac(hi, lo, context);
+                pac = 1;
+            }
 			break;
 		case 0x17:
 			if (lo>=0x21 && lo<=0x23)
 				handle_command(hi, lo, context, sub);
 			if (lo>=0x2e && lo<=0x2f)
 				handle_text_attr(hi, lo, context);
-			if (lo>=0x40 && lo<=0x7f)
+			if (lo>=0x40 && lo<=0x7f) {
 				handle_pac(hi, lo, context);
+                pac = 1;
+            }
 			break;
 	}
+    
+    if (pac) {
+        update_psm(context, COM_UNKNOWN, pac);
+        pac = 0;
+    }    
+    
 	return wrote_to_screen;
 }
 
@@ -1211,7 +1404,7 @@ int process608(const unsigned char *data, int length, void *private_data, struct
 				// Ignore only the first repetition
 				context->last_c1=-1;
 				context->last_c2 = -1;
-                                context->fsd->cc608_dp.dual_control_command_check = 1;
+                context->fsd->cc608_dp.dual_control_command_check = 1;
 				continue;
 			}
 			context->last_c1 = hi;

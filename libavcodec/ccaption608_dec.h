@@ -171,6 +171,51 @@ typedef struct eia608_screen // A CC buffer
 	int cur_xds_packet_class;
 } eia608_screen;
 
+enum POPON_CMD_SEQ {
+    RCL = 1,
+    ENM,
+    PAC,
+    TOFF,
+    EDM,
+    EOC
+};
+
+enum ROLLUP_CMD_SEQ {
+    RU123 = 1,
+    CR,
+    PACR
+};
+
+/**
+ * Pop-on captions are delivered through a sequence of commands.
+ * The state machine, through state transitions, captures whether a 
+ * command is out of sequence or is missing.
+ * A missing command automatically leads to out of sequence command error.
+ */
+typedef struct popon_state_machine popon_state_machine;
+struct popon_state_machine {
+    int cur_state;
+    int next_state;
+    int rcl;
+    int enm;
+    int pac;
+    int toff;
+    int edm;
+    int eoc;
+    int oos_error;
+    int missing_error;
+};
+
+typedef struct rollup_state_machine rollup_state_machine;
+struct rollup_state_machine {
+    int cur_state;
+    int next_state;
+    int ru123;
+    int cr;
+    int pac;
+    int oos_error;
+    int missing_error;
+};
 
 typedef struct cc_608_ctx
 {
@@ -206,7 +251,10 @@ typedef struct cc_608_ctx
 	struct cc_common_timing_ctx *timing;
         
         AVFrameSideData *fsd;
+        popon_state_machine popon_sm;
+        rollup_state_machine rollup_sm;
 
+          
 } cc_608_ctx;
 
 
