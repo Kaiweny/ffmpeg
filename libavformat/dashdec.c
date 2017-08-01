@@ -25,7 +25,9 @@
   */
 
 // @ShahzadLone for more information!
-// #define ALL_TOGETHER_REPS // If defined we store all representations together.
+// #define OLD_PATCH // Just for reference search this key word, all commented out on what we used to do in old patch. 
+// #define ALL_TOGETHER_REPS // If defined we store all representations together. (Currently we haven't integrated the refreshing/reloading if this is defined)
+
 
 /**
  * @file
@@ -225,6 +227,18 @@ struct representation {
 
     int is_restart_needed;
 
+    /**
+     *  record the sequence number of the first segment
+     *  in current timeline. 
+     *  Since the problem mpd availabilityStartTime is UTC epoch 
+     *  starting time, the cur_seq_no is already big number
+     *  get_fragment_start_time use local counter to compare 
+     *  with cur_seq_no which then blow up the result, it always 
+     *  return the last segment timestamp in the timeline.
+     *  Use this temporary variable to track the first seq_no.
+     */ 
+    int64_t first_seq_no_in_representation;
+    
     char id[MAX_FIELD_LEN];
     char codecs[MAX_FIELD_LEN]; 
     int height;
@@ -240,8 +254,10 @@ typedef struct DASHContext {
 
     char *base_url;
 
+    #ifdef ALL_TOGETHER_REPS
     int nb_representations;
     struct representation **representations;
+    #endif //ALL_TOGETHER_REPS
 
     struct representation *cur_video;
     struct representation *cur_audio;
@@ -608,7 +624,6 @@ static enum RepType get_content_type(xmlNodePtr node)
     return type;
 }
 
-
 static int parse_mainifest(AVFormatContext *s, const char *url, AVIOContext *in)
 {
     DASHContext *c = s->priv_data;
@@ -838,9 +853,29 @@ static int parse_mainifest(AVFormatContext *s, const char *url, AVIOContext *in)
 
                         else if ( (type == REP_TYPE_VIDEO && ( ( c->video_rep_index < 0 ) || videoRepIdx == (int32_t)c->video_rep_index )) || 
                                   (type == REP_TYPE_AUDIO && ( ( c->audio_rep_index < 0 ) || audioRepIdx == (int32_t)c->audio_rep_index )) ) {
-                            
+
                             // convert selected representation to our internal struct
+                            #ifdef ALL_TOGETHER_REPS 
+                            struct representation *rep = NULL;
+                            
+                            char temp_rep_id[MAX_FIELD_LEN];
+                            strcpy(temp_rep_id, rep_id_val);
+                            for (int i_rep = 0; i_rep < c->nb_representations; i_rep++){
+                                if (strcmp(c->representations[i_rep]->id, temp_rep_id) == 0){ // Representation already exists (Just a reload)
+                                    av_log(NULL, AV_LOG_ERROR, "Representation Already Exists\n");
+                                    rep = c->representations[i_rep];
+                                }
+                            }
+                            if (!rep) // New Representation
+                                rep = av_mallocz(sizeof(struct representation));
+
+                            if (!rep) { // SHOULD WE EVEN NEED THIS ?????????
+                                ret = AVERROR(ENOMEM);
+                                goto cleanup; //end;????????????
+                            }
+                            #else // ----------------- IF Using New Patch's Method -----------------
                             struct representation *rep = av_mallocz(sizeof(struct representation));
+                            #endif // ALL_TOGETHER_REPS
 
                             // Added to read more metadata from manifest and expand Representation structure. @ShahzadLone for info!
                             #ifdef TESTING
@@ -935,7 +970,17 @@ static int parse_mainifest(AVFormatContext *s, const char *url, AVIOContext *in)
                                     segmentTimelineNode = findChildNodeByName(segmentTemplateNode, "SegmentTimeline");
                                 
                                 if (segmentTimelineNode) {
+
+                                    //#ifdef OLD_PATCH // If OLD_PATCH reload method should be used.
+                                    //// On reload, if the new MPD contain segmetntimeline node, clean up the existing
+                                    //// timeline by set the array size counter to 0.
+                                    //if (rep->n_timelines) {
+                                    //    rep->n_timelines = 0;
+                                    //}
+                                    //#endif // OLD_PATCH
+
                                     segmentTimelineNode = xmlFirstElementChild(segmentTimelineNode);
+
                                     while (segmentTimelineNode) {
                                         if (!xmlStrcmp(segmentTimelineNode->name, (const xmlChar *)"S")) {
                                             struct timeline *tml = av_mallocz(sizeof(struct timeline));
@@ -1023,15 +1068,38 @@ static int parse_mainifest(AVFormatContext *s, const char *url, AVIOContext *in)
                                 
                                 if (type == REP_TYPE_VIDEO) {
                                     rep->rep_idx = videoRepIdx;
+                                    
+                                    #ifdef ALL_TOGETHER_REPS
+                                    if (!c->cur_video) {
+                                        // assign this temporary 'rep' to cur_video only when cur_video is uninitialized.
+                                        // otherwise, rep and cur_video point to the same address.
+                                        c->cur_video = rep;
+                                    }
+                                    #else // ----------------- IF not using our way -----------------
                                     c->cur_video = rep;
-                                }
-                                else {
-                                    rep->rep_idx = audioRepIdx;
-                                    c->cur_audio = rep;
+                                    #endif // ALL_TOGETHER_REPS
+          
                                 }
 
+                                else { // (type == REP_TYPE_AUDIO)
+                                    rep->rep_idx = audioRepIdx;
+
+                                    #ifdef ALL_TOGETHER_REPS
+                                    if (!c->cur_audio) {
+                                        // assign this temporary 'rep' to cur_audio only when cur_audio is uninitialized.
+                                        // otherwise, rep and cur_audio point to the same address.
+                                        c->cur_audio = rep;
+                                    }
+                                    #else // ----------------- IF not using our way -----------------
+                                    c->cur_audio = rep;
+                                    #endif // ALL_TOGETHER_REPS
+
+                                }
+
+                                #ifdef ALL_TOGETHER_REPS
                                 av_log(NULL, AV_LOG_ERROR, "Adding One Representation\n");
                                 dynarray_add(&c->representations, &c->nb_representations, rep);
+                                #endif // ALL_TOGETHER_REPS
                             }
                         }
                         
@@ -1087,16 +1155,58 @@ cleanup:
     return ret;
 }
 
-/////////////////////////////////////////////////////////////////////////////
-/////////////////////////////////////////////////////////////////////////////
-static int64_t get_segment_start_time_based_on_timeline(struct representation *pls, int64_t cur_seq_no)
-{
+/*
+//#ifdef OLD_PATCH  // For Reference if we need to look at what we did before in the old patch
+static int64_t get_segment_start_time(struct representation *pls, int64_t cur_seq_no, DASHContext* c) {
+        
+    int64_t i = 0;
+    int64_t j = 0;
+    int64_t num = 0;
+    int64_t startTime = 0;
+
+    if (c->is_live){
+
+        // Dirty hack to initial, by @Kaiwen, because for unknown reason init the field to 0. 
+        if ( !( pls->first_seq_no_in_representation ) ) {
+            pls->first_seq_no_in_representation = (((GetCurrentTimeInSec() - c->availabilityStartTimeSec) - c->presentationDelaySec) * pls->segmentTimescalce) / pls->segmentDuration;
+        }
+        num = pls->first_seq_no_in_representation;
+
+    }
+
+    if (pls->n_timelines) {
+        for (i = 0; i < pls->n_timelines; ++i) {
+            if (pls->timelines[i]->t > 0) {
+                startTime = pls->timelines[i]->t;
+            }
+            if (num == cur_seq_no)
+                goto finish;
+            startTime += pls->timelines[i]->d;
+            for (j = 0; j < pls->timelines[i]->r; ++j) {
+                num++;
+                if (num == cur_seq_no)
+                    goto finish;
+                startTime += pls->timelines[i]->d;
+            }
+            num++;
+        }
+    }
+
+finish:
+    return startTime;
+}
+#endif // OLD FUNCTION
+*/
+
+static int64_t get_segment_start_time_based_on_timeline( struct representation *pls, int64_t cur_seq_no ) {
+
     int64_t startTime = 0;
     if (pls->n_timelines) {
+        
         int64_t i = 0;
         int64_t j = 0;
         int64_t num = 0;
-        
+
         for (i=0; i<pls->n_timelines; ++i) {
             if (pls->timelines[i]->t > 0) {
                 startTime = pls->timelines[i]->t;
@@ -1302,8 +1412,8 @@ static int64_t calc_min_seg_no(struct representation *pls, DASHContext *c)
     return num;
 }
 
-static int64_t calc_max_seg_no(struct representation *pls, DASHContext *c)
-{
+static int64_t calc_max_seg_no(struct representation *pls, DASHContext *c) {
+    
     int64_t num = 0;
 
     if (pls->n_segments) {
@@ -1313,6 +1423,7 @@ static int64_t calc_max_seg_no(struct representation *pls, DASHContext *c)
         num = pls->first_seq_no + pls->n_timelines - 1;
         for (i=0; i<pls->n_timelines; ++i) {
             num += pls->timelines[i]->r;
+
         }
     }
     else if (c->is_live) {
@@ -1349,7 +1460,7 @@ static struct segment *get_current_segment(struct representation *pls)
     
     if (c->is_live) {
 
-        printf("get_current_fragment (is_live)\n");
+        printf("get_current_segment (is_live)\n");
 
 
         while ( !( ff_check_interrupt( c->interrupt_callback ) ) )  { // Updated Patch's Loop @ShahzadLone
@@ -1384,12 +1495,37 @@ static struct segment *get_current_segment(struct representation *pls)
     
     if (seg) {
         if (pls->tmp_url_type != TMP_URL_TYPE_UNSPECIFIED) {
+
+            //#ifdef OLD_PATCH // If old patch stuff was used it would be used here and this way.
+            //int64_t tmp_val = pls->tmp_url_type == TMP_URL_TYPE_NUMBER ? pls->cur_seq_no : get_segment_start_time(pls, pls->cur_seq_no, c);
+            //#else // ----------------- IF not using Old Patch -----------------
+            //int64_t tmp_val = pls->tmp_url_type == TMP_URL_TYPE_NUMBER ? pls->cur_seq_no : get_segment_start_time_based_on_timeline(pls, pls->cur_seq_no);
+            //#endif
+
             int64_t tmp_val = pls->tmp_url_type == TMP_URL_TYPE_NUMBER ? pls->cur_seq_no : get_segment_start_time_based_on_timeline(pls, pls->cur_seq_no);
+
             tmp_str = av_mallocz(MAX_URL_SIZE);
-            snprintf(tmp_str, MAX_URL_SIZE-1, pls->url_template, (int64_t)tmp_val);
+
+            if ( ( snprintf( tmp_str, ( MAX_URL_SIZE - 1 ), pls->url_template, (int64_t)tmp_val ) ) < 0 ) { //@ShahzadLone for help
+                av_log(pls->parent, AV_LOG_ERROR, "Invalid Segment Filename URL Template: %s\n", pls->url_template );
+                av_free(tmp_str);
+                return( NULL );
+            }
+
+            // Check to make sure we got the right tmp_url_type and iff not then handle the errors. @ShahzadLone for help.
+            if (pls->tmp_url_type == TMP_URL_TYPE_NUMBER) {
+                av_log(pls->parent, AV_LOG_VERBOSE, "SUPPORTED : Templete URL is of [Number] type. \n");
+            } else if (pls->tmp_url_type == TMP_URL_TYPE_TIME) {
+                av_log(pls->parent, AV_LOG_VERBOSE, "SUPPORTED : Templete URL is of [Time] type. \n");
+            } else { // @ShahzadLone for why added
+                av_log(pls->parent, AV_LOG_ERROR, "ERROR : Templete URL of this type [%u] is not supported! \n", pls->tmp_url_type);
+                av_free(tmp_str);
+                return( NULL );
+            }
+
             seg->url = av_strdup(tmp_str);
         } else {
-            av_log(pls->parent, AV_LOG_ERROR, "Unable to resolve template url '%s'\n", pls->url_template);
+            av_log(pls->parent, AV_LOG_ERROR, "Unspecified URL Template : Unable to resolve template url [%s] \n", pls->url_template);
             seg->url = av_strdup(pls->url_template);
         }
         seg->size = -1;
@@ -1601,8 +1737,28 @@ static int read_data(void *opaque, uint8_t *buf, int buf_size)
     int ret = 0;
 restart:
     if (!v->input) {
+
         free_segment(&v->cur_seg);
+        
+        //#ifdef OLD_PATCH // Old Reload method.
+        // Get reload interval @Kaiwen for help, because part of Kaiwens Fix.  
+        //int64_t reload_interval = v->n_timelines > 0 ? v->timelines[v->n_timelines-1]->d : v->target_duration;
+        //reload:
+        //if ( ( v->first_seq_no_in_representation ) && 
+        //     ( ( v->cur_seq_no - v->first_seq_no_in_representation ) > 100 ) ) {
+        //    AVFormatContext* fmtctx = v->parent;
+        //    printf("require reload-------------------------------\n");
+        //    if ((ret = parse_manifest(fmtctx, fmtctx->filename, NULL)) < 0) {
+        //        printf("failed: &&&&&&&&&&&& %d\n", ret);
+        //        return ret;
+        //    }
+        //    c->cur_video->first_seq_no_in_representation = ( ( ( GetCurrentTimeInSec() - c->availability_start_time_sec) - c->presentation_delay_sec ) * ( c->cur_video->fragment_timescale ) ) / c->cur_video->fragment_duration;  
+        //    c->cur_audio->first_seq_no_in_representation = ( ( ( GetCurrentTimeInSec() - c->availability_start_time_sec) - c->presentation_delay_sec ) * ( c->cur_audio->fragment_timescale ) ) / c->cur_audio->fragment_duration;
+        //}
+        //#endif // OLD_PATCH Reload Method
+        
         v->cur_seg = get_current_segment(v);
+
         if (!v->cur_seg) {
             ret = AVERROR_EOF;
             goto end;
@@ -1613,8 +1769,10 @@ restart:
         if (ret)
             goto end;
 
+        printf("open input: %s \n", v->cur_seg->url);
         ret = open_input(c, v, v->cur_seg);
         if (ret < 0) {
+            printf("failed to open input: %s \n", v->cur_seg->url);
             if (ff_check_interrupt(c->interrupt_callback)) {
                 goto end;
                 ret = AVERROR_EXIT;
