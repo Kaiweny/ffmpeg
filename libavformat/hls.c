@@ -160,6 +160,10 @@ struct playlist {
      * playlist, if any. */
     int n_init_sections;
     struct segment **init_sections;
+
+    /* Maintain mpegts parser callback mechanism for AVIOContext changes */
+    ffurl_read_callback mpegts_parser_input_backup;
+    void* mpegts_parser_input_context_backup;
 };
 
 /*
@@ -1271,12 +1275,26 @@ static int64_t default_reload_interval(struct playlist *pls)
                           pls->target_duration;
 }
 
+struct AVIOInternal {
+    URLContext *h;
+};
+
 static int read_data(void *opaque, uint8_t *buf, int buf_size)
 {
     struct playlist *v = opaque;
     HLSContext *c = v->parent->priv_data;
     int ret, i;
     int just_opened = 0;
+    struct AVIOInternal* interal = NULL;
+    URLContext* urlc = NULL;
+
+    // keep reference of mpegts parser callback mechanism
+    if(v->input) {
+        interal = (struct AVIOInternal*)v->input->opaque;
+        urlc = (URLContext*)interal->h;
+        v->mpegts_parser_input_backup = urlc->mpegts_parser_injection;
+        v->mpegts_parser_input_context_backup = urlc->mpegts_parser_injection_context;
+    }
 
 restart:
     if (!v->needed)
@@ -1372,6 +1390,14 @@ reload:
             /* Intercept ID3 tags here, elementary audio streams are required
              * to convey timestamps using them in the beginning of each segment. */
             intercept_id3(v, buf, buf_size, &ret);
+        }
+
+        // replace mpegts parser callback mechanism
+        if(interal && urlc && v->input) {
+            interal = (struct AVIOInternal*)v->input->opaque;
+            urlc = (URLContext*)interal->h;
+            urlc->mpegts_parser_injection = v->mpegts_parser_input_backup;
+            urlc->mpegts_parser_injection_context = v->mpegts_parser_input_context_backup;
         }
 
         return ret;
