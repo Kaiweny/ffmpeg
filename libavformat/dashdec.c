@@ -1662,7 +1662,7 @@ static struct segment *get_current_segment(struct representation *pls)
 
                 av_log(c, AV_LOG_VERBOSE, "%s wait for new segment: min[%"PRId64"] max[%"PRId64"], playlist %d\n", __FUNCTION__, min_seq_no, max_seq_no, (int)pls->rep_idx);
                 
-                sleep(2);
+                sleep(.5); // Changed from sleep(2) to Make the Stream Smoother and not Lag. @ShahzadLone
                 if (c->is_live && (pls->timelines || pls->segments)) {
                     refresh_manifest(pls->parent);
                 }
