@@ -279,6 +279,8 @@ typedef struct DASHContext {
 
     char *base_url;
 
+    int nb_video_representations;
+    int nb_audio_representations;
     int nb_representations;
     struct representation **representations;
     #ifdef ALL_TOGETHER_REPS
@@ -305,6 +307,9 @@ typedef struct DASHContext {
        
     int audio_rep_index;
     int video_rep_index;
+
+    char *video_rep_id;
+    char *audio_rep_id;
     
     AVIOInterruptCB *interrupt_callback;
     char *user_agent;                    ///< holds HTTP user agent set as an AVOption to the HTTP protocol context
@@ -986,8 +991,12 @@ static int parse_mainifest(AVFormatContext *s, const char *url, AVIOContext *in)
 
                         //else if ( (type == REP_TYPE_VIDEO && ((c->video_rep_index < 0 && !c->cur_video) || videoRepIdx == (int32_t)c->video_rep_index )) || 
                         //          (type == REP_TYPE_AUDIO && ((c->audio_rep_index < 0 && !c->cur_audio) || audioRepIdx == (int32_t)c->audio_rep_index )) ) { //@ShahzadLone for Info.
-                        else if ( (type == REP_TYPE_VIDEO && ( ( c->video_rep_index < 0 ) || videoRepIdx == (int32_t)c->video_rep_index )) || 
-                                  (type == REP_TYPE_AUDIO && ( ( c->audio_rep_index < 0 ) || audioRepIdx == (int32_t)c->audio_rep_index )) ) {
+                        
+                        //else if ( (type == REP_TYPE_VIDEO && ( ( c->video_rep_index < 0 ) || videoRepIdx == (int32_t)c->video_rep_index )) || 
+                        //          (type == REP_TYPE_AUDIO && ( ( c->audio_rep_index < 0 ) || audioRepIdx == (int32_t)c->audio_rep_index )) ) {
+                        
+                        else if ( (type == REP_TYPE_VIDEO && ( ( strcmp(c->video_rep_id, "") == 0 ) || ( strcmp(c->video_rep_id, rep_id_val) == 0 ) )) || 
+                                  (type == REP_TYPE_AUDIO && ( ( strcmp(c->audio_rep_id, "") == 0 ) || ( strcmp(c->audio_rep_id, rep_id_val) == 0 ) )) ) {
 
                             // convert selected representation to our internal struct
                             #ifdef ALL_TOGETHER_REPS 
@@ -1279,6 +1288,8 @@ static int parse_mainifest(AVFormatContext *s, const char *url, AVIOContext *in)
             av_log(s, AV_LOG_VERBOSE, "audio_rep_idx[%d]\n", (int)c->cur_audio->rep_idx);
             av_log(s, AV_LOG_VERBOSE, "audio_rep_count[%d]\n", (int)audioRepIdx);
         }
+        c->nb_video_representations = videoRepIdx;
+        c->nb_audio_representations = audioRepIdx;
 
 cleanup:
         /*free the document */
@@ -2638,6 +2649,8 @@ static const AVOption dash_options[] = {
     // Updated Patch Method Options.
     { "audio_rep_index", "audio representation index to be used", OFFSET(audio_rep_index), AV_OPT_TYPE_INT, {.i64 = -1}, INT_MIN, INT_MAX, FLAGS },
     { "video_rep_index", "video representation index to be used", OFFSET(video_rep_index), AV_OPT_TYPE_INT, {.i64 = -1}, INT_MIN, INT_MAX, FLAGS },
+    { "video_rep_id", "selected representations"  , OFFSET(video_rep_id), AV_OPT_TYPE_STRING, {.str = ""}, INT_MIN, INT_MAX, FLAGS },
+    { "audio_rep_id", "selected representations"  , OFFSET(audio_rep_id), AV_OPT_TYPE_STRING, {.str = ""}, INT_MIN, INT_MAX, FLAGS },
 #endif // ALL_TOGETHER_REPS    
   
     {NULL}
