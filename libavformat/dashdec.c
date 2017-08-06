@@ -279,6 +279,8 @@ typedef struct DASHContext {
 
     char *base_url;
 
+    int nb_representations;
+    struct representation **representations;
     #ifdef ALL_TOGETHER_REPS
     int nb_representations;
     struct representation **representations;
@@ -295,11 +297,10 @@ typedef struct DASHContext {
     uint32_t publishTimeSec;
     uint32_t minimumUpdatePeriodSec;
     uint32_t timeShiftBufferDepthSec;
-    uint32_t minBufferTimeSec;
-    
+    uint32_t minBufferTimeSec;    
     uint32_t periodDurationSec;
     uint32_t periodStartSec;
-    
+    uint32_t maxSegmentDuration;
     int is_live;
        
     int audio_rep_index;
@@ -870,7 +871,8 @@ static int parse_mainifest(AVFormatContext *s, const char *url, AVIOContext *in)
                 c->suggestedPresentationDelaySec = GetDurationInSec((const char *)val);
             else if (!xmlStrcmp(attr->name, (const xmlChar *)"mediaPresentationDuration"))
                 c->mediaPresentationDurationSec = GetDurationInSec((const char *)val);
-            
+            else if (!xmlStrcmp(attr->name, (const xmlChar *)"maxSegmentDuration"))
+                c->maxSegmentDuration = GetDurationInSec((const char *)val);
             attr = attr->next;
             
             xmlFree(val);
@@ -983,8 +985,7 @@ static int parse_mainifest(AVFormatContext *s, const char *url, AVIOContext *in)
                         } 
 
                         //else if ( (type == REP_TYPE_VIDEO && ((c->video_rep_index < 0 && !c->cur_video) || videoRepIdx == (int32_t)c->video_rep_index )) || 
-                        //          (type == REP_TYPE_AUDIO && ((c->audio_rep_index < 0 && !c->cur_audio) || audioRepIdx == (int32_t)c->audio_rep_index )) ) @ShahzadLone for Info.
-
+                        //          (type == REP_TYPE_AUDIO && ((c->audio_rep_index < 0 && !c->cur_audio) || audioRepIdx == (int32_t)c->audio_rep_index )) ) { //@ShahzadLone for Info.
                         else if ( (type == REP_TYPE_VIDEO && ( ( c->video_rep_index < 0 ) || videoRepIdx == (int32_t)c->video_rep_index )) || 
                                   (type == REP_TYPE_AUDIO && ( ( c->audio_rep_index < 0 ) || audioRepIdx == (int32_t)c->audio_rep_index )) ) {
 
@@ -1018,6 +1019,7 @@ static int parse_mainifest(AVFormatContext *s, const char *url, AVIOContext *in)
                             }
                             #else // ----------------- IF Using New Patch's Method -----------------
                             struct representation *rep = av_mallocz(sizeof(struct representation));
+                            dynarray_add(&c->representations, &c->nb_representations, rep); // WHY ADDED AND REMOVED FROM OTHER PLACE
                             #endif // ALL_TOGETHER_REPS
 
                             // Added to read more metadata from manifest and expand Representation structure. @ShahzadLone for info!
@@ -2611,7 +2613,8 @@ static int dash_probe(AVProbeData *p)
     if (strstr(p->buf, "dash:profile:isoff-on-demand:2011") ||
         strstr(p->buf, "dash:profile:isoff-live:2011") ||
         strstr(p->buf, "dash:profile:isoff-live:2012") ||
-        strstr(p->buf, "dash:profile:isoff-main:2011")) {
+        strstr(p->buf, "dash:profile:isoff-main:2011") || 
+        av_stristr(p->buf, "dash:schema:mpd") ) {
         return AVPROBE_SCORE_MAX;
     }
     
