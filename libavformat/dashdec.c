@@ -731,6 +731,27 @@ static enum RepType get_content_type(xmlNodePtr node, xmlChar **mimeType, xmlCha
 
     if (node) {
         
+        const char *attr = "contentType";
+        val = xmlGetProp(node, attr);
+        if (val) {
+            if (strstr((const char *) val, "video"))
+                type = REP_TYPE_VIDEO;
+            else if (strstr((const char *) val, "audio"))
+                type = REP_TYPE_AUDIO;
+        }
+
+        attr = "mimeType"; 
+        val = xmlGetProp(node, attr);
+        if (type == REP_TYPE_UNSPECIFIED) {
+            if (val) {
+                if (strstr((const char *) val, "video"))
+                    type = REP_TYPE_VIDEO;
+                else if (strstr((const char *) val, "audio"))
+                    type = REP_TYPE_AUDIO;
+            }
+        }
+
+        #ifdef OLD
         //for ( int i = 0; ( (type == REP_TYPE_UNSPECIFIED) && (i < 2) ); ++i ) {    
         for ( int i = 0; i < 2; ++i ) {
             
@@ -755,6 +776,7 @@ static enum RepType get_content_type(xmlNodePtr node, xmlChar **mimeType, xmlCha
             }
 
         } // End of For-Loop
+        #endif
     
     }
 
@@ -936,7 +958,7 @@ static int parse_mainifest(AVFormatContext *s, const char *url, AVIOContext *in)
                 periodBaseUrlNode = adaptionSetNode;
             } else if (!xmlStrcmp(adaptionSetNode->name, (const xmlChar *)"AdaptationSet")) {
 
-                av_log(NULL, AV_LOG_INFO, "Adaptaion Set: [%d] \n", ++nb_adaptationsets);
+                av_log(NULL, AV_LOG_INFO, "Adaptation Set: [%d] \n", ++nb_adaptationsets);
 
                 xmlNodePtr segmentTemplateNode = NULL;
                 xmlNodePtr contentComponentNode = NULL;
@@ -953,8 +975,6 @@ static int parse_mainifest(AVFormatContext *s, const char *url, AVIOContext *in)
                     } else if (!xmlStrcmp(node->name, (const xmlChar *)"BaseURL")) {
                         adaptionSetBaseUrlNode = node;
                     } else if (!xmlStrcmp(node->name, (const xmlChar *)"Representation")) {
-
-                        av_log(NULL, AV_LOG_INFO, "Representation: [%d] \n", ++nb_representation);
 
                         xmlNodePtr representationNode = node;
                         
@@ -976,14 +996,15 @@ static int parse_mainifest(AVFormatContext *s, const char *url, AVIOContext *in)
                         if (type == REP_TYPE_UNSPECIFIED) {
                             type = get_content_type(representationNode, &rep_mimeType_val, &rep_contentType_val);
                         }
-                        // try get information from contentComponen
-                        if (type == REP_TYPE_UNSPECIFIED) {
-                            type = get_content_type(contentComponentNode, &rep_mimeType_val, &rep_contentType_val);
-                        }
                         // try get information from adaption set
                         if (type == REP_TYPE_UNSPECIFIED) {
                             type = get_content_type(adaptionSetNode, &rep_mimeType_val, &rep_contentType_val);
                         }
+                        // try get information from contentComponen
+                        if (type == REP_TYPE_UNSPECIFIED) {
+                            type = get_content_type(contentComponentNode, &rep_mimeType_val, &rep_contentType_val);
+                        }
+                        
                         
                         if (type == REP_TYPE_UNSPECIFIED) {
                             av_log(s, AV_LOG_VERBOSE, "Parsing [%s] : SKIPPING because representation of this type is not supported \n", url);
@@ -1254,8 +1275,8 @@ static int parse_mainifest(AVFormatContext *s, const char *url, AVIOContext *in)
                                     #endif // ALL_TOGETHER_REPS
 
                                 }
-
                             }
+                            av_log(NULL, AV_LOG_INFO, "Representation: Number = %d, Type = %d , ID = %s\n", ++nb_representation, type, (const char *)rep_id_val);
                         }
                         
                         if (type == REP_TYPE_VIDEO) {
@@ -1269,6 +1290,7 @@ static int parse_mainifest(AVFormatContext *s, const char *url, AVIOContext *in)
                         
                         if (rep_bandwidth_val)
                             xmlFree(rep_bandwidth_val);
+
                     }
                     node = xmlNextElementSibling(node);
                 }
