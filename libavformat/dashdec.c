@@ -1117,7 +1117,10 @@ static int parse_mainifest(AVFormatContext *s, const char *url, AVIOContext *in)
                                 }
                                 
                                 if (startNumber_val) {
-                                    rep->first_seq_no = (int64_t) atoll((const char *)startNumber_val);
+                                    if (rep->tmp_url_type == TMP_URL_TYPE_NUMBER)
+                                        rep->first_seq_no = (int64_t) atoll((const char *)startNumber_val);
+                                    else
+                                        rep->first_seq_no = 0;
                                     xmlFree(startNumber_val);
                                 }
                                 
