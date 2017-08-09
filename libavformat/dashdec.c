@@ -1650,12 +1650,12 @@ static struct segment *get_current_segment(struct representation *pls)
             printf( "%s[HIT 1](enter while) with min[%d], cur[%d], max[%d]\n", yellow_str, min_seq_no, pls->cur_seq_no, max_seq_no);
             #endif //PRINTING
 
-            if (pls->cur_seq_no <= min_seq_no) {
+            if (pls->cur_seq_no < min_seq_no) {
 
-                av_log( c, AV_LOG_DEBUG, "[HIT 2](if [cur <= min] case)\n" );
+                av_log( c, AV_LOG_DEBUG, "[HIT 2](if [cur < min] case)\n" );
                
                 #ifdef PRINTING
-                printf("%s[HIT 2](if [cur <= min] case)\n", cyan_str);
+                printf("%s[HIT 2](if [cur < min] case)\n", cyan_str);
                 #endif //PRINTING
 
                 av_log(pls->parent, AV_LOG_VERBOSE, "%s to old segment: cur[%"PRId64"] min[%"PRId64"] max[%"PRId64"], playlist %d\n", __FUNCTION__, (int64_t)pls->cur_seq_no, min_seq_no, max_seq_no, (int)pls->rep_idx);
@@ -1663,7 +1663,20 @@ static struct segment *get_current_segment(struct representation *pls)
                     refresh_manifest(pls->parent);
                 }
                 pls->cur_seq_no = calc_cur_seg_no(pls, c);
-            } 
+            }
+
+            else if (pls->cur_seq_no == min_seq_no) { // Don't Refresh this case. @Shahzad for info!
+
+                av_log( c, AV_LOG_DEBUG, "[HIT MIN EQUAL CASE](if [cur == min] case)\n" );
+               
+                #ifdef PRINTING
+                printf("%s[HIT MIN EQUAL CASE](if [cur == min] case)\n", cyan_str);
+                #endif //PRINTING
+
+                av_log(pls->parent, AV_LOG_VERBOSE, "%s to old segment: cur[%"PRId64"] min[%"PRId64"] max[%"PRId64"], playlist %d\n", __FUNCTION__, (int64_t)pls->cur_seq_no, min_seq_no, max_seq_no, (int)pls->rep_idx);
+
+                pls->cur_seq_no = calc_cur_seg_no(pls, c);
+            }  
 
             else if (pls->cur_seq_no > max_seq_no) {
 
@@ -1675,7 +1688,7 @@ static struct segment *get_current_segment(struct representation *pls)
 
                 av_log(c, AV_LOG_VERBOSE, "%s wait for new segment: min[%"PRId64"] max[%"PRId64"], playlist %d\n", __FUNCTION__, min_seq_no, max_seq_no, (int)pls->rep_idx);
                 
-                sleep(.5); // Changed from sleep(2) to Make the Stream Smoother and not Lag. @ShahzadLone
+                sleep(.2); // Changed from sleep(2) to Make the Stream Smoother and not Lag. @ShahzadLone
                 if (c->is_live && (pls->timelines || pls->segments)) {
                     refresh_manifest(pls->parent);
                 }
