@@ -1,4 +1,5 @@
 #include "ccaption608_dec.h"
+#include "ccaptionXDS_dec.h"
 //#include "ccx_common_common.h"
 //#include "ccx_common_structs.h"
 //#include "ccx_common_constants.h"
@@ -1009,8 +1010,8 @@ static void handle_command(unsigned char c1, const unsigned char c2, cc_608_ctx 
 	//	context->cursor_row, context->cursor_column, context->visible_buffer);
 	//ccx_common_logging.debug_ftn(CCX_DMT_DECODER_608, "\rCommand end: %02X %02X (%s)\n", c1, c2, command_type[command]);
     
-    printf("Command begin: %02X %02X (%s)\n", c1, c2, command_type[command]);
-    printf("Current mode: %d  Position: %d,%d  VisBuf: %d\n", context->mode,context->cursor_row, context->cursor_column, context->visible_buffer);
+   // printf("Command begin: %02X %02X (%s)\n", c1, c2, command_type[command]);
+   // printf("Current mode: %d  Position: %d,%d  VisBuf: %d\n", context->mode,context->cursor_row, context->cursor_column, context->visible_buffer);
 
 }
 
@@ -1093,7 +1094,7 @@ static void handle_pac(unsigned char c1, unsigned char c2, cc_608_ctx *context)
 	int row=rowdata[((c1<<1)&14)|((c2>>5)&1)];
 
 	//ccx_common_logging.debug_ftn(CCX_DMT_DECODER_608, "\rPAC: %02X %02X", c1, c2);
-    printf("PAC: %02X %02X", c1, c2);
+   // printf("PAC: %02X %02X", c1, c2);
 	if (c2>=0x40 && c2<=0x5f)
 	{
 		c2=c2-0x40;
@@ -1117,8 +1118,8 @@ static void handle_pac(unsigned char c1, unsigned char c2, cc_608_ctx *context)
 	//ccx_common_logging.debug_ftn(CCX_DMT_DECODER_608, "  --  Position: %d:%d, color: %s,  font: %s\n", row,
 	//	indent, color_text[context->current_color][0], font_text[context->font]);
     
-    printf("  --  Position: %d:%d, color: %s,  font: %s\n", row,
-    indent, color_text[context->current_color][0], font_text[context->font]);
+    //printf("  --  Position: %d:%d, color: %s,  font: %s\n", row,
+    //indent, color_text[context->current_color][0], font_text[context->font]);
     
     if ((context->current_color == COL_WHITE || context->current_color == COL_TRANSPARENT))
 	//if (context->settings->default_color == COL_USERDEFINED && (context->current_color == COL_WHITE || context->current_color == COL_TRANSPARENT))
@@ -1307,6 +1308,7 @@ int process608(const unsigned char *data, int length, void *private_data, struct
 	CCaption708SubContext *dec_ctx = private_data;
 	struct cc_608_ctx *context;
 	int i, parity1, parity2;
+	cc_decode *ccdec =  dec_ctx->cc_decode;
 
 	if(dec_ctx->current_field == 1)
 	{
@@ -1365,7 +1367,7 @@ int process608(const unsigned char *data, int length, void *private_data, struct
 				context->channel = 3;
 			if (!in_xds_mode)
 			{
-				//ts_start_of_xds = get_fts(dec_ctx->timing, dec_ctx->current_field);
+			//	ts_start_of_xds = get_fts(context->timing, dec_ctx->current_field);
 				in_xds_mode = 1;
 			}
 			if(report)
@@ -1374,7 +1376,7 @@ int process608(const unsigned char *data, int length, void *private_data, struct
 		if (hi == 0x0F && in_xds_mode && (context == NULL || context->my_field == 2)) // End of XDS block
 		{
 			in_xds_mode=0;
-			//do_end_of_xds (sub, dec_ctx->xds_ctx, lo);
+			do_end_of_xds(ccdec->xds_ctx, lo);
 			if (context)
 				context->channel = context->new_channel; // Switch from channel 3
 			continue;
@@ -1420,7 +1422,7 @@ int process608(const unsigned char *data, int length, void *private_data, struct
 		{
 			if (in_xds_mode && (context == NULL || context->my_field == 2))
 			{
-				//process_xds_bytes (dec_ctx->xds_ctx, hi, lo);
+				process_xds_bytes(ccdec->xds_ctx, hi, lo);
 				continue;
 			}
 			if (!context) // No XDS code after this point, and user doesn't want captions.

@@ -245,7 +245,12 @@ typedef struct cc_608_data_points {
     //missing command error
     int popon_missing_error; //bool default 0 else 1
     int rollup_oos_error; //bool default 0 else 1
-    int rollup_missing_error; //bool default 0 else 1    
+    int rollup_missing_error; //bool default 0 else 1
+    //xds
+    int xds_invalid_pkt_structure; //bool default 0 else 1
+    int xds_checksum_error; //bool default 0 else 1
+    int xds_invalid_characters; //bool default 0 else 1
+    
 } cc_608_data_points; 
 
 

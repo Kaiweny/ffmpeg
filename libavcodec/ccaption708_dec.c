@@ -920,6 +920,12 @@ static void init_data_points(AVFrameSideData *fsd) {
     fsd->cc608_dp.popon_oos_error = 0;
     fsd->cc608_dp.rollup_missing_error = 0;
     fsd->cc608_dp.rollup_oos_error = 0;
+    
+    //xsd
+    fsd->cc608_dp.xds_checksum_error = 0;
+    fsd->cc608_dp.xds_invalid_characters = 0;
+    fsd->cc608_dp.xds_invalid_pkt_structure = 0;
+    
 }
 
 ////
