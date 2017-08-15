@@ -731,6 +731,27 @@ static enum RepType get_content_type(xmlNodePtr node, xmlChar **mimeType, xmlCha
 
     if (node) {
         
+        const char *attr = "contentType";
+        val = xmlGetProp(node, attr);
+        if (val) {
+            if (strstr((const char *) val, "video"))
+                type = REP_TYPE_VIDEO;
+            else if (strstr((const char *) val, "audio"))
+                type = REP_TYPE_AUDIO;
+        }
+
+        attr = "mimeType"; 
+        val = xmlGetProp(node, attr);
+        if (type == REP_TYPE_UNSPECIFIED) {
+            if (val) {
+                if (strstr((const char *) val, "video"))
+                    type = REP_TYPE_VIDEO;
+                else if (strstr((const char *) val, "audio"))
+                    type = REP_TYPE_AUDIO;
+            }
+        }
+
+        #ifdef OLD
         //for ( int i = 0; ( (type == REP_TYPE_UNSPECIFIED) && (i < 2) ); ++i ) {    
         for ( int i = 0; i < 2; ++i ) {
             
@@ -755,6 +776,7 @@ static enum RepType get_content_type(xmlNodePtr node, xmlChar **mimeType, xmlCha
             }
 
         } // End of For-Loop
+        #endif
     
     }
 
@@ -936,7 +958,7 @@ static int parse_mainifest(AVFormatContext *s, const char *url, AVIOContext *in)
                 periodBaseUrlNode = adaptionSetNode;
             } else if (!xmlStrcmp(adaptionSetNode->name, (const xmlChar *)"AdaptationSet")) {
 
-                av_log(NULL, AV_LOG_INFO, "Adaptaion Set: [%d] \n", ++nb_adaptationsets);
+                av_log(NULL, AV_LOG_INFO, "Adaptation Set: [%d] \n", ++nb_adaptationsets);
 
                 xmlNodePtr segmentTemplateNode = NULL;
                 xmlNodePtr contentComponentNode = NULL;
@@ -953,8 +975,6 @@ static int parse_mainifest(AVFormatContext *s, const char *url, AVIOContext *in)
                     } else if (!xmlStrcmp(node->name, (const xmlChar *)"BaseURL")) {
                         adaptionSetBaseUrlNode = node;
                     } else if (!xmlStrcmp(node->name, (const xmlChar *)"Representation")) {
-
-                        av_log(NULL, AV_LOG_INFO, "Representation: [%d] \n", ++nb_representation);
 
                         xmlNodePtr representationNode = node;
                         
@@ -976,14 +996,15 @@ static int parse_mainifest(AVFormatContext *s, const char *url, AVIOContext *in)
                         if (type == REP_TYPE_UNSPECIFIED) {
                             type = get_content_type(representationNode, &rep_mimeType_val, &rep_contentType_val);
                         }
-                        // try get information from contentComponen
-                        if (type == REP_TYPE_UNSPECIFIED) {
-                            type = get_content_type(contentComponentNode, &rep_mimeType_val, &rep_contentType_val);
-                        }
                         // try get information from adaption set
                         if (type == REP_TYPE_UNSPECIFIED) {
                             type = get_content_type(adaptionSetNode, &rep_mimeType_val, &rep_contentType_val);
                         }
+                        // try get information from contentComponen
+                        if (type == REP_TYPE_UNSPECIFIED) {
+                            type = get_content_type(contentComponentNode, &rep_mimeType_val, &rep_contentType_val);
+                        }
+                        
                         
                         if (type == REP_TYPE_UNSPECIFIED) {
                             av_log(s, AV_LOG_VERBOSE, "Parsing [%s] : SKIPPING because representation of this type is not supported \n", url);
@@ -1117,7 +1138,10 @@ static int parse_mainifest(AVFormatContext *s, const char *url, AVIOContext *in)
                                 }
                                 
                                 if (startNumber_val) {
-                                    rep->first_seq_no = (int64_t) atoll((const char *)startNumber_val);
+                                    if (rep->tmp_url_type == TMP_URL_TYPE_NUMBER)
+                                        rep->first_seq_no = (int64_t) atoll((const char *)startNumber_val);
+                                    else
+                                        rep->first_seq_no = 0;
                                     xmlFree(startNumber_val);
                                 }
                                 
@@ -1251,8 +1275,8 @@ static int parse_mainifest(AVFormatContext *s, const char *url, AVIOContext *in)
                                     #endif // ALL_TOGETHER_REPS
 
                                 }
-
                             }
+                            av_log(NULL, AV_LOG_INFO, "Representation: Number = %d, Type = %d , ID = %s\n", ++nb_representation, type, (const char *)rep_id_val);
                         }
                         
                         if (type == REP_TYPE_VIDEO) {
@@ -1266,6 +1290,7 @@ static int parse_mainifest(AVFormatContext *s, const char *url, AVIOContext *in)
                         
                         if (rep_bandwidth_val)
                             xmlFree(rep_bandwidth_val);
+
                     }
                     node = xmlNextElementSibling(node);
                 }
@@ -1650,12 +1675,12 @@ static struct segment *get_current_segment(struct representation *pls)
             printf( "%s[HIT 1](enter while) with min[%d], cur[%d], max[%d]\n", yellow_str, min_seq_no, pls->cur_seq_no, max_seq_no);
             #endif //PRINTING
 
-            if (pls->cur_seq_no <= min_seq_no) {
+            if (pls->cur_seq_no < min_seq_no) {
 
-                av_log( c, AV_LOG_DEBUG, "[HIT 2](if [cur <= min] case)\n" );
+                av_log( c, AV_LOG_DEBUG, "[HIT 2](if [cur < min] case)\n" );
                
                 #ifdef PRINTING
-                printf("%s[HIT 2](if [cur <= min] case)\n", cyan_str);
+                printf("%s[HIT 2](if [cur < min] case)\n", cyan_str);
                 #endif //PRINTING
 
                 av_log(pls->parent, AV_LOG_VERBOSE, "%s to old segment: cur[%"PRId64"] min[%"PRId64"] max[%"PRId64"], playlist %d\n", __FUNCTION__, (int64_t)pls->cur_seq_no, min_seq_no, max_seq_no, (int)pls->rep_idx);
@@ -1663,7 +1688,20 @@ static struct segment *get_current_segment(struct representation *pls)
                     refresh_manifest(pls->parent);
                 }
                 pls->cur_seq_no = calc_cur_seg_no(pls, c);
-            } 
+            }
+
+            else if (pls->cur_seq_no == min_seq_no) { // Don't Refresh this case. @Shahzad for info!
+
+                av_log( c, AV_LOG_DEBUG, "[HIT MIN EQUAL CASE](if [cur == min] case)\n" );
+               
+                #ifdef PRINTING
+                printf("%s[HIT MIN EQUAL CASE](if [cur == min] case)\n", cyan_str);
+                #endif //PRINTING
+
+                av_log(pls->parent, AV_LOG_VERBOSE, "%s to old segment: cur[%"PRId64"] min[%"PRId64"] max[%"PRId64"], playlist %d\n", __FUNCTION__, (int64_t)pls->cur_seq_no, min_seq_no, max_seq_no, (int)pls->rep_idx);
+
+                pls->cur_seq_no = calc_cur_seg_no(pls, c);
+            }  
 
             else if (pls->cur_seq_no > max_seq_no) {
 
@@ -1675,7 +1713,7 @@ static struct segment *get_current_segment(struct representation *pls)
 
                 av_log(c, AV_LOG_VERBOSE, "%s wait for new segment: min[%"PRId64"] max[%"PRId64"], playlist %d\n", __FUNCTION__, min_seq_no, max_seq_no, (int)pls->rep_idx);
                 
-                sleep(.5); // Changed from sleep(2) to Make the Stream Smoother and not Lag. @ShahzadLone
+                sleep(.2); // Changed from sleep(2) to Make the Stream Smoother and not Lag. @ShahzadLone
                 if (c->is_live && (pls->timelines || pls->segments)) {
                     refresh_manifest(pls->parent);
                 }
