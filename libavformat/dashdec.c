@@ -1639,7 +1639,6 @@ static struct segment *get_current_segment(struct representation *pls)
             struct segment *seg_ptr = pls->segments[pls->cur_seq_no];
             seg = av_mallocz(sizeof(struct segment));
             seg->url = av_strdup(seg_ptr->url);
-
             seg->size = seg_ptr->size;
             seg->url_offset = seg_ptr->url_offset;
 
@@ -1777,7 +1776,16 @@ static struct segment *get_current_segment(struct representation *pls)
             seg->url = av_strdup(pls->url_template);
         }
 
-        seg->size = -1;
+        // Calculating Segment Size (in Bytes). Using ffurl_seek is much faster than avio_size
+        URLContext* urlCtx;
+        //int ret = ffurl_alloc(&urlCtx, "", 0, 0);
+        if (ffurl_open(&urlCtx, seg->url, 0, 0, NULL) >= 0)
+            seg->size = ffurl_seek(urlCtx, 0, AVSEEK_SIZE);
+        else
+            seg->size = -1;
+        ffurl_close(urlCtx);
+        av_log(NULL, AV_LOG_DEBUG, "Seg: url: %s,  size = %d\n", seg->url, seg->size);
+
     }
     
     av_free(tmp_str);
