@@ -430,7 +430,7 @@ static struct segment *new_init_section(struct playlist *pls,
         return NULL;
     }
 
-    sec->actual_size = 0;
+    // Parsed Segment Size
     if (info->byterange[0]) {
         sec->size = strtoll(info->byterange, NULL, 10);
         ptr = strchr(info->byterange, '@');
@@ -440,6 +440,16 @@ static struct segment *new_init_section(struct playlist *pls,
         /* the entire file is the init section */
         sec->size = -1;
     }
+
+    // Actual Segment Size
+    URLContext* urlCtx;
+    //int ret = ffurl_alloc(&urlCtx, "", 0, 0);
+    if (ffurl_open(&urlCtx, sec->url, 0, 0, NULL) >= 0)
+        sec->actual_size = ffurl_seek(urlCtx, 0, AVSEEK_SIZE);
+    else
+        sec->actual_size = -1;
+    ffurl_close(urlCtx);
+    av_log(NULL, AV_LOG_INFO, "Init Segment: url: %s,  size = %d / %d\n", sec->url, sec->size, sec->actual_size);
 
     dynarray_add(&pls->init_sections, &pls->n_init_sections, sec);
 
@@ -857,7 +867,7 @@ static int parse_playlist(HLSContext *c, const char *url,
                 dynarray_add(&pls->segments, &pls->n_segments, seg);
                 is_segment = 0;
 
-                seg->actual_size = 0;
+                // Parsed Segment Size
                 seg->size = seg_size;
                 if (seg_size >= 0) {
                     seg->url_offset = seg_offset;
@@ -867,6 +877,16 @@ static int parse_playlist(HLSContext *c, const char *url,
                     seg->url_offset = 0;
                     seg_offset = 0;
                 }
+
+                // Actual Segment Size
+                URLContext* urlCtx;
+                //int ret = ffurl_alloc(&urlCtx, "", 0, 0);
+                if (ffurl_open(&urlCtx, seg->url, 0, 0, NULL) >= 0)
+                    seg->actual_size = ffurl_seek(urlCtx, 0, AVSEEK_SIZE);
+                else
+                    seg->actual_size = -1;
+                ffurl_close(urlCtx);
+                av_log(NULL, AV_LOG_INFO, "Segment: url: %s,  size = %d / %d\n", seg->url, seg->size, seg->actual_size);
 
                 seg->init_section = cur_init_section;
             }
@@ -1249,8 +1269,6 @@ static int update_init_section(struct playlist *pls, struct segment *seg)
 
     ret = read_from_url(pls, seg->init_section, pls->init_sec_buf,
                         pls->init_sec_buf_size, READ_COMPLETE);
-    if (ret > 0)
-        seg->init_section->actual_size += ret;
 
     ff_format_io_close(pls->parent, &pls->input);
 
@@ -1385,7 +1403,6 @@ reload:
 
     ret = read_from_url(v, current_segment(v), buf, buf_size, READ_NORMAL);
     if (ret > 0) {
-        current_segment(v)->actual_size += ret;
         if (just_opened && v->is_id3_timestamped != 0) {
             /* Intercept ID3 tags here, elementary audio streams are required
              * to convey timestamps using them in the beginning of each segment. */
