@@ -1775,17 +1775,6 @@ static struct segment *get_current_segment(struct representation *pls)
             av_log(pls->parent, AV_LOG_ERROR, "Unspecified URL Template : Unable to resolve template url [%s] \n", pls->url_template);
             seg->url = av_strdup(pls->url_template);
         }
-
-        // Calculating Segment Size (in Bytes). Using ffurl_seek is much faster than avio_size
-        URLContext* urlCtx;
-        //int ret = ffurl_alloc(&urlCtx, "", 0, 0);
-        if (ffurl_open(&urlCtx, seg->url, 0, 0, NULL) >= 0)
-            seg->size = ffurl_seek(urlCtx, 0, AVSEEK_SIZE);
-        else
-            seg->size = -1;
-        ffurl_close(urlCtx);
-        av_log(NULL, AV_LOG_DEBUG, "Seg: url: %s,  size = %d\n", seg->url, seg->size);
-
     }
     
     av_free(tmp_str);
@@ -1844,6 +1833,17 @@ static int open_input(DASHContext *c, struct representation *pls, struct segment
     }
 
     ff_make_absolute_url(url, MAX_URL_SIZE, c->base_url, seg->url);
+
+    // Calculating Segment Size (in Bytes). Using ffurl_seek is much faster than avio_size
+    URLContext* urlCtx;
+    //int ret = ffurl_alloc(&urlCtx, "", 0, 0);
+    if (ffurl_open(&urlCtx, url, 0, 0, NULL) >= 0)
+        seg->size = ffurl_seek(urlCtx, 0, AVSEEK_SIZE);
+    else
+        seg->size = -1;
+    ffurl_close(urlCtx);
+    av_log(NULL, AV_LOG_ERROR, "Seg: url: %s,  size = %d\n", url, seg->size);
+    
     
     av_log(pls->parent, AV_LOG_VERBOSE, "DASH request for url '%s', offset %"PRId64", playlist %d\n",
            url, seg->url_offset, pls->rep_idx);
