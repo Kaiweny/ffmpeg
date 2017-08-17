@@ -1487,9 +1487,9 @@ static int refresh_manifest(AVFormatContext *s)
     struct representation *cur_audio =  c->cur_audio;
     char *base_url = c->base_url;
     
-    c->base_url = NULL;
-    c->cur_video = NULL;
-    c->cur_audio = NULL;
+    //c->base_url = NULL;
+    //c->cur_video = NULL;
+    //c->cur_audio = NULL;
     
     av_log( c, AV_LOG_INFO, "---- Require Refreshing/Reloading, so now try to parse file with name[%s] ----\n", s->filename );
 

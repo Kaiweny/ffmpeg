@@ -449,7 +449,7 @@ static struct segment *new_init_section(struct playlist *pls,
     else
         sec->actual_size = -1;
     ffurl_close(urlCtx);
-    av_log(NULL, AV_LOG_INFO, "Init Segment: url: %s,  size = %d / %d\n", sec->url, sec->size, sec->actual_size);
+    //av_log(NULL, AV_LOG_INFO, "Init Segment: url: %s,  size = %d / %d\n", sec->url, sec->size, sec->actual_size);
 
     dynarray_add(&pls->init_sections, &pls->n_init_sections, sec);
 
@@ -886,7 +886,7 @@ static int parse_playlist(HLSContext *c, const char *url,
                 else
                     seg->actual_size = -1;
                 ffurl_close(urlCtx);
-                av_log(NULL, AV_LOG_INFO, "Segment: url: %s,  size = %d / %d\n", seg->url, seg->size, seg->actual_size);
+                //av_log(NULL, AV_LOG_INFO, "Segment: url: %s,  size = %d / %d\n", seg->url, seg->size, seg->actual_size);
 
                 seg->init_section = cur_init_section;
             }
