@@ -313,6 +313,8 @@ typedef struct DASHContext {
 
     char *video_rep_id;
     char *audio_rep_id;
+
+    int live_start_index;
     
     AVIOInterruptCB *interrupt_callback;
     char *user_agent;                    ///< holds HTTP user agent set as an AVOption to the HTTP protocol context
@@ -1744,7 +1746,13 @@ static struct segment *get_current_segment(struct representation *pls)
                 if (c->is_live && (pls->timelines || pls->segments)) {
                     refresh_manifest(pls->parent);
                 }
-                pls->cur_seq_no = calc_cur_seg_no(pls, c);
+                // User picks which segment to fetch
+                if (c->live_start_index == 0)
+                    pls->cur_seq_no = calc_cur_seg_no(pls, c);
+                else if (c->live_start_index < 0)
+                    pls->cur_seq_no = pls->last_seq_no + c->live_start_index + 1;
+                else if (c->live_start_index > 0)
+                    pls->cur_seq_no = pls->first_seq_no + c->live_start_index - 1;
             }
 
             else if (pls->cur_seq_no == min_seq_no) { // Don't Refresh this case. @Shahzad for info!
@@ -1757,7 +1765,13 @@ static struct segment *get_current_segment(struct representation *pls)
 
                 av_log(pls->parent, AV_LOG_VERBOSE, "%s to old segment: cur[%"PRId64"] min[%"PRId64"] max[%"PRId64"], playlist %d\n", __FUNCTION__, (int64_t)pls->cur_seq_no, min_seq_no, max_seq_no, (int)pls->rep_idx);
 
-                pls->cur_seq_no = calc_cur_seg_no(pls, c);
+                // User picks which segment to fetch
+                if (c->live_start_index == 0)
+                    pls->cur_seq_no = calc_cur_seg_no(pls, c);
+                else if (c->live_start_index < 0)
+                    pls->cur_seq_no = pls->last_seq_no + c->live_start_index + 1;
+                else if (c->live_start_index > 0)
+                    pls->cur_seq_no = pls->first_seq_no + c->live_start_index - 1;
             }  
 
             else if (pls->cur_seq_no > max_seq_no) {
@@ -2312,10 +2326,19 @@ fail:
 static int open_demux_for_component(AVFormatContext *s, struct representation *pls, int rep_idx)
 {
     int ret = 0;
+
+    DASHContext *c = s->priv_data;
     
     pls->parent = s;
-    pls->cur_seq_no  = calc_cur_seg_no(pls, s->priv_data);
-    pls->last_seq_no = calc_max_seg_no(pls, s->priv_data);
+    pls->cur_seq_no = calc_cur_seg_no(pls, c);
+    pls->last_seq_no = calc_max_seg_no(pls, c);
+    // User picks which segment to fetch
+    if (c->live_start_index == 0)
+        pls->cur_seq_no = calc_cur_seg_no(pls, c);
+    else if (c->live_start_index < 0)
+        pls->cur_seq_no = pls->last_seq_no + c->live_start_index + 1;
+    else if (c->live_start_index > 0)
+        pls->cur_seq_no = pls->first_seq_no + c->live_start_index - 1;
 
     ret = reopen_demux_for_component(s, pls);
     if (ret < 0) {
@@ -2764,6 +2787,7 @@ static const AVOption dash_options[] = {
     { "video_rep_index", "video representation index to be used", OFFSET(video_rep_index), AV_OPT_TYPE_INT, {.i64 = -1}, INT_MIN, INT_MAX, FLAGS },
     { "video_rep_id", "selected representations"  , OFFSET(video_rep_id), AV_OPT_TYPE_STRING, {.str = ""}, INT_MIN, INT_MAX, FLAGS },
     { "audio_rep_id", "selected representations"  , OFFSET(audio_rep_id), AV_OPT_TYPE_STRING, {.str = ""}, INT_MIN, INT_MAX, FLAGS },
+    { "live_start_index", "segment index to start live streams at (negative values are from the end)", OFFSET(live_start_index), AV_OPT_TYPE_INT, {.i64 = 0}, INT_MIN, INT_MAX, FLAGS},
 #endif // ALL_TOGETHER_REPS    
   
     {NULL}
