@@ -1551,7 +1551,7 @@ static int refresh_manifest(AVFormatContext *s)
 
     #ifdef PRINTING
     printf( "%s---- Require Refreshing/Reloading, so now try to parse file with name[%s] ----\n", green_str, s->filename );
-    #endif // PRINTING
+    #endif //PRINTING
 
     ret = parse_mainifest(s, s->filename, NULL);
     if (ret != 0) {
@@ -1560,7 +1560,7 @@ static int refresh_manifest(AVFormatContext *s)
 
         #ifdef PRINTING
         printf( "%sFailed to Refresh/Reload: Parse Manifest gave non-zero ret[%d] \n", red_str, ret );
-        #endif // PRINTING
+        #endif //PRINTING
         
         goto finish;
 
@@ -1699,6 +1699,9 @@ static struct segment *get_current_segment(struct representation *pls)
 
             return seg;
         } else if (c->is_live) {
+            #ifdef PRINTING
+            printf( "%sSleeping Hitpoint 1 \n", cyan_str );
+            #endif //PRINTING
             sleep(2);
             refresh_manifest(pls->parent);
         } else
@@ -1708,7 +1711,7 @@ static struct segment *get_current_segment(struct representation *pls)
     if (c->is_live) {
         
         #ifdef PRINTING
-        printf("get_current_segment (is_live)\n");
+        printf("%sget_current_segment (is_live)\n" , blue_str );
         #endif //PRINTING
 
         av_log( c, AV_LOG_VERBOSE, "get_current_segment (is_live)\n" );
@@ -1767,6 +1770,9 @@ static struct segment *get_current_segment(struct representation *pls)
 
                 av_log(c, AV_LOG_VERBOSE, "%s wait for new segment: min[%"PRId64"] max[%"PRId64"], playlist %d\n", __FUNCTION__, min_seq_no, max_seq_no, (int)pls->rep_idx);
                 
+                #ifdef PRINTING
+                printf( "%sSleeping Hitpoint 2 \n", cyan_str );
+                #endif //PRINTING
                 sleep(.2); // Changed from sleep(2) to Make the Stream Smoother and not Lag. @ShahzadLone
                 if (c->is_live && (pls->timelines || pls->segments)) {
                     refresh_manifest(pls->parent);
@@ -2120,11 +2126,16 @@ restart:
 
             #ifdef PRINTING
             printf( "%sFailed to Open Segment of the following Playlist [%d] \n", red_str, v->rep_idx );
-            #endif // PRINTING
+            #endif //PRINTING
 
             if (c->is_live && (v->timelines || v->segments)) {
-                // refresh_manifest(v->parent);
-                sleep(1);
+               
+                #ifdef PRINTING
+                printf( "%sSleeping Hitpoint 3 \n", cyan_str );
+                #endif //PRINTING
+                sleep(.2); // Changed from sleep(1), and put it before refreshing.
+
+                refresh_manifest(v->parent); // Uncommented, not sure why it was commented(this used to be before the above sleep). 
             }
             else {
                 v->cur_seq_no += 1;
@@ -2596,6 +2607,9 @@ static int dash_read_packet(AVFormatContext *s, AVPacket *pkt)
                         ff_format_io_close(cur->parent, &cur->input);
                     ret = reopen_demux_for_component(s, cur);
                     if (c->is_live && ret != 0) {
+                        #ifdef PRINTING
+                        printf( "%sSleeping Hitpoint 4 \n", cyan_str );
+                        #endif //PRINTING
                         sleep(2);
                         continue;
                     }
