@@ -1752,7 +1752,7 @@ static struct segment *get_current_segment(struct representation *pls)
                     refresh_manifest(pls->parent);
                 }
                 // User picks which segment to fetch
-                if (c->live_start_index == 0)
+                if (c->live_start_index == 0 || !c->is_live)
                     pls->cur_seq_no = calc_cur_seg_no(pls, c);
                 else if (c->live_start_index < 0)
                     pls->cur_seq_no = pls->last_seq_no + c->live_start_index + 1;
@@ -1771,7 +1771,7 @@ static struct segment *get_current_segment(struct representation *pls)
                 av_log(pls->parent, AV_LOG_VERBOSE, "%s to old segment: cur[%"PRId64"] min[%"PRId64"] max[%"PRId64"], playlist %d\n", __FUNCTION__, (int64_t)pls->cur_seq_no, min_seq_no, max_seq_no, (int)pls->rep_idx);
 
                 // User picks which segment to fetch
-                if (c->live_start_index == 0)
+                if (c->live_start_index == 0 || !c->is_live)
                     pls->cur_seq_no = calc_cur_seg_no(pls, c);
                 else if (c->live_start_index < 0)
                     pls->cur_seq_no = pls->last_seq_no + c->live_start_index + 1;
@@ -2346,7 +2346,7 @@ static int open_demux_for_component(AVFormatContext *s, struct representation *p
     pls->cur_seq_no = calc_cur_seg_no(pls, c);
     pls->last_seq_no = calc_max_seg_no(pls, c);
     // User picks which segment to fetch
-    if (c->live_start_index == 0)
+    if (c->live_start_index == 0 || !c->is_live)
         pls->cur_seq_no = calc_cur_seg_no(pls, c);
     else if (c->live_start_index < 0)
         pls->cur_seq_no = pls->last_seq_no + c->live_start_index + 1;
