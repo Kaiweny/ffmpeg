@@ -1743,7 +1743,12 @@ static struct segment *get_current_segment(struct representation *pls)
                 #endif //PRINTING
 
                 av_log(pls->parent, AV_LOG_VERBOSE, "%s to old segment: cur[%"PRId64"] min[%"PRId64"] max[%"PRId64"], playlist %d\n", __FUNCTION__, (int64_t)pls->cur_seq_no, min_seq_no, max_seq_no, (int)pls->rep_idx);
-                if (c->is_live && (pls->timelines || pls->segments)) {
+               
+                if ( c->is_live && ( ( pls->timelines ) ||
+                                     ( pls->segments )  ||
+                                     ( pls->tmp_url_type == TMP_URL_TYPE_NUMBER ) 
+                                   ) 
+                   ) {
                     refresh_manifest(pls->parent);
                 }
                 // User picks which segment to fetch
@@ -1788,7 +1793,11 @@ static struct segment *get_current_segment(struct representation *pls)
                 printf( "%sSleeping Hitpoint 2 \n", cyan_str );
                 #endif //PRINTING
                 sleep(.2); // Changed from sleep(2) to Make the Stream Smoother and not Lag. @ShahzadLone
-                if (c->is_live && (pls->timelines || pls->segments)) {
+                if ( c->is_live && ( ( pls->timelines ) ||
+                                     ( pls->segments )  ||
+                                     ( pls->tmp_url_type == TMP_URL_TYPE_NUMBER ) 
+                                   ) 
+                   ) {
                     refresh_manifest(pls->parent);
                 }
 
@@ -2142,8 +2151,12 @@ restart:
             printf( "%sFailed to Open Segment of the following Playlist [%d] \n", red_str, v->rep_idx );
             #endif //PRINTING
 
-            if (c->is_live && (v->timelines || v->segments)) {
-               
+            if ( c->is_live && ( ( v->timelines ) ||
+                                 ( v->segments )  ||
+                                 ( v->tmp_url_type == TMP_URL_TYPE_NUMBER ) 
+                               ) 
+               ) {
+            
                 #ifdef PRINTING
                 printf( "%sSleeping Hitpoint 3 \n", cyan_str );
                 #endif //PRINTING
