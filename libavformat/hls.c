@@ -207,6 +207,7 @@ typedef struct HLSContext {
 
     int cur_seq_no;
     int live_start_index;
+    char *selected_variant_id;
     int first_packet;
     int64_t first_timestamp;
     int64_t cur_timestamp;
@@ -219,6 +220,19 @@ typedef struct HLSContext {
     int strict_std_compliance;
     char *allowed_extensions;
 } HLSContext;
+
+// Compares low-level m3u8 filenames (not including path but including extension) to check if user selected this variant
+static int is_selected(const char * current_variant_url, const char *selected_variant_url)
+{
+    char *current_variant_filename = av_basename(current_variant_url);
+    int str_len = strlen(current_variant_filename);
+    char *selected_variant_filename = av_basename(selected_variant_url);
+    int suffix_len = strlen(selected_variant_filename);
+
+    return 
+        (str_len >= suffix_len) &&
+        (0 == strcmp(current_variant_filename + (str_len-suffix_len), selected_variant_filename));
+}
 
 static int read_chomp_line(AVIOContext *s, char *buf, int maxlen)
 {
@@ -812,7 +826,8 @@ static int parse_playlist(HLSContext *c, const char *url,
         } else if (av_strstart(line, "#", NULL)) {
             continue;
         } else if (line[0]) {
-            if (is_variant) {
+            if ( is_variant && is_selected(line, c->selected_variant_id) ) {
+                av_log(c, AV_LOG_INFO, "Variant %s selected\n", line);
                 if (!new_variant(c, &variant_info, line, url)) {
                     ret = AVERROR(ENOMEM);
                     goto fail;
@@ -1592,7 +1607,6 @@ static void add_stream_to_programs(AVFormatContext *s, struct playlist *pls, AVS
         for (j = 0; j < v->n_playlists; j++) {
             if (v->playlists[j] != pls)
                 continue;
-
             av_program_add_stream_index(s, i, stream->index);
 
             if (bandwidth < 0)
@@ -2215,6 +2229,9 @@ static const AVOption hls_options[] = {
         OFFSET(allowed_extensions), AV_OPT_TYPE_STRING,
         {.str = "3gp,aac,avi,flac,mkv,m3u8,m4a,m4s,m4v,mpg,mov,mp2,mp3,mp4,mpeg,mpegts,ogg,ogv,oga,ts,vob,wav"},
         INT_MIN, INT_MAX, FLAGS},
+    {"selected_variant_id", "selected low-level manifests (variants)", 
+        OFFSET(selected_variant_id), AV_OPT_TYPE_STRING, 
+        {.str = ""}, INT_MIN, INT_MAX, FLAGS},
     {NULL}
 };
 

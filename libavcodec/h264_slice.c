@@ -2783,6 +2783,12 @@ int ff_h264_execute_decode_slices(H264Context *h)
     }
 
 finish:
+    // store deblocking filter flags within H264Context (for external use)
+    if (h->ps.pps)
+        h->deblocking_filter_parameters_present = h->ps.pps->deblocking_filter_parameters_present;
+    if (h->slice_ctx)
+        h->deblocking_filter = h->slice_ctx->deblocking_filter;
+
     h->nb_slice_ctx_queued = 0;
     return ret;
 }
