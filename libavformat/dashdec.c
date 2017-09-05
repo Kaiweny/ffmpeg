@@ -493,11 +493,12 @@ static int open_url(AVFormatContext *s, AVIOContext **pb, const char *url,
         return AVERROR_INVALIDDATA;
 
     #ifdef PRINTING
-    time_t begin,end;
-    begin = time(NULL);
+    struct timespec begin, end;
+    clock_gettime(CLOCK_MONOTONIC_RAW, &begin);
     ret = s->io_open(s, pb, url, AVIO_FLAG_READ, &tmp);
-    end = time(NULL);
-    printf( "%sio_open in open_url took %f seconds to complete.\n%s", red_str, difftime(end, begin), normal_str );
+    clock_gettime(CLOCK_MONOTONIC_RAW, &end);
+    uint64_t microSec = (end.tv_sec - begin.tv_sec) * 1000000 + (end.tv_nsec - begin.tv_nsec) / 1000;
+    printf( "%sio_open in open_url took %d micro-seconds to complete.\n%s", red_str, microSec, normal_str );
     #else
     ret = s->io_open(s, pb, url, AVIO_FLAG_READ, &tmp);
     #endif 
