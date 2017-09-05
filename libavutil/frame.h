@@ -222,6 +222,7 @@ typedef struct service_data_points {
     int abnormal_window_position;  //boolean : default value 0 else 1 
     int abnormal_control_codes;    //boolean : default value 0 else 1 
     int abnormal_characters;       //boolean : default value 0 else 1 
+    int boundary_violation;       //boolean : default value 0 else 1 
 } service_data_points;
 
 typedef struct cc_708_services {
