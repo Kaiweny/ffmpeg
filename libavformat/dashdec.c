@@ -30,7 +30,7 @@
 // #define AHMED_READ_PACKET // If defined then use ahmed's new read packet function. (Probably should be used with ALL_TOGETHER_REPS)
 // #define ALL_TOGETHER_REPS // If defined we store all representations together. (Currently we haven't integrated the refreshing/reloading if this is defined)
 
-// #define PRINTING // Only for temporary printfs rest should all be av_log
+#define PRINTING // Only for temporary printfs rest should all be av_log
 // #define HTTPS // If Defined we replace https in BaseURL with http @Ahmed
 
 
@@ -492,7 +492,16 @@ static int open_url(AVFormatContext *s, AVIOContext **pb, const char *url,
     else if (strcmp(proto_name, "file") || !strncmp(url, "file,", 5))
         return AVERROR_INVALIDDATA;
 
+    #ifdef PRINTING
+    time_t begin,end;
+    begin = time(NULL);
     ret = s->io_open(s, pb, url, AVIO_FLAG_READ, &tmp);
+    end = time(NULL);
+    printf( "%sio_open in open_url took %f seconds to complete.\n%s", red_str, difftime(end, begin), normal_str );
+    #else
+    ret = s->io_open(s, pb, url, AVIO_FLAG_READ, &tmp);
+    #endif 
+
     if (ret >= 0) {
         // update cookies on http response with setcookies.
         void *u = (s->flags & AVFMT_FLAG_CUSTOM_IO) ? NULL : s->pb;
