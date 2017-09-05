@@ -30,7 +30,7 @@
 // #define AHMED_READ_PACKET // If defined then use ahmed's new read packet function. (Probably should be used with ALL_TOGETHER_REPS)
 // #define ALL_TOGETHER_REPS // If defined we store all representations together. (Currently we haven't integrated the refreshing/reloading if this is defined)
 
-#define PRINTING // Only for temporary printfs rest should all be av_log
+// #define PRINTING // Only for temporary printfs rest should all be av_log
 // #define HTTPS // If Defined we replace https in BaseURL with http @Ahmed
 
 
