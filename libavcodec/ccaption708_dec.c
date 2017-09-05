@@ -516,10 +516,11 @@ static void _708_handle_DFx_DefineWindow(cc_708_ctx *dtvcc, cc_708_service_decod
 	int pen_style = data[6] & 0x7;
 	int win_style = (data[6] >> 3) & 0x7;
 
-        if (row_count > 15 || col_count > 64)
+        if (row_count > 15 || col_count*2 > 64)
             dp->abnormal_window_size = 1;
-
-
+        
+         if (row_count > 15 || col_count > 32)
+            dp->boundary_violation = 1;
 
 	int do_clear_window = 0;
 
@@ -905,6 +906,7 @@ static void init_data_points(AVFrameSideData *fsd) {
         svc_dp->svc_dps[k].abnormal_window_position = 0;
         svc_dp->svc_dps[k].abnormal_control_codes = 0;
         svc_dp->svc_dps[k].abnormal_characters = 0;
+        svc_dp->svc_dps[k].boundary_violation = 0;
     }
 
     fsd->cc608_dp.roll_up_error = 0;
