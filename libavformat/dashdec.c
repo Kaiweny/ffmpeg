@@ -470,6 +470,13 @@ static void update_options(char **dest, const char *name, void *src)
 static int open_url(AVFormatContext *s, AVIOContext **pb, const char *url,
                     AVDictionary *opts, AVDictionary *opts2, int *is_http)
 {
+
+    #ifdef PRINTING
+    printf("================\n");
+    printf("OPENING URL: %s\n", url);
+    printf("================\n");
+    #endif // PRINTING
+
     DASHContext *c = s->priv_data;
     AVDictionary *tmp = NULL;
     const char *proto_name = NULL;
@@ -1906,6 +1913,13 @@ static int read_from_url(struct representation *pls, struct segment *seg,
 
 static int open_input(DASHContext *c, struct representation *pls, struct segment *seg)
 {
+
+    #ifdef PRINTING
+    printf(" ====== open_input ====== \n");
+    printf("seg->url: %s\n", seg->url);
+    printf(" ====== open_input ====== \n");
+    #endif // PRINTING
+
     AVDictionary *opts = NULL;
     char url[MAX_URL_SIZE];
     int ret;
@@ -2091,6 +2105,11 @@ static int read_data(void *opaque, uint8_t *buf, int buf_size)
     struct AVIOInternal* interal = NULL;
     URLContext* urlc = NULL;
 
+    #ifdef PRINTING
+    printf(" ====== read_data ====== \n");
+    printf("Representation Type = %s\n", v->url_template);
+    printf(" ====== read_data ====== \n");
+    #endif // PRINTING
     // keep reference of mpegts parser callback mechanism
 
     if(v->input) {
@@ -2493,7 +2512,11 @@ static int dash_read_header(AVFormatContext *s)
 #else //-----------------------------------------------------------------------------------------------------------
     /* Open the demuxer for curent video and current audio components if available "UPGRADED PATCH WAY" */
     if ( ( 0 == ret ) && ( c->cur_video ) ) {
-
+        #ifdef PRINTING
+        printf("====== open_demux_for_component ===== \n");
+        printf(" Video ");
+        printf("====== open_demux_for_component ===== \n");
+        #endif // PRINTING
         ret = open_demux_for_component(s, c->cur_video, c->cur_video->rep_idx);
         if (ret == 0) {
             c->cur_video->stream_index = stream_index;
@@ -2505,7 +2528,11 @@ static int dash_read_header(AVFormatContext *s)
     }
     
     if ( ( 0 == ret ) && ( c->cur_audio ) ) {
-
+        #ifdef PRINTING
+        printf("====== open_demux_for_component ===== \n");
+        printf(" Audio ");
+        printf("====== open_demux_for_component ===== \n");
+        #endif // PRINTING
         ret = open_demux_for_component(s, c->cur_audio, c->cur_audio->rep_idx);
         if (ret == 0) {
             c->cur_audio->stream_index = stream_index;
