@@ -790,6 +790,7 @@ static enum RepType get_content_type(xmlNodePtr node, xmlChar **mimeType, xmlCha
         const char *attr = "contentType";
         val = xmlGetProp(node, attr);
         if (val) {
+            *contentType = val;
             if (strstr((const char *) val, "video"))
                 type = REP_TYPE_VIDEO;
             else if (strstr((const char *) val, "audio"))
@@ -800,6 +801,7 @@ static enum RepType get_content_type(xmlNodePtr node, xmlChar **mimeType, xmlCha
         val = xmlGetProp(node, attr);
         if (type == REP_TYPE_UNSPECIFIED) {
             if (val) {
+                *mimeType = val;
                 if (strstr((const char *) val, "video"))
                     type = REP_TYPE_VIDEO;
                 else if (strstr((const char *) val, "audio"))
