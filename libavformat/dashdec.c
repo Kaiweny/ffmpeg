@@ -228,6 +228,7 @@ struct representation {
     
     int64_t segmentDuration;
     int64_t segmentTimescalce;
+    int64_t presentationTimeOffset;
     
     int64_t cur_seq_no;
     int64_t cur_seg_offset;
@@ -1203,7 +1204,7 @@ static int parse_mainifest(AVFormatContext *s, const char *url, AVIOContext *in)
                                 xmlChar *duration_val        = get_val_from_nodes_tab(segmentTemplatesTab,  2, "duration");
                                 xmlChar *startNumber_val     = get_val_from_nodes_tab(segmentTemplatesTab,  2, "startNumber");
                                 xmlChar *timescale_val       = get_val_from_nodes_tab(segmentTemplatesTab,  2, "timescale");
-                                
+                                xmlChar *presentationTimeOffset_val       = get_val_from_nodes_tab(segmentTemplatesTab,  2, "presentationTimeOffset");
                                 xmlChar *initialization_val  = get_val_from_nodes_tab(segmentTemplatesTab,  2, "initialization");
                                 xmlChar *media_val           = get_val_from_nodes_tab(segmentTemplatesTab,  2, "media");
                                 
@@ -1245,6 +1246,11 @@ static int parse_mainifest(AVFormatContext *s, const char *url, AVIOContext *in)
                                 if (timescale_val) {
                                     rep->segmentTimescalce = (int64_t) atoll((const char *)timescale_val);
                                     xmlFree(timescale_val);
+                                }
+                                
+                                if (presentationTimeOffset_val) {
+                                    rep->presentationTimeOffset = (int64_t) atoll((const char *)presentationTimeOffset_val);
+                                    xmlFree(presentationTimeOffset_val);
                                 }
                                 
                                 if (startNumber_val) {
@@ -1661,7 +1667,17 @@ static int64_t calc_cur_seg_no(struct representation *pls, DASHContext *c)
                 num = pls->first_seq_no;
         }
         else {
-            num = pls->first_seq_no + (((GetCurrentTimeInSec() - c->availabilityStartTimeSec) - c->presentationDelaySec) * pls->segmentTimescalce) / pls->segmentDuration;
+            num = pls->first_seq_no + (((GetCurrentTimeInSec() - c->availabilityStartTimeSec) - c->presentationDelaySec - pls->presentationTimeOffset) * pls->segmentTimescalce) / pls->segmentDuration;
+            #ifdef PRINTING
+            printf("pls->first_seq_no = %d\n", pls->first_seq_no);
+            printf("pls->segmentTimescalce = %d\n", pls->segmentTimescalce);
+            printf("pls->segmentDuration = %d\n", pls->segmentDuration);
+            printf("GetCurrentTimeInSec() = %d\n", GetCurrentTimeInSec());
+            printf("c->presentationDelaySec = %d\n", c->presentationDelaySec);
+            printf("pls->presentationTimeOffset = %d\n", pls->presentationTimeOffset);
+            printf("c->availabilityStartTimeSec = %d\n", c->availabilityStartTimeSec);
+            printf("num = %d\n", num);
+            #endif // PRINTING
         }
 
     } else {
@@ -1675,7 +1691,7 @@ static int64_t calc_min_seg_no(struct representation *pls, DASHContext *c)
     int64_t num = 0;
 
     if (c->is_live && pls->segmentDuration) { 
-        num = pls->first_seq_no + (((GetCurrentTimeInSec() - c->availabilityStartTimeSec) - c->timeShiftBufferDepthSec) * pls->segmentTimescalce)  / pls->segmentDuration;
+        num = pls->first_seq_no + (((GetCurrentTimeInSec() - c->availabilityStartTimeSec) - c->timeShiftBufferDepthSec - pls->presentationTimeOffset) * pls->segmentTimescalce)  / pls->segmentDuration;
 
     } else {
         num = pls->first_seq_no;
@@ -1696,7 +1712,7 @@ static int64_t calc_max_seg_no(struct representation *pls, DASHContext *c) {
         }
     }
     else if (c->is_live) {
-        num = pls->first_seq_no + (((GetCurrentTimeInSec() - c->availabilityStartTimeSec)) * pls->segmentTimescalce)  / pls->segmentDuration;
+        num = pls->first_seq_no + (((GetCurrentTimeInSec() - c->availabilityStartTimeSec)) * pls->segmentTimescalce - pls->presentationTimeOffset)  / pls->segmentDuration;
     }
     else {
         num = pls->first_seq_no + (c->mediaPresentationDurationSec * pls->segmentTimescalce) / pls->segmentDuration;
@@ -2164,7 +2180,6 @@ restart:
 
         ret = open_input(c, v, v->cur_seg);
         if (ret < 0) {
-
             av_log( v->parent, AV_LOG_WARNING, "Failed to Open Input by (open_input): %s \n", v->cur_seg->url);
 
             #ifdef PRINTING
