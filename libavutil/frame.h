@@ -134,6 +134,13 @@ enum AVFrameSideDataType {
      * the form of the AVContentLightMetadata struct.
      */
     AV_FRAME_DATA_CONTENT_LIGHT_LEVEL,
+
+    /**
+     * The data contains an ICC profile as an opaque octet buffer following the
+     * format described by ISO 15076-1 with an optional name defined in the
+     * metadata key entry "name".
+     */
+    AV_FRAME_DATA_ICC_PROFILE,
 };
 
 enum AVActiveFormatDescription {
@@ -146,26 +153,6 @@ enum AVActiveFormatDescription {
     AV_AFD_SP_4_3       = 15,
 };
 
-typedef struct cc_708_channel_datapoints {
-    int dtvcc_packing_matched;
-    int sequence_continuity;
-} cc_708_channel_datapoints;
-
-enum  service_type {None_SVC, Primary_SVC, Secondary_SVC};
-
-typedef struct service_data_points {
-    enum service_type svc_type;
-    int abnormal_window_size;
-    int abnormal_window_position;
-    int abnormal_control_codes;
-    int abnormal_characters;
-} service_data_points;
-
-typedef struct cc_708_services {
-    service_data_points svc_dps[2];
-    int service_number[2];
-    int abnormal_service_block;
-} cc_708_services;
 
 /**
  * Structure to hold side data for an AVFrame.
@@ -179,8 +166,6 @@ typedef struct AVFrameSideData {
     int      size;
     AVDictionary *metadata;
     AVBufferRef *buf;
-    cc_708_channel_datapoints channel_dp_708;
-    cc_708_services svcs_dp_708;
 } AVFrameSideData;
 
 /**
@@ -787,6 +772,40 @@ AVFrameSideData *av_frame_get_side_data(const AVFrame *frame,
  * from the frame.
  */
 void av_frame_remove_side_data(AVFrame *frame, enum AVFrameSideDataType type);
+
+
+/**
+ * Flags for frame cropping.
+ */
+enum {
+    /**
+     * Apply the maximum possible cropping, even if it requires setting the
+     * AVFrame.data[] entries to unaligned pointers. Passing unaligned data
+     * to Libav API is generally not allowed, and causes undefined behavior
+     * (such as crashes). You can pass unaligned data only to Libav APIs that
+     * are explicitly documented to accept it. Use this flag only if you
+     * absolutely know what you are doing.
+     */
+    AV_FRAME_CROP_UNALIGNED     = 1 << 0,
+};
+
+/**
+ * Crop the given video AVFrame according to its crop_left/crop_top/crop_right/
+ * crop_bottom fields. If cropping is successful, the function will adjust the
+ * data pointers and the width/height fields, and set the crop fields to 0.
+ *
+ * In all cases, the cropping boundaries will be rounded to the inherent
+ * alignment of the pixel format. In some cases, such as for opaque hwaccel
+ * formats, the left/top cropping is ignored. The crop fields are set to 0 even
+ * if the cropping was rounded or ignored.
+ *
+ * @param frame the frame which should be cropped
+ * @param flags Some combination of AV_FRAME_CROP_* flags, or 0.
+ *
+ * @return >= 0 on success, a negative AVERROR on error. If the cropping fields
+ * were invalid, AVERROR(ERANGE) is returned, and nothing is changed.
+ */
+int av_frame_apply_cropping(AVFrame *frame, int flags);
 
 /**
  * @return a string identifying the side data type

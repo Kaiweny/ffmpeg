@@ -33,6 +33,8 @@ HEADERS = adler32.h                                                     \
           hmac.h                                                        \
           hwcontext.h                                                   \
           hwcontext_cuda.h                                              \
+          hwcontext_d3d11va.h                                           \
+          hwcontext_drm.h                                               \
           hwcontext_dxva2.h                                             \
           hwcontext_qsv.h                                               \
           hwcontext_vaapi.h                                             \
@@ -141,6 +143,7 @@ OBJS = adler32.o                                                        \
        samplefmt.o                                                      \
        sha.o                                                            \
        sha512.o                                                         \
+       slicethread.o                                                    \
        spherical.o                                                      \
        stereo3d.o                                                       \
        threadmessage.o                                                  \
@@ -156,8 +159,10 @@ OBJS = adler32.o                                                        \
 OBJS-$(!HAVE_ATOMICS_NATIVE)            += atomic.o                     \
 
 OBJS-$(CONFIG_CUDA)                     += hwcontext_cuda.o
+OBJS-$(CONFIG_D3D11VA)                  += hwcontext_d3d11va.o
 OBJS-$(CONFIG_DXVA2)                    += hwcontext_dxva2.o
 OBJS-$(CONFIG_QSV)                   += hwcontext_qsv.o
+OBJS-$(CONFIG_LIBDRM)                   += hwcontext_drm.o
 OBJS-$(CONFIG_LZO)                      += lzo.o
 OBJS-$(CONFIG_OPENCL)                   += opencl.o opencl_internal.o
 OBJS-$(CONFIG_VAAPI)                    += hwcontext_vaapi.o
@@ -171,6 +176,7 @@ SLIBOBJS-$(HAVE_GNU_WINDRES)            += avutilres.o
 
 SKIPHEADERS-$(HAVE_CUDA_H)             += hwcontext_cuda.h
 SKIPHEADERS-$(CONFIG_CUDA)             += hwcontext_cuda_internal.h
+SKIPHEADERS-$(CONFIG_D3D11VA)          += hwcontext_d3d11va.h
 SKIPHEADERS-$(CONFIG_DXVA2)            += hwcontext_dxva2.h
 SKIPHEADERS-$(CONFIG_QSV)           += hwcontext_qsv.h
 SKIPHEADERS-$(CONFIG_VAAPI)            += hwcontext_vaapi.h
@@ -202,7 +208,6 @@ TESTPROGS = adler32                                                     \
             eval                                                        \
             file                                                        \
             fifo                                                        \
-            float_dsp                                                   \
             hash                                                        \
             hmac                                                        \
             imgutils                                                    \
@@ -216,6 +221,7 @@ TESTPROGS = adler32                                                     \
             parseutils                                                  \
             pixdesc                                                     \
             pixelutils                                                  \
+            pixfmt_best                                                 \
             random_seed                                                 \
             rational                                                    \
             ripemd                                                      \

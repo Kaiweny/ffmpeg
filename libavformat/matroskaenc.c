@@ -839,7 +839,7 @@ static int mkv_write_codecprivate(AVFormatContext *s, AVIOContext *pb,
                 ret = AVERROR(EINVAL);
             }
 
-            ff_put_bmp_header(dyn_cp, par, ff_codec_bmp_tags, 0, 0);
+            ff_put_bmp_header(dyn_cp, par, 0, 0);
         }
     } else if (par->codec_type == AVMEDIA_TYPE_AUDIO) {
         unsigned int tag;
@@ -1681,17 +1681,20 @@ static int mkv_write_tags(AVFormatContext *s)
         }
     }
 
-    for (i = 0; i < s->nb_chapters; i++) {
-        AVChapter *ch = s->chapters[i];
+    if (mkv->mode != MODE_WEBM) {
+        for (i = 0; i < s->nb_chapters; i++) {
+            AVChapter *ch = s->chapters[i];
 
-        if (!mkv_check_tag(ch->metadata, MATROSKA_ID_TAGTARGETS_CHAPTERUID))
-            continue;
+            if (!mkv_check_tag(ch->metadata, MATROSKA_ID_TAGTARGETS_CHAPTERUID))
+                continue;
 
-        ret = mkv_write_tag(s, ch->metadata, MATROSKA_ID_TAGTARGETS_CHAPTERUID, ch->id + mkv->chapter_id_offset, &mkv->tags);
-        if (ret < 0) return ret;
+            ret = mkv_write_tag(s, ch->metadata, MATROSKA_ID_TAGTARGETS_CHAPTERUID, ch->id + mkv->chapter_id_offset, &mkv->tags);
+            if (ret < 0)
+                return ret;
+        }
     }
 
-    if (mkv->have_attachments) {
+    if (mkv->have_attachments && mkv->mode != MODE_WEBM) {
         for (i = 0; i < mkv->attachments->num_entries; i++) {
             mkv_attachment *attachment = &mkv->attachments->entries[i];
             AVStream *st = s->streams[attachment->stream_idx];
@@ -1988,11 +1991,11 @@ static int mkv_write_header(AVFormatContext *s)
         ret = mkv_write_attachments(s);
         if (ret < 0)
             goto fail;
-
-        ret = mkv_write_tags(s);
-        if (ret < 0)
-            goto fail;
     }
+
+    ret = mkv_write_tags(s);
+    if (ret < 0)
+        goto fail;
 
     if (!(s->pb->seekable & AVIO_SEEKABLE_NORMAL) && !mkv->is_live)
         mkv_write_seekhead(pb, mkv);

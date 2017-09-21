@@ -31,10 +31,6 @@
 #include "h264_ps.h"
 #include "h264_sei.h"
 #include "internal.h"
-#include "libavformat/avformat.h"
-
-#include "ccaption708_dec.h"
-
 
 #define AVERROR_PS_NOT_FOUND      FFERRTAG(0xF8,'?','P','S')
 
@@ -85,7 +81,7 @@ static int decode_picture_timing(H264SEIPictureTiming *h, GetBitContext *gb,
         h->pic_struct = get_bits(gb, 4);
         h->ct_type    = 0;
 
-        if (h->pic_struct > SEI_PIC_STRUCT_FRAME_TRIPLING)
+        if (h->pic_struct > H264_SEI_PIC_STRUCT_FRAME_TRIPLING)
             return AVERROR_INVALIDDATA;
 
         num_clock_ts = sei_num_clock_ts_table[h->pic_struct];
@@ -150,30 +146,6 @@ static int decode_registered_user_data_afd(H264SEIAFD *h, GetBitContext *gb, int
     return 0;
 }
 
-static int init_a53_decoder(H264SEIA53Caption *s) {
-    AVCodec *codec;
-    int ret;
-
-    codec = avcodec_find_decoder(AV_CODEC_ID_EIA_708);
-    if (!codec) {
-        av_log(log, AV_LOG_ERROR, "Failed to find any codec\n");
-        return AVERROR(EINVAL);
-    }
-
-    s->a53_context = avcodec_alloc_context3(codec);
-    if (!s->a53_context)
-        return AVERROR(ENOMEM);
-
-    //codec context and codec private options can be passed here
-    if ((ret = avcodec_open2(s->a53_context, codec, NULL)) < 0) {
-        av_log(log, AV_LOG_ERROR, "Failed to open codec\n");
-        return ret;
-    }
-
-    codec->init(s->a53_context);
-    return 0;
-}
-
 static int decode_registered_user_data_closed_caption(H264SEIA53Caption *h,
                                                      GetBitContext *gb, void *logctx,
                                                      int size)
@@ -184,12 +156,6 @@ static int decode_registered_user_data_closed_caption(H264SEIA53Caption *h,
 
     if (size < 3)
         return AVERROR(EINVAL);
-
-    if (!h->a53_context_allocated) {
-        if (init_a53_decoder(h))
-            return -1;
-        h->a53_context_allocated = 1;
-    }
 
     user_data_type_code = get_bits(gb, 8);
     if (user_data_type_code == 0x3) {
@@ -220,6 +186,7 @@ static int decode_registered_user_data_closed_caption(H264SEIA53Caption *h,
                     h->a53_caption[h->a53_caption_size++] = get_bits(gb, 8);
                     h->a53_caption[h->a53_caption_size++] = get_bits(gb, 8);
                 }
+
                 skip_bits(gb, 8);   // marker_bits
             }
         }
@@ -415,6 +382,14 @@ static int decode_green_metadata(H264SEIGreenMetaData *h, GetBitContext *gb)
     return 0;
 }
 
+static int decode_alternative_transfer(H264SEIAlternativeTransfer *h,
+                                       GetBitContext *gb)
+{
+    h->present = 1;
+    h->preferred_transfer_characteristics = get_bits(gb, 8);
+    return 0;
+}
+
 int ff_h264_sei_decode(H264SEIContext *h, GetBitContext *gb,
                        const H264ParamSets *ps, void *logctx)
 {
@@ -446,29 +421,32 @@ int ff_h264_sei_decode(H264SEIContext *h, GetBitContext *gb,
         next = get_bits_count(gb) + 8 * size;
 
         switch (type) {
-        case SEI_TYPE_PIC_TIMING: // Picture timing SEI
+        case H264_SEI_TYPE_PIC_TIMING: // Picture timing SEI
             ret = decode_picture_timing(&h->picture_timing, gb, ps, logctx);
             break;
-        case SEI_TYPE_USER_DATA_REGISTERED:
+        case H264_SEI_TYPE_USER_DATA_REGISTERED:
             ret = decode_registered_user_data(h, gb, logctx, size);
             break;
-        case SEI_TYPE_USER_DATA_UNREGISTERED:
+        case H264_SEI_TYPE_USER_DATA_UNREGISTERED:
             ret = decode_unregistered_user_data(&h->unregistered, gb, logctx, size);
             break;
-        case SEI_TYPE_RECOVERY_POINT:
+        case H264_SEI_TYPE_RECOVERY_POINT:
             ret = decode_recovery_point(&h->recovery_point, gb);
             break;
-        case SEI_TYPE_BUFFERING_PERIOD:
+        case H264_SEI_TYPE_BUFFERING_PERIOD:
             ret = decode_buffering_period(&h->buffering_period, gb, ps, logctx);
             break;
-        case SEI_TYPE_FRAME_PACKING:
+        case H264_SEI_TYPE_FRAME_PACKING:
             ret = decode_frame_packing_arrangement(&h->frame_packing, gb);
             break;
-        case SEI_TYPE_DISPLAY_ORIENTATION:
+        case H264_SEI_TYPE_DISPLAY_ORIENTATION:
             ret = decode_display_orientation(&h->display_orientation, gb);
             break;
-        case SEI_TYPE_GREEN_METADATA:
+        case H264_SEI_TYPE_GREEN_METADATA:
             ret = decode_green_metadata(&h->green_metadata, gb);
+            break;
+        case H264_SEI_TYPE_ALTERNATIVE_TRANSFER:
+            ret = decode_alternative_transfer(&h->alternative_transfer, gb);
             break;
         default:
             av_log(logctx, AV_LOG_DEBUG, "unknown SEI type %d\n", type);
@@ -491,37 +469,37 @@ const char *ff_h264_sei_stereo_mode(const H264SEIFramePacking *h)
 {
     if (h->frame_packing_arrangement_cancel_flag == 0) {
         switch (h->frame_packing_arrangement_type) {
-            case SEI_FPA_TYPE_CHECKERBOARD:
+            case H264_SEI_FPA_TYPE_CHECKERBOARD:
                 if (h->content_interpretation_type == 2)
                     return "checkerboard_rl";
                 else
                     return "checkerboard_lr";
-            case SEI_FPA_TYPE_INTERLEAVE_COLUMN:
+            case H264_SEI_FPA_TYPE_INTERLEAVE_COLUMN:
                 if (h->content_interpretation_type == 2)
                     return "col_interleaved_rl";
                 else
                     return "col_interleaved_lr";
-            case SEI_FPA_TYPE_INTERLEAVE_ROW:
+            case H264_SEI_FPA_TYPE_INTERLEAVE_ROW:
                 if (h->content_interpretation_type == 2)
                     return "row_interleaved_rl";
                 else
                     return "row_interleaved_lr";
-            case SEI_FPA_TYPE_SIDE_BY_SIDE:
+            case H264_SEI_FPA_TYPE_SIDE_BY_SIDE:
                 if (h->content_interpretation_type == 2)
                     return "right_left";
                 else
                     return "left_right";
-            case SEI_FPA_TYPE_TOP_BOTTOM:
+            case H264_SEI_FPA_TYPE_TOP_BOTTOM:
                 if (h->content_interpretation_type == 2)
                     return "bottom_top";
                 else
                     return "top_bottom";
-            case SEI_FPA_TYPE_INTERLEAVE_TEMPORAL:
+            case H264_SEI_FPA_TYPE_INTERLEAVE_TEMPORAL:
                 if (h->content_interpretation_type == 2)
                     return "block_rl";
                 else
                     return "block_lr";
-            case SEI_FPA_TYPE_2D:
+            case H264_SEI_FPA_TYPE_2D:
             default:
                 return "mono";
         }
