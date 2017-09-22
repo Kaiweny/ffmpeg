@@ -4,6 +4,8 @@
 
 #include "VideoMasterHD_Core.h"
 #include "VideoMasterHD_Sdi.h"
+#include "VideoMasterHD_Sdi_Vbi.h"
+#include "VideoMasterHD_Sdi_VbiData.h"
 
 #include "libavdevice/deltacast/Tools.h"
 #include "libavdevice/deltacast/Tools.h"
@@ -39,6 +41,9 @@ struct deltacast_ctx {
     /* Options */
     /* video channel index */	
     int v_channelIndex;
+
+    /* Afd Slot AR Code */   
+    ULONG afd_ARCode;
 };
 
 static int start_video_stream(struct deltacast_ctx *ctx) {
@@ -178,7 +183,8 @@ static int deltacast_read_header(AVFormatContext *avctx) {
 		st->codecpar->codec_id    = AV_CODEC_ID_RAWVIDEO;
 		st->codecpar->format      = AV_PIX_FMT_UYVY422;
 		st->codecpar->codec_tag   = MKTAG('U', 'Y', 'V', 'Y');
-		ctx->video_st=st;
+        ctx->video_st=st;
+        ctx->afd_ARCode = NB_VHD_AFD_AR_CODE;
     }				
 	
 	return status;
@@ -198,11 +204,23 @@ static int deltacast_read_packet(AVFormatContext *avctx, AVPacket *pkt) {
  	ULONG result, bufferSize;
     BYTE  *pBuffer = NULL;
 	struct deltacast_ctx *ctx = (struct deltacast_ctx *) avctx->priv_data;
-	int err = 0;
-	
+    int err = 0;
+    
+    VHD_AFD_AR_SLOT AfdArSlot;
+    /* Set Afd line */
+    memset(&AfdArSlot, 0, sizeof(VHD_AFD_AR_SLOT));
+    AfdArSlot.LineNumber = 0;
+    
 	result = VHD_LockSlotHandle(ctx->StreamHandle, &ctx->SlotHandle);
 
 	if (result == VHDERR_NOERROR) {
+        /* Extract Afd Slot */
+        result = VHD_SlotExtractAFD(ctx->SlotHandle, &AfdArSlot);
+        if (result == VHDERR_NOERROR) {
+            //printf("Afd and AR code received : 0x%02X \n", AfdArSlot.AFD_ARCode);
+            ctx->afd_ARCode = AfdArSlot.AFD_ARCode;
+        }
+
         result = VHD_GetSlotBuffer(ctx->SlotHandle, VHD_SDI_BT_VIDEO, &pBuffer,&bufferSize);
 		
    		if (result == VHDERR_NOERROR) {
