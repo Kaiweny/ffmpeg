@@ -24,7 +24,6 @@
   * 
   */
 
-// #define AHMED_READ_PACKET // If defined then use ahmed's new read packet function. (Probably should be used with ALL_TOGETHER_REPS)
 // #define ALL_TOGETHER_REPS // If defined we store all representations together. (Currently we haven't integrated the refreshing/reloading if this is defined)
 
 // #define PRINTING // Only for temporary printfs rest should all be av_log
@@ -2529,56 +2528,6 @@ fail:
 }
 
 
-#ifdef define AHMED_READ_PACKET // Then Use these two Ahmed's functions
-
-// Helper for @Ahmed's new one
-static struct representation *get_rep_with_min_timestamp(DASHContext *c) {
-    int ret = -1;
-    int64_t min_timestamp;
-    int rep_idx;
-    for (rep_idx = 0; rep_idx < c->nb_representations; rep_idx++) {
-        if (c->representations[rep_idx]->needed) {
-            if (ret < 0) {
-                min_timestamp = c->representations[rep_idx]->cur_timestamp;
-                ret = rep_idx;
-            }
-            if ((c->representations[rep_idx]->cur_timestamp < min_timestamp)) {
-                min_timestamp = c->representations[rep_idx]->cur_timestamp;
-                ret = rep_idx;
-            }
-        }
-    }
-    if (ret == -1)
-        return NULL;
-    return c->representations[ret];
-}
-
-// @Ahmed's new one
-static int dash_read_packet(AVFormatContext *s, AVPacket *pkt)
-{
-    DASHContext *c = s->priv_data;
-    int ret = 0;
-    struct representation *cur = NULL;
-    cur = get_rep_with_min_timestamp(c);
-    if (!cur)
-        return 0;
-    if (cur->ctx) {
-        ret = av_read_frame(cur->ctx, &cur->pkt);
-        if (ret < 0) {
-            av_packet_unref(&cur->pkt);
-        } else {
-            // If we got a packet, return it.
-            *pkt = cur->pkt;
-            cur->cur_timestamp = av_rescale(pkt->pts, (int64_t)cur->ctx->streams[0]->time_base.num * 90000, cur->ctx->streams[0]->time_base.den);
-            pkt->stream_index = cur->stream_index;
-            reset_packet(&cur->pkt);
-            return 0;
-        }
-    }
-    return AVERROR_EOF;
-}
-#else // ----------------- IF Using New Patch's dash_read_packet function ----------------- @Shahzad for help.
-// Upgraded Patch One.
 static int dash_read_packet(AVFormatContext *s, AVPacket *pkt)
 {
     DASHContext *c = s->priv_data;
@@ -2637,7 +2586,6 @@ static int dash_read_packet(AVFormatContext *s, AVPacket *pkt)
     
     return AVERROR_EOF;
 }
-#endif // AHMED_READ_PACKET 
 
 
 static int dash_close(AVFormatContext *s)
