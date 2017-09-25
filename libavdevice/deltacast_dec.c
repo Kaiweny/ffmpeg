@@ -13,7 +13,7 @@
 struct deltacast_ctx {
     AVClass *class;
     /* Deltacast SDK interfaces */
-	HANDLE BoardHandle, StreamHandle, SlotHandle;
+	HANDLE BoardHandle, StreamHandle, StreamHandleANC, SlotHandle;
     ULONG ChnType, VideoStandard, Interface, ClockSystem;	
 
     /* Deltacast mode information */
@@ -106,7 +106,9 @@ static int start_video_stream(struct deltacast_ctx *ctx) {
 						WaitForChannelLocked(ctx->BoardHandle, CHNSTATUS);    
 						Result = VHD_GetBoardProperty(ctx->BoardHandle, CLOCKDIV, &ctx->ClockSystem);
 						if(Result == VHDERR_NOERROR) {
-							Result = VHD_OpenStreamHandle(ctx->BoardHandle, STRMTYPE, VHD_SDI_STPROC_DISJOINED_VIDEO, NULL, &ctx->StreamHandle, NULL);
+                            VHD_OpenStreamHandle(ctx->BoardHandle, STRMTYPE, VHD_SDI_STPROC_DISJOINED_ANC, NULL, &ctx->StreamHandleANC, NULL);
+                            Result = VHD_OpenStreamHandle(ctx->BoardHandle, STRMTYPE, VHD_SDI_STPROC_DISJOINED_VIDEO, NULL, &ctx->StreamHandle, NULL);
+
 							if (Result == VHDERR_NOERROR) {
 								Result = VHD_GetStreamProperty(ctx->StreamHandle, VHD_SDI_SP_VIDEO_STANDARD, &ctx->VideoStandard);
 								if ((Result == VHDERR_NOERROR) && (ctx->VideoStandard != NB_VHD_VIDEOSTANDARDS)) {
@@ -122,12 +124,13 @@ static int start_video_stream(struct deltacast_ctx *ctx) {
                                             AfdArSlot.LineNumber = 0;
 
                                             /* Start stream */
-											Result = VHD_StartStream(ctx->StreamHandle);
+                                            Result = VHD_StartStream(ctx->StreamHandle);
+                                            VHD_StartStream(ctx->StreamHandleANC);
 											if (Result == VHDERR_NOERROR) {
                                                 status = 0; 
                                                 
                                                 /* Try to lock next slot */
-                                                Result = VHD_LockSlotHandle(ctx->StreamHandle,&ctx->SlotHandle);
+                                                Result = VHD_LockSlotHandle(ctx->StreamHandleANC,&ctx->SlotHandle);
                                                 if (Result == VHDERR_NOERROR) 
                                                 {
                                                     /* Extract Afd Slot */
@@ -136,7 +139,7 @@ static int start_video_stream(struct deltacast_ctx *ctx) {
                                                         ctx->afd_ARCode = AfdArSlot.AFD_ARCode;
 
                                                     /* Unlock slot */ 
-                                                    VHD_UnlockSlotHandle(ctx->SlotHandle); 
+                                                    VHD_UnlockSlotHandle(ctx->SlotHandle);
                                                 }
                                                 else if (Result != VHDERR_TIMEOUT) {
                                                     printf("ERROR : Cannot lock slot on RX0 stream. Result = 0x%08X (%s)\n",Result, GetErrorDescription(Result));
@@ -182,7 +185,9 @@ static int start_video_stream(struct deltacast_ctx *ctx) {
 
 static int stop_video_stream(struct deltacast_ctx *ctx) {
 	VHD_StopStream(ctx->StreamHandle);
-	VHD_CloseStreamHandle(ctx->StreamHandle);
+    VHD_CloseStreamHandle(ctx->StreamHandle);
+    VHD_StopStream(ctx->StreamHandleANC);
+    VHD_CloseStreamHandle(ctx->StreamHandleANC);
 	VHD_CloseBoardHandle(ctx->BoardHandle);
 
 	return 0;
