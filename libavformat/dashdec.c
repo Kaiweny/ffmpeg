@@ -24,14 +24,11 @@
   * 
   */
 
-
-// @ShahzadLone for more information!
-// #DUMMY_define OLD_PATCH // Just for reference search this key word(OLD_PATCH), all commented out on what we used to do in old patch. 
 // #define AHMED_READ_PACKET // If defined then use ahmed's new read packet function. (Probably should be used with ALL_TOGETHER_REPS)
 // #define ALL_TOGETHER_REPS // If defined we store all representations together. (Currently we haven't integrated the refreshing/reloading if this is defined)
 
 // #define PRINTING // Only for temporary printfs rest should all be av_log
-// #define HTTPS // If Defined we replace https in BaseURL with http @Ahmed
+#define HTTPS // If Defined we replace https in BaseURL with http @Ahmed
 
 
 /**
@@ -851,14 +848,6 @@ static void fill_timelines(struct representation *rep, xmlNodePtr *nodes, const 
             xmlNodePtr segmentTimelineNode = findChildNodeByName(nodes[i], "SegmentTimeline");
             if (segmentTimelineNode) {
 
-                //#ifdef OLD_PATCH // If OLD_PATCH reload method should be used.
-                //// On reload, if the new MPD contain segmetntimeline node, clean up the existing
-                //// timeline by set the array size counter to 0.
-                //if (rep->n_timelines) {
-                //    rep->n_timelines = 0;
-                //}
-                //#endif // OLD_PATCH
-
                 segmentTimelineNode = xmlFirstElementChild(segmentTimelineNode);
                 while (segmentTimelineNode) {
 
@@ -1417,47 +1406,6 @@ cleanup:
     return ret;
 }
 
-/*
-//#ifdef OLD_PATCH  // For Reference if we need to look at what we did before in the old patch
-static int64_t get_segment_start_time(struct representation *pls, int64_t cur_seq_no, DASHContext* c) {
-        
-    int64_t num = 0;
-    int64_t startTime = 0;
-
-    if (c->is_live){
-
-        // Dirty hack to initial, by @Kaiwen, because for unknown reason init the field to 0. 
-        if ( !( pls->first_seq_no_in_representation ) ) {
-            pls->first_seq_no_in_representation = (((GetCurrentTimeInSec() - c->availabilityStartTimeSec) - c->presentationDelaySec) * pls->segmentTimescalce) / pls->segmentDuration;
-        }
-        num = pls->first_seq_no_in_representation;
-
-    }
-
-    if (pls->n_timelines) {
-        for ( int64_t i = 0; i < pls->n_timelines; ++i ) {
-            if (pls->timelines[i]->t > 0) {
-                startTime = pls->timelines[i]->t;
-            }
-            if (num == cur_seq_no)
-                goto finish;
-            startTime += pls->timelines[i]->d;
-            for ( int64_t j = 0; j < pls->timelines[i]->r; ++j ) {
-                num++;
-                if (num == cur_seq_no)
-                    goto finish;
-                startTime += pls->timelines[i]->d;
-            }
-            ++num;
-        }
-    }
-
-finish:
-    return startTime;
-}
-#endif // OLD FUNCTION
-*/
-
 static int64_t get_segment_start_time_based_on_timeline( struct representation *pls, int64_t cur_seq_no ) {
 
     int64_t startTime = 0;
@@ -1859,12 +1807,6 @@ static struct segment *get_current_segment(struct representation *pls)
     if (seg) {
         if (pls->tmp_url_type != TMP_URL_TYPE_UNSPECIFIED) {
 
-            //#ifdef OLD_PATCH // If old patch stuff was used it would be used here and this way.
-            //int64_t val = pls->tmp_url_type == TMP_URL_TYPE_NUMBER ? pls->cur_seq_no : get_segment_start_time(pls, pls->cur_seq_no, c);
-            //#else // ----------------- IF not using Old Patch -----------------
-            //int64_t val = pls->tmp_url_type == TMP_URL_TYPE_NUMBER ? pls->cur_seq_no : get_segment_start_time_based_on_timeline(pls, pls->cur_seq_no);
-            //#endif
-
             int64_t val = pls->tmp_url_type == TMP_URL_TYPE_NUMBER ? pls->cur_seq_no : get_segment_start_time_based_on_timeline(pls, pls->cur_seq_no);
 
             int size = snprintf(NULL, 0, pls->url_template_format, val); // calc needed buffer size
@@ -1876,12 +1818,12 @@ static struct segment *get_current_segment(struct representation *pls)
             }
             // av_log(pls->parent, AV_LOG_ERROR, "Invalid Segment Filename URL Template: %s\n", pls->url_template );
 
-            // Check to make sure we got the right tmp_url_type and iff not then handle the errors. @ShahzadLone for help.
+            // Check to make sure we got the right tmp_url_type and if not then handle the errors.
             if (pls->tmp_url_type == TMP_URL_TYPE_NUMBER) {
                 av_log(pls->parent, AV_LOG_VERBOSE, "SUPPORTED : Templete URL is of [Number] type. \n");
             } else if (pls->tmp_url_type == TMP_URL_TYPE_TIME) {
                 av_log(pls->parent, AV_LOG_VERBOSE, "SUPPORTED : Templete URL is of [Time] type. \n");
-            } else { // @ShahzadLone for why added
+            } else { 
                 av_log(pls->parent, AV_LOG_ERROR, "ERROR : Templete URL of this type [%u] is not supported! \n", pls->tmp_url_type);
                 return( NULL ); // ?? not sure
             }
@@ -2142,23 +2084,6 @@ restart:
     if (!v->input) {
 
         free_segment(&v->cur_seg);
-        
-        //#ifdef OLD_PATCH // Old Reload method.
-        // Get reload interval @Kaiwen for help, because part of Kaiwens Fix.  
-        //int64_t reload_interval = v->n_timelines > 0 ? v->timelines[v->n_timelines-1]->d : v->target_duration;
-        //reload:
-        //if ( ( v->first_seq_no_in_representation ) && 
-        //     ( ( v->cur_seq_no - v->first_seq_no_in_representation ) > 10 ) ) {
-        //    AVFormatContext* fmtctx = v->parent;
-        //    printf("require reload-------------------------------\n");
-        //    if ((ret = parse_manifest(fmtctx, fmtctx->filename, NULL)) < 0) {
-        //        printf("failed: &&&&&&&&&&&& %d\n", ret);
-        //        return ret;
-        //    }
-        //    c->cur_video->first_seq_no_in_representation = ( ( ( GetCurrentTimeInSec() - c->availability_start_time_sec) - c->presentation_delay_sec ) * ( c->cur_video->fragment_timescale ) ) / c->cur_video->fragment_duration;  
-        //    c->cur_audio->first_seq_no_in_representation = ( ( ( GetCurrentTimeInSec() - c->availability_start_time_sec) - c->presentation_delay_sec ) * ( c->cur_audio->fragment_timescale ) ) / c->cur_audio->fragment_duration;
-        //}
-        //#endif // OLD_PATCH Reload Method
         
         v->cur_seg = get_current_segment(v);
 
