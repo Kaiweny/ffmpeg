@@ -24,8 +24,6 @@
   * 
   */
 
-// #define ALL_TOGETHER_REPS // If defined we store all representations together. (Currently we haven't integrated the refreshing/reloading if this is defined)
-
 // #define PRINTING // Only for temporary printfs rest should all be av_log
 #define HTTPS // If Defined we replace https in BaseURL with http @Ahmed
 
@@ -283,11 +281,6 @@ typedef struct DASHContext {
     int nb_audio_representations;
     int nb_representations;
     struct representation **representations;
-    #ifdef ALL_TOGETHER_REPS
-    int nb_representations;
-    struct representation **representations;
-    #endif //ALL_TOGETHER_REPS
-
     struct representation *cur_video;
     struct representation *cur_audio;
     
@@ -1110,7 +1103,7 @@ static int parse_mainifest(AVFormatContext *s, const char *url, AVIOContext *in)
                         } 
 
                         //else if ( (type == REP_TYPE_VIDEO && ((c->video_rep_index < 0 && !c->cur_video) || videoRepIdx == (int32_t)c->video_rep_index )) || 
-                        //          (type == REP_TYPE_AUDIO && ((c->audio_rep_index < 0 && !c->cur_audio) || audioRepIdx == (int32_t)c->audio_rep_index )) ) { //@ShahzadLone for Info.
+                        //          (type == REP_TYPE_AUDIO && ((c->audio_rep_index < 0 && !c->cur_audio) || audioRepIdx == (int32_t)c->audio_rep_index )) ) { 
                         
                         //else if ( (type == REP_TYPE_VIDEO && ( ( c->video_rep_index < 0 ) || videoRepIdx == (int32_t)c->video_rep_index )) || 
                         //          (type == REP_TYPE_AUDIO && ( ( c->audio_rep_index < 0 ) || audioRepIdx == (int32_t)c->audio_rep_index )) ) {
@@ -1118,38 +1111,8 @@ static int parse_mainifest(AVFormatContext *s, const char *url, AVIOContext *in)
                         else if ( (type == REP_TYPE_VIDEO && ( ( strcmp(c->video_rep_id, "") == 0 ) || ( strcmp(c->video_rep_id, rep_id_val) == 0 ) )) || 
                                   (type == REP_TYPE_AUDIO && ( ( strcmp(c->audio_rep_id, "") == 0 ) || ( strcmp(c->audio_rep_id, rep_id_val) == 0 ) )) ) {
 
-                            // convert selected representation to our internal struct
-                            #ifdef ALL_TOGETHER_REPS 
-                            struct representation *rep = NULL;
-                            
-                            char temp_rep_id[MAX_FIELD_LEN];
-                            strcpy(temp_rep_id, rep_id_val);
-                            for (int i_rep = 0; i_rep < c->nb_representations; ++i_rep){
-                                if (strcmp(c->representations[i_rep]->id, temp_rep_id) == 0){ // Representation already exists (Just a reload)
-                                    
-                                    av_log(NULL, AV_LOG_INFO, "Representation id[%d] Already Exists. \n", c->representations[i_rep]->id);
-
-                                    rep = c->representations[i_rep];
-                                }
-                            }
-                            if (!rep) { // New Representation
-                                rep = av_mallocz(sizeof(struct representation));
-                                
-                                av_log(NULL, AV_LOG_INFO, "Total Number of Representations is [%d]. \n", c->nb_representations );
-                                av_log(NULL, AV_LOG_INFO, "Adding One Representation. \n");
-                                
-                                dynarray_add(&c->representations, &c->nb_representations, rep); // WHY ADDED AND REMOVED FROM OTHER PLACE
-
-                            }
-
-                            if (!rep) { // SHOULD WE EVEN NEED THIS ????????? ASK AHMED
-                                ret = AVERROR(ENOMEM);
-                                goto cleanup; //end;????????????
-                            }
-                            #else // ----------------- IF Using New Patch's Method -----------------
                             struct representation *rep = av_mallocz(sizeof(struct representation));
                             dynarray_add(&c->representations, &c->nb_representations, rep); // WHY ADDED AND REMOVED FROM OTHER PLACE
-                            #endif // ALL_TOGETHER_REPS
 
                             // Added to read more metadata from manifest and expand Representation structure. @ShahzadLone for info!
                             av_log(NULL, AV_LOG_VERBOSE, "rep(id[%s],mimeType[%s],contentType[%s],codecs[%s],height[%s],width[%s],frameRate[%s],scanType[%s],bandwidth[%s]) -- before \n", 
@@ -1318,32 +1281,16 @@ static int parse_mainifest(AVFormatContext *s, const char *url, AVIOContext *in)
                                     rep->segmentTimescalce = 1;
                                 
                                 if (type == REP_TYPE_VIDEO) {
+
                                     rep->rep_idx = videoRepIdx;
-                                    
-                                    #ifdef ALL_TOGETHER_REPS
-                                    if (!c->cur_video) {
-                                        // assign this temporary 'rep' to cur_video only when cur_video is uninitialized.
-                                        // otherwise, rep and cur_video point to the same address.
-                                        c->cur_video = rep;
-                                    }
-                                    #else // ----------------- IF not using our way -----------------
                                     c->cur_video = rep;
-                                    #endif // ALL_TOGETHER_REPS
           
                                 }
 
                                 else { // (type == REP_TYPE_AUDIO)
-                                    rep->rep_idx = audioRepIdx;
 
-                                    #ifdef ALL_TOGETHER_REPS
-                                    if (!c->cur_audio) {
-                                        // assign this temporary 'rep' to cur_audio only when cur_audio is uninitialized.
-                                        // otherwise, rep and cur_audio point to the same address.
-                                        c->cur_audio = rep;
-                                    }
-                                    #else // ----------------- IF not using our way -----------------
+                                    rep->rep_idx = audioRepIdx;
                                     c->cur_audio = rep;
-                                    #endif // ALL_TOGETHER_REPS
 
                                 }
                             }
@@ -2395,62 +2342,6 @@ static int dash_read_header(AVFormatContext *s)
         s->duration = (int64_t) c->mediaPresentationDurationSec * AV_TIME_BASE;
     }
 
-
-#ifdef ALL_TOGETHER_REPS
-    /* Open the demuxer for all Representation Components(Video & Audio) if available "OUR WAY" @ShahzadLone*/
-    av_log(NULL, AV_LOG_INFO, "Start Selecting Reps: [%s] \n", c->selected_reps);  
-
-    #ifdef PRINTING
-    printf("%sStart Selecting Reps: [%s] \n", mag_str, c->selected_reps);
-    #endif //PRINTING
-    
-    for (int repIndex = 0; repIndex < c->nb_representations; ++repIndex) {
-        
-        c->representations[repIndex]->needed = 0;
-        
-        if (is_rep_selected(c, repIndex)) {
-            
-            av_log(NULL, AV_LOG_INFO,"Representation [%d] is being selected \n", repIndex);
-
-            #ifdef PRINTING
-             printf( "%sRepresentation [%d] is being selected \n", mag_str, repIndex );
-            #endif //PRINTING
-
-            c->representations[repIndex]->needed = 1;
-        }
-
-        if ( (ret == 0) && c->representations[repIndex]) {
-            ret = open_demux_for_component(s, c->representations[repIndex], repIndex);
-            if (ret == 0) {
-                c->representations[repIndex]->stream_index = stream_index;
-                ++stream_index;
-            } else {
-                free_representation(c->representations[repIndex]);
-                c->representations[repIndex] = NULL;
-            }
-        }
-
-        av_log(NULL, AV_LOG_VERBOSE, "rep[%d]->id = (%s) \n", repIndex, c->representations[repIndex]->id);
-        av_log(NULL, AV_LOG_VERBOSE, "rep[%d]->mimeType = (%s) \n", repIndex, c->representations[repIndex]->mimeType);
-        av_log(NULL, AV_LOG_VERBOSE, "rep[%d]->contentType = (%s) \n", repIndex, c->representations[repIndex]->contentType);
-        av_log(NULL, AV_LOG_VERBOSE, "rep[%d]->codecs = (%s) \n", repIndex, c->representations[repIndex]->codecs);
-        av_log(NULL, AV_LOG_VERBOSE, "rep[%d]->height = (%d) \n", repIndex, c->representations[repIndex]->height);
-        av_log(NULL, AV_LOG_VERBOSE, "rep[%d]->width = (%d) \n", repIndex, c->representations[repIndex]->width);
-        av_log(NULL, AV_LOG_VERBOSE, "rep[%d]->frameRate = (%d) \n", repIndex, c->representations[repIndex]->frameRate);
-        av_log(NULL, AV_LOG_VERBOSE, "rep[%d]->scanType = (%d) \n", repIndex, c->representations[repIndex]->scanType);
-        av_log(NULL, AV_LOG_VERBOSE, "rep[%d]->bandwidth = (%d) \n", repIndex, c->representations[repIndex]->bandwidth);
-        av_log(NULL, AV_LOG_VERBOSE, "rep[%d]->needed = (%d) \n", repIndex, c->representations[repIndex]->needed);
-
-        av_log(NULL, AV_LOG_INFO, "Selected these Reps: [%s] \n", c->selected_reps);
-
-        #ifdef PRINTING
-        printf("Selected these Reps: [%s] \n", c->selected_reps);
-        #endif //PRINTING
-
-    } // End of For-Loop that selects our Reps.
-
-    // End of Our Method
-#else //-----------------------------------------------------------------------------------------------------------
     /* Open the demuxer for curent video and current audio components if available "UPGRADED PATCH WAY" */
     if ( ( 0 == ret ) && ( c->cur_video ) ) {
         #ifdef PRINTING
@@ -2483,8 +2374,6 @@ static int dash_read_header(AVFormatContext *s)
             c->cur_audio = NULL;
         }
     }
-    // End of Upgrade Patch Method
-#endif // ALL_TOGETHER_REPS
 
     if (0 == stream_index) {
 
@@ -2501,15 +2390,6 @@ static int dash_read_header(AVFormatContext *s)
             goto fail;
         }
 
-#ifdef ALL_TOGETHER_REPS
-        // Our Method @ShahzadLone for info!
-        for (int repIndex = 0; repIndex < c->nb_representations; ++repIndex) {
-            if (c->representations[repIndex])
-                av_program_add_stream_index(s, 0, c->representations[repIndex]->stream_index);
-        }
-        // End of Our Method
-#else //----------------------------------------------------------------------
-        // Upgraded Patch Method
         if (c->cur_video) {
             av_program_add_stream_index(s, 0, c->cur_video->stream_index);
         }
@@ -2517,8 +2397,6 @@ static int dash_read_header(AVFormatContext *s)
         if (c->cur_audio) {
             av_program_add_stream_index(s, 0, c->cur_audio->stream_index);
         }
-        // End of Upgrade Patch Method
-#endif // ALL_TOGETHER_REPS
 
     }
 
@@ -2717,18 +2595,12 @@ static int dash_probe(AVProbeData *p)
 
 static const AVOption dash_options[] = {
 
-#ifdef ALL_TOGETHER_REPS
-    // Our Method Options. @ShahzadLone
-    { "rep_index", "representation index"  , OFFSET(rep_index), AV_OPT_TYPE_INT, {.i64 = 0}, INT_MIN, INT_MAX, FLAGS },
-    { "selected_reps", "selected representations"  , OFFSET(selected_reps), AV_OPT_TYPE_STRING, {.str = ""}, INT_MIN, INT_MAX, FLAGS },
-#else 
     // Updated Patch Method Options.
     { "audio_rep_index", "audio representation index to be used", OFFSET(audio_rep_index), AV_OPT_TYPE_INT, {.i64 = -1}, INT_MIN, INT_MAX, FLAGS },
     { "video_rep_index", "video representation index to be used", OFFSET(video_rep_index), AV_OPT_TYPE_INT, {.i64 = -1}, INT_MIN, INT_MAX, FLAGS },
     { "video_rep_id", "selected representations"  , OFFSET(video_rep_id), AV_OPT_TYPE_STRING, {.str = ""}, INT_MIN, INT_MAX, FLAGS },
     { "audio_rep_id", "selected representations"  , OFFSET(audio_rep_id), AV_OPT_TYPE_STRING, {.str = ""}, INT_MIN, INT_MAX, FLAGS },
     { "live_start_index", "segment index to start live streams at (negative values are from the end)", OFFSET(live_start_index), AV_OPT_TYPE_INT, {.i64 = 0}, INT_MIN, INT_MAX, FLAGS},
-#endif // ALL_TOGETHER_REPS    
   
     {NULL}
 
