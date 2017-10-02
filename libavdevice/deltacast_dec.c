@@ -87,6 +87,30 @@ static int start_video_stream(struct deltacast_ctx *ctx) {
 			CLOCKDIV = VHD_SDI_BP_RX3_CLOCK_DIV;
 			STRMTYPE = VHD_ST_RX3;		
 		break;
+		case 4:
+			CHNTYPE = VHD_CORE_BP_RX4_TYPE; 
+			CHNSTATUS = VHD_CORE_BP_RX4_STATUS;
+			CLOCKDIV = VHD_SDI_BP_RX4_CLOCK_DIV;
+			STRMTYPE = VHD_ST_RX4;		
+		break;
+		case 5:
+			CHNTYPE = VHD_CORE_BP_RX5_TYPE; 
+			CHNSTATUS = VHD_CORE_BP_RX5_STATUS;
+			CLOCKDIV = VHD_SDI_BP_RX5_CLOCK_DIV;
+			STRMTYPE = VHD_ST_RX5;		
+		break;
+		case 6:
+			CHNTYPE = VHD_CORE_BP_RX6_TYPE; 
+			CHNSTATUS = VHD_CORE_BP_RX6_STATUS;
+			CLOCKDIV = VHD_SDI_BP_RX6_CLOCK_DIV;
+			STRMTYPE = VHD_ST_RX6;		
+		break;
+		case 7:
+			CHNTYPE = VHD_CORE_BP_RX7_TYPE; 
+			CHNSTATUS = VHD_CORE_BP_RX7_STATUS;
+			CLOCKDIV = VHD_SDI_BP_RX7_CLOCK_DIV;
+			STRMTYPE = VHD_ST_RX7;		
+		break;
 		default:
 		break;	
 	}
@@ -103,6 +127,7 @@ static int start_video_stream(struct deltacast_ctx *ctx) {
 					VHD_GetBoardProperty(ctx->BoardHandle, CHNTYPE, &ctx->ChnType);
 					if((ctx->ChnType == VHD_CHNTYPE_SDSDI) || (ctx->ChnType == VHD_CHNTYPE_HDSDI) || (ctx->ChnType == VHD_CHNTYPE_3GSDI)) {
 						VHD_SetBoardProperty(ctx->BoardHandle, VHD_CORE_BP_BYPASS_RELAY_3, FALSE);
+						//VHD_SetBoardProperty(ctx->BoardHandle, VHD_CORE_BP_BYPASS_RELAY_0, TRUE);
 						WaitForChannelLocked(ctx->BoardHandle, CHNSTATUS);    
 						Result = VHD_GetBoardProperty(ctx->BoardHandle, CLOCKDIV, &ctx->ClockSystem);
 						if(Result == VHDERR_NOERROR) {
@@ -117,7 +142,9 @@ static int start_video_stream(struct deltacast_ctx *ctx) {
 										if((Result == VHDERR_NOERROR) && (ctx->Interface != NB_VHD_INTERFACE)) {
 											VHD_SetStreamProperty(ctx->StreamHandle, VHD_SDI_SP_VIDEO_STANDARD, ctx->VideoStandard);
 											VHD_SetStreamProperty(ctx->StreamHandle, VHD_CORE_SP_TRANSFER_SCHEME, VHD_TRANSFER_SLAVED);
-                                            VHD_SetStreamProperty(ctx->StreamHandle, VHD_SDI_SP_INTERFACE, ctx->Interface);
+											VHD_SetStreamProperty(ctx->StreamHandle, VHD_SDI_SP_INTERFACE, ctx->Interface);
+											VHD_SetStreamProperty(ctx->StreamHandle,VHD_CORE_SP_BUFFERQUEUE_DEPTH,32); // AB
+											VHD_SetStreamProperty(ctx->StreamHandle,VHD_CORE_SP_DELAY,1); // AB
                                             
                                             /* Set Afd line */
                                             memset(&AfdArSlot, 0, sizeof(VHD_AFD_AR_SLOT));
@@ -138,8 +165,8 @@ static int start_video_stream(struct deltacast_ctx *ctx) {
                                                     if(Result == VHDERR_NOERROR)
                                                         ctx->afd_ARCode = AfdArSlot.AFD_ARCode;
 
-                                                    /* Unlock slot */ 
-                                                    VHD_UnlockSlotHandle(ctx->SlotHandle);
+													/* Unlock slot */ 
+													VHD_UnlockSlotHandle(ctx->SlotHandle);
                                                 }
                                                 else if (Result != VHDERR_TIMEOUT) {
                                                     printf("ERROR : Cannot lock slot on RX0 stream. Result = 0x%08X (%s)\n",Result, GetErrorDescription(Result));
@@ -164,6 +191,7 @@ static int start_video_stream(struct deltacast_ctx *ctx) {
 						} else {
 							//log error
 						}
+						//VHD_SetBoardProperty(ctx->BoardHandle, VHD_CORE_BP_BYPASS_RELAY_0, TRUE);
 					} else {
 						//log error
 					}
@@ -237,10 +265,38 @@ static int deltacast_read_packet(AVFormatContext *avctx, AVPacket *pkt) {
 	struct deltacast_ctx *ctx = (struct deltacast_ctx *) avctx->priv_data;
     int err = 0;
 
+	VHD_AFD_AR_SLOT AfdArSlot;
+
+
+	memset(&AfdArSlot, 0, sizeof(VHD_AFD_AR_SLOT));
+	AfdArSlot.LineNumber = 0;
+	
+	/* Try to lock next slot */
+	result = VHD_LockSlotHandle(ctx->StreamHandleANC,&ctx->SlotHandle);
+	if (result == VHDERR_NOERROR) 
+	{
+		/* Extract Afd Slot */
+		result = VHD_SlotExtractAFD(ctx->SlotHandle, &AfdArSlot);
+		//printf("SDI: Result = %d\n", result);
+		if(result == VHDERR_NOERROR)
+			ctx->afd_ARCode = AfdArSlot.AFD_ARCode;
+			//printf("SDI: AFD = %d\n", AfdArSlot.AFD_ARCode);
+		/* Unlock slot */ 
+		VHD_UnlockSlotHandle(ctx->SlotHandle);
+	}
+	else if (result != VHDERR_TIMEOUT) {
+		printf("ERROR : Cannot lock slot on RX0 stream. Result = 0x%08X (%s)\n",result, GetErrorDescription(result));
+	}
+	else
+		printf("Timeout \n");
+
+
     result = VHD_LockSlotHandle(ctx->StreamHandle, &ctx->SlotHandle);
 
 	if (result == VHDERR_NOERROR) {
         result = VHD_GetSlotBuffer(ctx->SlotHandle, VHD_SDI_BT_VIDEO, &pBuffer,&bufferSize);
+
+		//printf("Read Buffer Size = %d\n", bufferSize);
 
    		if (result == VHDERR_NOERROR) {
 			err = av_packet_from_data(pkt, pBuffer, bufferSize);
@@ -250,10 +306,14 @@ static int deltacast_read_packet(AVFormatContext *avctx, AVPacket *pkt) {
 				//set flags in the packet
 			}	
 		} else {
-			//printf("\nERROR : Cannot get slot buffer. Result = 0x%08X (%s)\n",Result, GetErrorDescription(Result));
+			printf("\nERROR : Cannot get slot buffer. Result = 0x%08X (%s)\n", result, GetErrorDescription(result));
 	   	}
 		VHD_UnlockSlotHandle(ctx->SlotHandle); // AB
+		VHD_GetStreamProperty(ctx->StreamHandle, VHD_CORE_SP_SLOTS_COUNT, &ctx->frameCount);
+		VHD_GetStreamProperty(ctx->StreamHandle, VHD_CORE_SP_SLOTS_DROPPED, &ctx->dropped);
+		pkt->pts = ctx->frameCount;
 	} else if (result != VHDERR_TIMEOUT) {
+		printf("\nERROR : Timeout. Result = 0x%08X (%s)\n", result, GetErrorDescription(result));
    		//cannot lock the stream
    		//log the error  
 	} else {
@@ -267,7 +327,7 @@ static int deltacast_read_packet(AVFormatContext *avctx, AVPacket *pkt) {
 #define DEC AV_OPT_FLAG_DECODING_PARAM
 
 static const AVOption options[] = {
-    { "v_channelIndex", "video channel index"  , OFFSET(v_channelIndex), AV_OPT_TYPE_INT   , { .i64 = 0   }, 0, 1, DEC },
+    { "v_channelIndex", "video channel index"  , OFFSET(v_channelIndex), AV_OPT_TYPE_INT   , { .i64 = 0   }, 0, 7, DEC },
     { NULL },
 };
 
