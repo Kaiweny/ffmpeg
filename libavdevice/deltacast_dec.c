@@ -43,7 +43,7 @@ struct deltacast_ctx {
     int v_channelIndex;
 
     /* Afd Slot AR Code */   
-    ULONG afd_ARCode;
+    int afd_ARCode;
 };
 
 static int start_video_stream(struct deltacast_ctx *ctx) {
@@ -224,7 +224,7 @@ static int stop_video_stream(struct deltacast_ctx *ctx) {
 static int deltacast_read_header(AVFormatContext *avctx) {
 	AVStream *st;
     struct deltacast_ctx *ctx = (struct deltacast_ctx *) avctx->priv_data;
-    ctx->afd_ARCode = NB_VHD_AFD_AR_CODE;
+    ctx->afd_ARCode = -1;
 	int status =  start_video_stream(ctx);
 	if (status == 0) {
 		st = avformat_new_stream(avctx, NULL);
