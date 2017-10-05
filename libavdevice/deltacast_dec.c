@@ -49,7 +49,7 @@ struct deltacast_ctx {
 static int start_video_stream(struct deltacast_ctx *ctx) {
 	
 	int status = 1;
-    ULONG Result,DllVersion,NbBoards;
+    ULONG Result,Result1,DllVersion,NbBoards;
     ULONG BrdId = 0;
     ULONG NbRxRequired, NbTxRequired;       
 
@@ -57,8 +57,6 @@ static int start_video_stream(struct deltacast_ctx *ctx) {
 	VHD_CORE_BOARDPROPERTY CHNSTATUS;
 	VHD_SDI_BOARDPROPERTY CLOCKDIV;
     VHD_STREAMTYPE STRMTYPE;
-    
-    VHD_AFD_AR_SLOT AfdArSlot;
 
 	int ind = ctx->v_channelIndex;	
 
@@ -126,15 +124,15 @@ static int start_video_stream(struct deltacast_ctx *ctx) {
 				if (Result == VHDERR_NOERROR) {
 					VHD_GetBoardProperty(ctx->BoardHandle, CHNTYPE, &ctx->ChnType);
 					if((ctx->ChnType == VHD_CHNTYPE_SDSDI) || (ctx->ChnType == VHD_CHNTYPE_HDSDI) || (ctx->ChnType == VHD_CHNTYPE_3GSDI)) {
-						VHD_SetBoardProperty(ctx->BoardHandle, VHD_CORE_BP_BYPASS_RELAY_3, FALSE);
+						VHD_SetBoardProperty(ctx->BoardHandle, VHD_CORE_BP_BYPASS_RELAY_3, FALSE); // RELAY_3 or RELAY_0
 						//VHD_SetBoardProperty(ctx->BoardHandle, VHD_CORE_BP_BYPASS_RELAY_0, TRUE);
 						WaitForChannelLocked(ctx->BoardHandle, CHNSTATUS);    
 						Result = VHD_GetBoardProperty(ctx->BoardHandle, CLOCKDIV, &ctx->ClockSystem);
 						if(Result == VHDERR_NOERROR) {
-                            VHD_OpenStreamHandle(ctx->BoardHandle, STRMTYPE, VHD_SDI_STPROC_DISJOINED_ANC, NULL, &ctx->StreamHandleANC, NULL);
                             Result = VHD_OpenStreamHandle(ctx->BoardHandle, STRMTYPE, VHD_SDI_STPROC_DISJOINED_VIDEO, NULL, &ctx->StreamHandle, NULL);
+                            Result1 = VHD_OpenStreamHandle(ctx->BoardHandle, STRMTYPE, VHD_SDI_STPROC_DISJOINED_ANC, NULL, &ctx->StreamHandleANC, NULL);
 
-							if (Result == VHDERR_NOERROR) {
+							if (Result == VHDERR_NOERROR && Result1 == VHDERR_NOERROR) {
 								Result = VHD_GetStreamProperty(ctx->StreamHandle, VHD_SDI_SP_VIDEO_STANDARD, &ctx->VideoStandard);
 								if ((Result == VHDERR_NOERROR) && (ctx->VideoStandard != NB_VHD_VIDEOSTANDARDS)) {
 									if (GetVideoCharacteristics(ctx->VideoStandard, &ctx->width, &ctx->height, &ctx->interlaced, &ctx->isHD)) {
@@ -145,34 +143,12 @@ static int start_video_stream(struct deltacast_ctx *ctx) {
 											VHD_SetStreamProperty(ctx->StreamHandle, VHD_SDI_SP_INTERFACE, ctx->Interface);
 											VHD_SetStreamProperty(ctx->StreamHandle,VHD_CORE_SP_BUFFERQUEUE_DEPTH,32); // AB
 											VHD_SetStreamProperty(ctx->StreamHandle,VHD_CORE_SP_DELAY,1); // AB
-                                            
-                                            /* Set Afd line */
-                                            memset(&AfdArSlot, 0, sizeof(VHD_AFD_AR_SLOT));
-                                            AfdArSlot.LineNumber = 0;
 
                                             /* Start stream */
                                             Result = VHD_StartStream(ctx->StreamHandle);
-                                            VHD_StartStream(ctx->StreamHandleANC);
-											if (Result == VHDERR_NOERROR) {
-                                                status = 0; 
-                                                
-                                                /* Try to lock next slot */
-                                                Result = VHD_LockSlotHandle(ctx->StreamHandleANC,&ctx->SlotHandle);
-                                                if (Result == VHDERR_NOERROR) 
-                                                {
-                                                    /* Extract Afd Slot */
-                                                    Result = VHD_SlotExtractAFD(ctx->SlotHandle, &AfdArSlot);
-                                                    if(Result == VHDERR_NOERROR)
-                                                        ctx->afd_ARCode = AfdArSlot.AFD_ARCode;
-
-													/* Unlock slot */ 
-													VHD_UnlockSlotHandle(ctx->SlotHandle);
-                                                }
-                                                else if (Result != VHDERR_TIMEOUT) {
-                                                    printf("ERROR : Cannot lock slot on RX0 stream. Result = 0x%08X (%s)\n",Result, GetErrorDescription(Result));
-                                                }
-                                                else
-                                                    printf("Timeout \n");
+                                            Result1 = VHD_StartStream(ctx->StreamHandleANC);
+											if (Result == VHDERR_NOERROR && Result1 == VHDERR_NOERROR) {
+                                                status = 0;
 											} else {
 												//log error
 											}                                                         
@@ -222,32 +198,39 @@ static int stop_video_stream(struct deltacast_ctx *ctx) {
 }
 
 static int deltacast_read_header(AVFormatContext *avctx) {
-	AVStream *st;
+    AVStream *v_stream;
+    AVStream *a_stream;
     struct deltacast_ctx *ctx = (struct deltacast_ctx *) avctx->priv_data;
+
+    // set AFD code to uninitialized value
     ctx->afd_ARCode = -1;
+
 	int status =  start_video_stream(ctx);
 	if (status == 0) {
-		st = avformat_new_stream(avctx, NULL);
-    	if (!st) {
+        // create video stream
+		v_stream = avformat_new_stream(avctx, NULL);
+    	if (!v_stream) {
         	av_log(avctx, AV_LOG_ERROR, "Cannot add stream\n");
         	goto error;
 		}
-		st->codecpar->codec_type  = AVMEDIA_TYPE_VIDEO;
-		st->codecpar->width       = ctx->width;
-		st->codecpar->height      = ctx->height;
-		//st->time_base.den      = ctx->bmd_tb_den;
-		//st->time_base.num      = ctx->bmd_tb_num;
-        st->avg_frame_rate.den  = 1000 + ctx->ClockSystem;
-        st->avg_frame_rate.num  = GetFPS(ctx->VideoStandard)*1000;
-		//st->codecpar->bit_rate    = av_image_get_buffer_size((AVPixelFormat)st->codecpar->format, ctx->bmd_width, ctx->bmd_height, 1) * 1/av_q2d(st->time_base) * 8;
-		st->codecpar->codec_id    = AV_CODEC_ID_RAWVIDEO;
-		st->codecpar->format      = AV_PIX_FMT_UYVY422;
-		st->codecpar->codec_tag   = MKTAG('U', 'Y', 'V', 'Y');
-        ctx->video_st=st;
+		v_stream->codecpar->codec_type  = AVMEDIA_TYPE_VIDEO;
+		v_stream->codecpar->width       = ctx->width;
+		v_stream->codecpar->height      = ctx->height;
+		//v_stream->time_base.den      = ctx->bmd_tb_den;
+		//v_stream->time_base.num      = ctx->bmd_tb_num;
+        v_stream->avg_frame_rate.den  = 1000 + ctx->ClockSystem;
+        v_stream->avg_frame_rate.num  = GetFPS(ctx->VideoStandard)*1000;
+		//v_stream->codecpar->bit_rate    = av_image_get_buffer_size((AVPixelFormat)st->codecpar->format, ctx->bmd_width, ctx->bmd_height, 1) * 1/av_q2d(st->time_base) * 8;
+		v_stream->codecpar->codec_id    = AV_CODEC_ID_RAWVIDEO;
+		v_stream->codecpar->format      = AV_PIX_FMT_UYVY422;
+		v_stream->codecpar->codec_tag   = MKTAG('U', 'Y', 'V', 'Y');
+        ctx->video_st=v_stream;
+
+        // create audio stream
+        //a_stream = avformat_new_stream(avctx, NULL);
     }				
 	
 	return status;
-	
 
 error:	
 	return AVERROR(EIO);
@@ -259,37 +242,42 @@ static int deltacast_read_close(AVFormatContext *avctx) {
 	return status;
 }
 
+static int read_afd_flag(struct deltacast_ctx* ctx) {
+    VHD_AFD_AR_SLOT AfdArSlot;
+    ULONG result;
+
+    /* Set Afd line */
+    memset(&AfdArSlot, 0, sizeof(VHD_AFD_AR_SLOT));
+    AfdArSlot.LineNumber = 0;
+    
+    /* Try to lock next slot */
+    result = VHD_LockSlotHandle(ctx->StreamHandleANC,&ctx->SlotHandle);
+    if (result == VHDERR_NOERROR) 
+    {
+        /* Extract Afd Slot */
+        result = VHD_SlotExtractAFD(ctx->SlotHandle, &AfdArSlot);
+        if(result == VHDERR_NOERROR)
+            ctx->afd_ARCode = AfdArSlot.AFD_ARCode;
+
+        /* Unlock slot */ 
+        VHD_UnlockSlotHandle(ctx->SlotHandle);
+    }
+    else if (result != VHDERR_TIMEOUT) {
+        printf("ERROR : Cannot lock slot on RX0 stream. Result = 0x%08X (%s)\n",result, GetErrorDescription(result));
+    }
+    else
+        printf("Timeout \n");
+    
+    return result;
+}
+
 static int deltacast_read_packet(AVFormatContext *avctx, AVPacket *pkt) {
  	ULONG result, bufferSize;
     BYTE  *pBuffer = NULL;
 	struct deltacast_ctx *ctx = (struct deltacast_ctx *) avctx->priv_data;
     int err = 0;
 
-	VHD_AFD_AR_SLOT AfdArSlot;
-
-
-	memset(&AfdArSlot, 0, sizeof(VHD_AFD_AR_SLOT));
-	AfdArSlot.LineNumber = 0;
-	
-	/* Try to lock next slot */
-	result = VHD_LockSlotHandle(ctx->StreamHandleANC,&ctx->SlotHandle);
-	if (result == VHDERR_NOERROR) 
-	{
-		/* Extract Afd Slot */
-		result = VHD_SlotExtractAFD(ctx->SlotHandle, &AfdArSlot);
-		//printf("SDI: Result = %d\n", result);
-		if(result == VHDERR_NOERROR)
-			ctx->afd_ARCode = AfdArSlot.AFD_ARCode;
-			//printf("SDI: AFD = %d\n", AfdArSlot.AFD_ARCode);
-		/* Unlock slot */ 
-		VHD_UnlockSlotHandle(ctx->SlotHandle);
-	}
-	else if (result != VHDERR_TIMEOUT) {
-		printf("ERROR : Cannot lock slot on RX0 stream. Result = 0x%08X (%s)\n",result, GetErrorDescription(result));
-	}
-	else
-		printf("Timeout \n");
-
+    read_afd_flag(ctx);
 
     result = VHD_LockSlotHandle(ctx->StreamHandle, &ctx->SlotHandle);
 
