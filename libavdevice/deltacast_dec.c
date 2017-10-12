@@ -286,7 +286,6 @@ static int deltacast_read_header(AVFormatContext *avctx) {
         if (ctx->channels <= 16) {
             ctx->pairs = (ctx->channels / 2) + (ctx->channels % 2); // stereo pair includes 2 channels
             ctx->pAudioChn = (VHD_AUDIOCHANNEL**)malloc(sizeof(VHD_AUDIOCHANNEL*) * ctx->pairs);
-            printf("1) Allocated %u pAudioChn pointers...\n", ctx->pairs);
         } else {
             printf("\nERROR : Invalid number of Audio Channels. %d Channels Requested > 16 Channel Limit\n", ctx->channels);
             status = VHDERR_BADARG;
@@ -302,7 +301,6 @@ static int deltacast_read_header(AVFormatContext *avctx) {
             ctx->pAudioChn[pair]=&ctx->AudioInfo->pAudioGroups[grp].pAudioChannels[grp_pair*2];
             ctx->pAudioChn[pair]->Mode=ctx->AudioInfo->pAudioGroups[grp].pAudioChannels[grp_pair*2+1].Mode=VHD_AM_STEREO;
             ctx->pAudioChn[pair]->BufferFormat=ctx->AudioInfo->pAudioGroups[grp].pAudioChannels[grp_pair*2+1].BufferFormat=VHD_AF_16;
-            printf("2) Configured pAudioChn pointer @ %u...\n", pair);
             grp_pair = !grp_pair;
         }
 
@@ -310,18 +308,15 @@ static int deltacast_read_header(AVFormatContext *avctx) {
         /* Get the biggest audio frame size */
         NbOfSamples = VHD_GetNbSamples((VHD_VIDEOSTANDARD)ctx->VideoStandard, CLOCK_SYSTEM, VHD_ASR_48000, 0);
         AudioBufferSize = NbOfSamples*VHD_GetBlockSize(ctx->pAudioChn[0]->BufferFormat, ctx->pAudioChn[0]->Mode);
-        printf("3) NbOfSamples:%u  AudioBufferSize%u\n", NbOfSamples, AudioBufferSize);
         
         /* Create audio buffer */
         for (int pair = 0; pair < ctx->pairs; pair++) {
             ctx->pAudioChn[pair]->pData = (BYTE*)malloc(sizeof(BYTE) * AudioBufferSize);
-            printf("4) Allocating buffer of size %u to pointer @ %u...\n", (sizeof(BYTE) * AudioBufferSize), pair);
         }
 
         /* Set the audio buffer size */
         for (int pair = 0; pair < ctx->pairs; pair++) {
             ctx->pAudioChn[pair]->DataSize = AudioBufferSize;
-            printf("5) Setting AudioBufferSize %u to pointer @ %u...\n", AudioBufferSize, pair);
         }
     }
 	
@@ -397,7 +392,6 @@ static int read_afd_flag(struct deltacast_ctx* ctx) {
     if(result == VHDERR_NOERROR)
         ctx->afd_ARCode = AfdArSlot.AFD_ARCode;
 
-    printf("AFD Result: %u\n", result);
     return result;
 }
 
@@ -433,10 +427,9 @@ static int read_audio_data(struct deltacast_ctx* ctx, AVPacket *pkt) {
         /* Unlock slot */
         VHD_UnlockSlotHandle(ctx->SlotHandle);
 
-        /* Print some statistics */
+        /* Get some statistics */
         VHD_GetStreamProperty(ctx->StreamHandleANC, VHD_CORE_SP_SLOTS_COUNT, &ctx->audFrameCount);
         VHD_GetStreamProperty(ctx->StreamHandleANC, VHD_CORE_SP_SLOTS_DROPPED, &ctx->audDropped);
-        printf("Audio Channel DataSize: %u    FrameCount: %u    AudDropped: %u\n", ctx->pAudioChn[0]->DataSize, ctx->audFrameCount, ctx->audDropped);
         pkt->pts = ctx->audFrameCount;
 
         // reset channel to max audio buffer size
@@ -446,8 +439,7 @@ static int read_audio_data(struct deltacast_ctx* ctx, AVPacket *pkt) {
        printf("\nERROR : Cannot lock slot on RX0 stream. Result = 0x%08X (%s)\n",result, GetErrorDescription(result));
     }
     else {
-        printf("\nERROR : Timeout on lock");
-        result = VHDERR_TIMEOUT;
+        printf("\nERROR : Timeout");
     }
 
     return result;
@@ -460,16 +452,13 @@ static int deltacast_read_packet(AVFormatContext *avctx, AVPacket *pkt) {
     // choose to read video or audio data depending on the current pts of each media type
     // i.e. make video packets have higher priority than audio packets for the current
     // pts value. 
-    printf("deltacast_read_packet>> VidFrameCnt: %u    AudFrameCnt: %u    packetAddress: %p\n", ctx->frameCount, ctx->audFrameCount, pkt);
     if (ctx->frameCount <= ctx->audFrameCount) {
         pkt->stream_index = ctx->video_st->index;
         result = read_video_data(ctx, pkt);
-        printf("Read a video packet, Result=%d    streamIdx=%d\n", result, pkt->stream_index);
     }
     else {
         pkt->stream_index = ctx->audio_st->index;
         result = read_audio_data(ctx, pkt);
-        printf("Read an audio packet, Result=%d    streamIdx=%d\n", result, pkt->stream_index);
     }
 
 	return result;
