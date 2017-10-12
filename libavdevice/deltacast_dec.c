@@ -419,13 +419,12 @@ static int read_audio_data(struct deltacast_ctx* ctx, AVPacket *pkt) {
         result = VHD_SlotExtractAudio(ctx->SlotHandle, ctx->AudioInfo);
         if(result==VHDERR_NOERROR) {
             // TODO-Mitch: only read first stereo pair for now
-            err = av_packet_from_data(pkt, ctx->pAudioChn[0]->pData, ctx->pAudioChn[0]->DataSize);
-
+            err = alloc_packet_from_buffer(pkt, ctx->pAudioChn[0]->pData, ctx->pAudioChn[0]->DataSize);
 			if (err) {
 				//log error
 			} else {
 				//set flags in the packet
-            }
+			}
 
         } else {
             printf("ERROR!:: Unable to Extract Audio from slot!, Result = 0x%08X\n", result);
