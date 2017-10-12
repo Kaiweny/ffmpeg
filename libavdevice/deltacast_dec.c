@@ -52,8 +52,19 @@ struct deltacast_ctx {
     int afd_ARCode;
 };
 
+static int alloc_packet_from_buffer(AVPacket *packet, BYTE  *buffer, ULONG buffer_size) {
+	packet->buf = av_buffer_alloc(buffer_size + AV_INPUT_BUFFER_PADDING_SIZE);
+	if (!packet->buf) {
+		printf("Error av_buffer_alloc\n");
+		return AVERROR(ENOMEM);
+	}
+	memcpy(packet->buf->data, buffer, buffer_size + AV_INPUT_BUFFER_PADDING_SIZE);
+	packet->data = packet->buf->data;
+	packet->size = buffer_size;
+	return 0;
+}
+
 static int start_stream(struct deltacast_ctx *ctx) {
-	
 	int status = 1;
     ULONG Result,DllVersion,NbBoards;
     ULONG BrdId = 0;
@@ -341,12 +352,20 @@ static int read_video_data(struct deltacast_ctx* ctx, AVPacket *pkt) {
 		//printf("Read Buffer Size = %d\n", bufferSize);
 
    		if (result == VHDERR_NOERROR) {
-			err = av_packet_from_data(pkt, pBuffer, bufferSize);
+			/*err = av_packet_from_data(pkt, pBuffer, bufferSize);
+			if (err) {
+				//log error
+			} else {
+				//set flags in the packet
+			}*/	
+	
+			err = alloc_packet_from_buffer(pkt, pBuffer, bufferSize);
 			if (err) {
 				//log error
 			} else {
 				//set flags in the packet
 			}
+			
 		} else {
 			printf("\nERROR : Cannot get slot buffer. Result = 0x%08X (%s)\n", result, GetErrorDescription(result));
 	   	}
