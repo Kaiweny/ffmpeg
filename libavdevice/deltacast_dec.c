@@ -32,8 +32,8 @@ struct deltacast_ctx {
     ULONG audDropped;
 
     AVStream *audio_st;
-    VHD_AUDIOINFO *AudioInfo;
-    VHD_AUDIOCHANNEL **pAudioChn;
+    void *AudioInfo;
+    void **pAudioChn;
     ULONG channels;
     ULONG pairs;
 
@@ -222,16 +222,16 @@ static int stop_video_stream(struct deltacast_ctx *ctx) {
 static int free_audio_data(struct deltacast_ctx *ctx) {
     // free audio buffers
     for (int pair = 0; pair < ctx->pairs; pair++) {
-        free(ctx->pAudioChn[pair]->pData);
-        ctx->pAudioChn[pair]->pData = NULL;
+        free(((VHD_AUDIOCHANNEL**)ctx->pAudioChn)[pair]->pData);
+        ((VHD_AUDIOCHANNEL**)ctx->pAudioChn)[pair]->pData = NULL;
     }
 
     // free audio channel pointers
-    free(ctx->pAudioChn);
+    free((VHD_AUDIOCHANNEL**)ctx->pAudioChn);
     ctx->pAudioChn = NULL;
 
     // free audio info
-    free(ctx->AudioInfo);
+    free((VHD_AUDIOINFO*)ctx->AudioInfo);
     ctx->AudioInfo = NULL;
 
 	return 0;
@@ -274,50 +274,60 @@ static int deltacast_read_header(AVFormatContext *avctx) {
         }
         a_stream->codecpar->codec_type  = AVMEDIA_TYPE_AUDIO;
         a_stream->codecpar->codec_id    = AV_CODEC_ID_PCM_S16LE;
+        a_stream->codecpar->format = AV_SAMPLE_FMT_S16;
+        a_stream->codecpar->channel_layout = AV_CH_LAYOUT_STEREO;
         a_stream->codecpar->sample_rate = 48000;
         ctx->channels = 2; // TODO-Mitch: Hardcode temp., can be specified by user?
         a_stream->codecpar->channels    = ctx->channels;
         ctx->audio_st = a_stream;
 
         // initialize deltacast ctx VHD_AUDIOINFO struct
-        ctx->AudioInfo = (VHD_AUDIOINFO*)malloc(sizeof(VHD_AUDIOINFO));
+        VHD_AUDIOINFO *AudioInfo;
+        AudioInfo = (VHD_AUDIOINFO*)malloc(sizeof(VHD_AUDIOINFO));
 
         // initialize deltacast ctx VHD_AUDIOCHANNEL array of pointers
+        VHD_AUDIOCHANNEL **pAudioChn;
         if (ctx->channels <= 16) {
             ctx->pairs = (ctx->channels / 2) + (ctx->channels % 2); // stereo pair includes 2 channels
-            ctx->pAudioChn = (VHD_AUDIOCHANNEL**)malloc(sizeof(VHD_AUDIOCHANNEL*) * ctx->pairs);
+            pAudioChn = (VHD_AUDIOCHANNEL**)malloc(sizeof(VHD_AUDIOCHANNEL*) * ctx->pairs);
         } else {
             printf("\nERROR : Invalid number of Audio Channels. %d Channels Requested > 16 Channel Limit\n", ctx->channels);
             status = VHDERR_BADARG;
         }
         
         // Configure Audio info: 48kHz - 16 bits audio reception on required channels
-        memset(ctx->AudioInfo, 0, sizeof(VHD_AUDIOINFO));
+        memset(AudioInfo, 0, sizeof(VHD_AUDIOINFO));
         int grp = 0;
         int grp_pair = 0;
         for (int pair = 0; pair < ctx->pairs; pair++) {
             grp += ( (pair / 2) >= 1  &&  (pair % 2) == 0) ? 1 : 0;
 
-            ctx->pAudioChn[pair]=&ctx->AudioInfo->pAudioGroups[grp].pAudioChannels[grp_pair*2];
-            ctx->pAudioChn[pair]->Mode=ctx->AudioInfo->pAudioGroups[grp].pAudioChannels[grp_pair*2+1].Mode=VHD_AM_STEREO;
-            ctx->pAudioChn[pair]->BufferFormat=ctx->AudioInfo->pAudioGroups[grp].pAudioChannels[grp_pair*2+1].BufferFormat=VHD_AF_16;
+            pAudioChn[pair]=&AudioInfo->pAudioGroups[grp].pAudioChannels[grp_pair*2];
+            pAudioChn[pair]->Mode=AudioInfo->pAudioGroups[grp].pAudioChannels[grp_pair*2+1].Mode=VHD_AM_STEREO;
+            pAudioChn[pair]->BufferFormat=AudioInfo->pAudioGroups[grp].pAudioChannels[grp_pair*2+1].BufferFormat=VHD_AF_16;
             grp_pair = !grp_pair;
         }
+
+        // Give the deltacast ctx the allocated Audio info
+        ctx->AudioInfo = AudioInfo;
 
         ULONG NbOfSamples, AudioBufferSize;
         /* Get the biggest audio frame size */
         NbOfSamples = VHD_GetNbSamples((VHD_VIDEOSTANDARD)ctx->VideoStandard, CLOCK_SYSTEM, VHD_ASR_48000, 0);
-        AudioBufferSize = NbOfSamples*VHD_GetBlockSize(ctx->pAudioChn[0]->BufferFormat, ctx->pAudioChn[0]->Mode);
+        AudioBufferSize = NbOfSamples*VHD_GetBlockSize(pAudioChn[0]->BufferFormat, pAudioChn[0]->Mode);
         
         /* Create audio buffer */
         for (int pair = 0; pair < ctx->pairs; pair++) {
-            ctx->pAudioChn[pair]->pData = (BYTE*)malloc(sizeof(BYTE) * AudioBufferSize);
+            pAudioChn[pair]->pData = (BYTE*)malloc(sizeof(BYTE) * AudioBufferSize);
         }
 
         /* Set the audio buffer size */
         for (int pair = 0; pair < ctx->pairs; pair++) {
-            ctx->pAudioChn[pair]->DataSize = AudioBufferSize;
+            pAudioChn[pair]->DataSize = AudioBufferSize;
         }
+
+        // Give the deltacast ctx the allocated audio channel pointers
+        ctx->pAudioChn = pAudioChn;
     }
 	
 	return status;
@@ -404,16 +414,18 @@ static int read_audio_data(struct deltacast_ctx* ctx, AVPacket *pkt) {
     result = VHD_LockSlotHandle(ctx->StreamHandleANC, &ctx->SlotHandle);
     if (result == VHDERR_NOERROR) {
         // Keep a copy of the max audio buffer size
-        AudioBufferSize = ctx->pAudioChn[0]->DataSize;
+        AudioBufferSize = ((VHD_AUDIOCHANNEL**)ctx->pAudioChn)[0]->DataSize;
 
         /* Extract AFD metadata */
         read_afd_flag(ctx);
 
         /* Extract Audio */
-        result = VHD_SlotExtractAudio(ctx->SlotHandle, ctx->AudioInfo);
+        result = VHD_SlotExtractAudio(ctx->SlotHandle, (VHD_AUDIOINFO*)ctx->AudioInfo);
         if(result==VHDERR_NOERROR) {
             // TODO-Mitch: only read first stereo pair for now
-            err = alloc_packet_from_buffer(pkt, ctx->pAudioChn[0]->pData, ctx->pAudioChn[0]->DataSize);
+            err = alloc_packet_from_buffer(pkt,
+                                           ((VHD_AUDIOCHANNEL**)ctx->pAudioChn)[0]->pData,
+                                           ((VHD_AUDIOCHANNEL**)ctx->pAudioChn)[0]->DataSize);
 			if (err) {
 				//log error
 			} else {
@@ -433,7 +445,7 @@ static int read_audio_data(struct deltacast_ctx* ctx, AVPacket *pkt) {
         pkt->pts = ctx->audFrameCount;
 
         // reset channel to max audio buffer size
-        ctx->pAudioChn[0]->DataSize = AudioBufferSize;
+        ((VHD_AUDIOCHANNEL**)ctx->pAudioChn)[0]->DataSize = AudioBufferSize;
     }
     else if (result != VHDERR_TIMEOUT) {
        printf("\nERROR : Cannot lock slot on RX0 stream. Result = 0x%08X (%s)\n",result, GetErrorDescription(result));
