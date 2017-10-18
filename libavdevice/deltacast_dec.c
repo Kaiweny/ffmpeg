@@ -166,6 +166,10 @@ static int start_stream(struct deltacast_ctx *ctx) {
 											VHD_SetStreamProperty(ctx->StreamHandle,VHD_CORE_SP_BUFFERQUEUE_DEPTH,32); // AB
 											VHD_SetStreamProperty(ctx->StreamHandle,VHD_CORE_SP_DELAY,1); // AB
 
+											if (ctx->interlaced) {// Merge top and bottom fields (interleave lines) 
+												VHD_SetStreamProperty(ctx->StreamHandle,VHD_CORE_SP_FIELD_MERGE,TRUE); // AB
+											}
+
                                             /* Start stream */
                                             Result = VHD_StartStream(ctx->StreamHandle);
                                             Result += VHD_StartStream(ctx->StreamHandleANC);
