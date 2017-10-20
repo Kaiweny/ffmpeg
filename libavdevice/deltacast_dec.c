@@ -387,12 +387,12 @@ static int read_video_data(struct deltacast_ctx* ctx, AVPacket *pkt) {
 		VHD_GetStreamProperty(ctx->StreamHandle, VHD_CORE_SP_SLOTS_DROPPED, &ctx->dropped);
 		if (ctx->interlaced)
 			pkt->pts = 2 * ctx->frameCount * 
-					(ctx->video_st->time_base.den / ctx->video_st->time_base.num) * 
-					(ctx->video_st->avg_frame_rate.den / ctx->video_st->avg_frame_rate.num);
+					((float)ctx->video_st->time_base.den / (float)ctx->video_st->time_base.num) * 
+					((float)ctx->video_st->avg_frame_rate.den / (float)ctx->video_st->avg_frame_rate.num);
 		else
 			pkt->pts = ctx->frameCount * 
-					(ctx->video_st->time_base.den / ctx->video_st->time_base.num) * 
-					(ctx->video_st->avg_frame_rate.den / ctx->video_st->avg_frame_rate.num);
+					((float)ctx->video_st->time_base.den / (float)ctx->video_st->time_base.num) * 
+					((float)ctx->video_st->avg_frame_rate.den / (float)ctx->video_st->avg_frame_rate.num);
 	} else if (result != VHDERR_TIMEOUT) {
 		printf("\nERROR : Timeout. Result = 0x%08X (%s)\n", result, GetErrorDescription(result));
    		//cannot lock the stream
@@ -460,13 +460,12 @@ static int read_audio_data(struct deltacast_ctx* ctx, AVPacket *pkt) {
 		//pkt->pts = ctx->audFrameCount;
 		if (ctx->interlaced)
 			pkt->pts = 2 * ctx->frameCount * 
-					(ctx->video_st->time_base.den / ctx->video_st->time_base.num) * 
-					(ctx->video_st->avg_frame_rate.den / ctx->video_st->avg_frame_rate.num);
+					((float)ctx->video_st->time_base.den / (float)ctx->video_st->time_base.num) * 
+					((float)ctx->video_st->avg_frame_rate.den / (float)ctx->video_st->avg_frame_rate.num);
 		else
 			pkt->pts = ctx->frameCount * 
-					(ctx->video_st->time_base.den / ctx->video_st->time_base.num) * 
-					(ctx->video_st->avg_frame_rate.den / ctx->video_st->avg_frame_rate.num);
-
+					((float)ctx->video_st->time_base.den / (float)ctx->video_st->time_base.num) * 
+					((float)ctx->video_st->avg_frame_rate.den / (float)ctx->video_st->avg_frame_rate.num);
         // reset channel to max audio buffer size
         ((VHD_AUDIOCHANNEL**)ctx->pAudioChn)[0]->DataSize = AudioBufferSize;
     }
