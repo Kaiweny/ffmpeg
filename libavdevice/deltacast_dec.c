@@ -262,12 +262,14 @@ static int deltacast_read_header(AVFormatContext *avctx) {
 		v_stream->codecpar->height      = ctx->height;
 		//v_stream->time_base.den      = ctx->bmd_tb_den;
 		//v_stream->time_base.num      = ctx->bmd_tb_num;
-        v_stream->avg_frame_rate.den  = 1000 + ctx->ClockSystem;
-        v_stream->avg_frame_rate.num  = GetFPS(ctx->VideoStandard)*1000;
+		v_stream->avg_frame_rate.den  = 1000 + ctx->ClockSystem;
+		v_stream->avg_frame_rate.num  = GetFPS(ctx->VideoStandard)*1000;
 		//v_stream->codecpar->bit_rate    = av_image_get_buffer_size((AVPixelFormat)st->codecpar->format, ctx->bmd_width, ctx->bmd_height, 1) * 1/av_q2d(st->time_base) * 8;
 		v_stream->codecpar->codec_id    = AV_CODEC_ID_RAWVIDEO;
 		v_stream->codecpar->format      = AV_PIX_FMT_UYVY422;
 		v_stream->codecpar->codec_tag   = MKTAG('U', 'Y', 'V', 'Y');
+		v_stream->time_base.num = 1;
+		v_stream->time_base.den = 90000;
         ctx->video_st=v_stream;
 
         /* #### create audio stream #### */
@@ -282,7 +284,9 @@ static int deltacast_read_header(AVFormatContext *avctx) {
         a_stream->codecpar->channel_layout = AV_CH_LAYOUT_STEREO;
         a_stream->codecpar->sample_rate = 48000;
         ctx->channels = 2; // TODO-Mitch: Hardcode temp., can be specified by user?
-        a_stream->codecpar->channels    = ctx->channels;
+		a_stream->codecpar->channels    = ctx->channels;
+		v_stream->time_base.num = 1;
+		v_stream->time_base.den = 90000;
         ctx->audio_st = a_stream;
 
         // initialize deltacast ctx VHD_AUDIOINFO struct
@@ -381,7 +385,14 @@ static int read_video_data(struct deltacast_ctx* ctx, AVPacket *pkt) {
 		VHD_UnlockSlotHandle(ctx->SlotHandle); // AB
 		VHD_GetStreamProperty(ctx->StreamHandle, VHD_CORE_SP_SLOTS_COUNT, &ctx->frameCount);
 		VHD_GetStreamProperty(ctx->StreamHandle, VHD_CORE_SP_SLOTS_DROPPED, &ctx->dropped);
-		pkt->pts = ctx->frameCount;
+		if (ctx->interlaced)
+			pkt->pts = 2 * ctx->frameCount * 
+					(ctx->video_st->time_base.den / ctx->video_st->time_base.num) * 
+					(ctx->video_st->avg_frame_rate.den / ctx->video_st->avg_frame_rate.num);
+		else
+			pkt->pts = ctx->frameCount * 
+					(ctx->video_st->time_base.den / ctx->video_st->time_base.num) * 
+					(ctx->video_st->avg_frame_rate.den / ctx->video_st->avg_frame_rate.num);
 	} else if (result != VHDERR_TIMEOUT) {
 		printf("\nERROR : Timeout. Result = 0x%08X (%s)\n", result, GetErrorDescription(result));
    		//cannot lock the stream
@@ -446,7 +457,15 @@ static int read_audio_data(struct deltacast_ctx* ctx, AVPacket *pkt) {
         /* Get some statistics */
         VHD_GetStreamProperty(ctx->StreamHandleANC, VHD_CORE_SP_SLOTS_COUNT, &ctx->audFrameCount);
         VHD_GetStreamProperty(ctx->StreamHandleANC, VHD_CORE_SP_SLOTS_DROPPED, &ctx->audDropped);
-        pkt->pts = ctx->audFrameCount;
+		//pkt->pts = ctx->audFrameCount;
+		if (ctx->interlaced)
+			pkt->pts = 2 * ctx->frameCount * 
+					(ctx->video_st->time_base.den / ctx->video_st->time_base.num) * 
+					(ctx->video_st->avg_frame_rate.den / ctx->video_st->avg_frame_rate.num);
+		else
+			pkt->pts = ctx->frameCount * 
+					(ctx->video_st->time_base.den / ctx->video_st->time_base.num) * 
+					(ctx->video_st->avg_frame_rate.den / ctx->video_st->avg_frame_rate.num);
 
         // reset channel to max audio buffer size
         ((VHD_AUDIOCHANNEL**)ctx->pAudioChn)[0]->DataSize = AudioBufferSize;
