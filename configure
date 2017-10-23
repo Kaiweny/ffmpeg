@@ -1499,7 +1499,6 @@ EXTERNAL_AUTODETECT_LIBRARY_LIST="
     securetransport
     xlib
     zlib
-    videomasterhd
 "
 
 EXTERNAL_LIBRARY_GPL_LIST="
