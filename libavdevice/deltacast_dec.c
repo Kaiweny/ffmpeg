@@ -393,21 +393,12 @@ static int read_cc_data(struct deltacast_ctx* ctx, AVPacket *pkt) {
         /* Extract WSS Slot */
         result = VHD_SlotExtractClosedCaptions(ctx->SlotHandle, &CCSlot);
         if (result == VHDERR_NOERROR) {
-            printf("1Packet Side data elems: %d\n", pkt->side_data_elems);
             err = alloc_packet_side_data_from_buffer(pkt, CCSlot.CCData.pData, CCSlot.CCData.DataSize);
             if (err) {
-                //log error
                 printf("Error on create cc side data\n");
+                result = VHDERR_OPERATIONFAILED;
 			} else {
                 //set flags in the packet
-                printf("Success on create cc side data\n");
-                printf("2Packet Side data elems: %d  %d  %d\n", pkt->side_data_elems, pkt->side_data[0].size, pkt->side_data[0].type);
-                printf("Packet side data: %02X %02X  vs. %02X %02X", 
-                    pkt->side_data[0].data[0], 
-                    pkt->side_data[0].data[CCSlot.CCData.DataSize-1],
-                    CCSlot.CCData.pData[0],
-                    CCSlot.CCData.pData[CCSlot.CCData.DataSize-1]
-                );
 			}
         }
         else {
@@ -478,8 +469,6 @@ static int read_video_data(struct deltacast_ctx* ctx, AVPacket *pkt) {
     // Fill video packet side data with Closed Captions data
     if (result == VHDERR_NOERROR) {
         result += read_cc_data(ctx, pkt);
-
-        printf("outside elems: %d  %d  %d\n", pkt->side_data_elems, pkt->side_data[0].size, pkt->side_data[0].type);
     }
 
     return result;
