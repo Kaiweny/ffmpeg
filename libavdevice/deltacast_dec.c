@@ -52,6 +52,17 @@ struct deltacast_ctx {
     int afd_ARCode;
 };
 
+static int alloc_packet_side_data_from_buffer(AVPacket *packet, BYTE  *buffer, ULONG buffer_size) {
+    // TODO Mitch: function to create side data with cc data in it
+    uint8_t* dst_data = av_packet_new_side_data(packet, AV_FRAME_DATA_A53_CC, buffer_size);
+    if (!dst_data) {
+        av_packet_free_side_data(packet);
+        return AVERROR(ENOMEM);
+    }
+    memcpy(dst_data, buffer, buffer_size);
+    return 0;
+}
+
 static int alloc_packet_from_buffer(AVPacket *packet, BYTE  *buffer, ULONG buffer_size) {
 	packet->buf = av_buffer_alloc(buffer_size + AV_INPUT_BUFFER_PADDING_SIZE);
 	if (!packet->buf) {
@@ -74,6 +85,8 @@ static int start_stream(struct deltacast_ctx *ctx) {
 	VHD_CORE_BOARDPROPERTY CHNSTATUS;
 	VHD_SDI_BOARDPROPERTY CLOCKDIV;
     VHD_STREAMTYPE STRMTYPE;
+
+    VHD_VBILINE pCaptureLines[VHD_MAXNB_VBICAPTURELINE];
 
 	int ind = ctx->v_channelIndex;	
 
@@ -164,20 +177,30 @@ static int start_stream(struct deltacast_ctx *ctx) {
                                             VHD_SetStreamProperty(ctx->StreamHandleANC, VHD_SDI_SP_INTERFACE, ctx->Interface);
 
 											VHD_SetStreamProperty(ctx->StreamHandle,VHD_CORE_SP_BUFFERQUEUE_DEPTH,32); // AB
-											VHD_SetStreamProperty(ctx->StreamHandle,VHD_CORE_SP_DELAY,1); // AB
-
-											if (ctx->interlaced) {// Merge top and bottom fields (interleave lines) 
+                                            VHD_SetStreamProperty(ctx->StreamHandle,VHD_CORE_SP_DELAY,1); // AB
+                                            
+                                            if (ctx->interlaced) {// Merge top and bottom fields (interleave lines) 
 												VHD_SetStreamProperty(ctx->StreamHandle,VHD_CORE_SP_FIELD_MERGE,TRUE); // AB
-											}
+                                            }
+                                            
+                                            /* Set line to capture: While in extraction mode (VHD_SlotExtractClosedCaption), setting default 
+                                               values of 0 will cause default line values to be used according to the current standard */
+                                            memset(pCaptureLines,0,VHD_MAXNB_VBICAPTURELINE * sizeof(VHD_VBILINE));
 
-                                            /* Start stream */
-                                            Result = VHD_StartStream(ctx->StreamHandle);
-                                            Result += VHD_StartStream(ctx->StreamHandleANC);
-											if (Result == VHDERR_NOERROR) {
-                                                status = 0;
-											} else {
-												//log error
-											}                                                         
+                                            Result = VHD_VbiSetCaptureLines(ctx->StreamHandleANC, pCaptureLines);
+                                            if (Result == VHDERR_NOERROR) {
+                                                /* Start stream */
+                                                Result = VHD_StartStream(ctx->StreamHandle);
+                                                Result += VHD_StartStream(ctx->StreamHandleANC);
+                                                if (Result == VHDERR_NOERROR) {
+                                                    status = 0;
+                                                } else {
+                                                    //log error
+                                                }
+                                            } else {
+                                                // log error
+                                            }
+
 										} else {
 											//log error
 										}
@@ -244,6 +267,10 @@ static int free_audio_data(struct deltacast_ctx *ctx) {
 static int deltacast_read_header(AVFormatContext *avctx) {
     AVStream *v_stream;
     AVStream *a_stream;
+
+    // Keep side data for closed captions embedding into video packet
+    avctx->flags = AVFMT_FLAG_KEEP_SIDE_DATA;
+
     struct deltacast_ctx *ctx = (struct deltacast_ctx *) avctx->priv_data;
 
     // set AFD code to uninitialized value
@@ -252,7 +279,7 @@ static int deltacast_read_header(AVFormatContext *avctx) {
 	int status =  start_stream(ctx);
 	if (status == 0) {
         /* #### create video stream #### */
-		v_stream = avformat_new_stream(avctx, NULL);
+        v_stream = avformat_new_stream(avctx, NULL);
     	if (!v_stream) {
         	av_log(avctx, AV_LOG_ERROR, "Cannot add stream\n");
         	goto error;
@@ -337,7 +364,7 @@ static int deltacast_read_header(AVFormatContext *avctx) {
         // Give the deltacast ctx the allocated audio channel pointers
         ctx->pAudioChn = pAudioChn;
     }
-	
+
 	return status;
 
 error:	
@@ -351,13 +378,60 @@ static int deltacast_read_close(AVFormatContext *avctx) {
 	return status;
 }
 
+static int read_cc_data(struct deltacast_ctx* ctx, AVPacket *pkt) {
+    ULONG result;
+    VHD_CC_SLOT CCSlot;
+    int err = 0;
+
+    /* Set CC line */
+    memset(&CCSlot, 0, sizeof(VHD_CC_SLOT));
+    CCSlot.CCInfo.CCType = VHD_CC_EIA_708;
+
+    /* Try to lock next slot */
+    result = VHD_LockSlotHandle(ctx->StreamHandleANC, &ctx->SlotHandle);
+    if (result == VHDERR_NOERROR) {
+        /* Extract WSS Slot */
+        result = VHD_SlotExtractClosedCaptions(ctx->SlotHandle, &CCSlot);
+        if (result == VHDERR_NOERROR) {
+            printf("1Packet Side data elems: %d\n", pkt->side_data_elems);
+            err = alloc_packet_side_data_from_buffer(pkt, CCSlot.CCData.pData, CCSlot.CCData.DataSize);
+            if (err) {
+                //log error
+                printf("Error on create cc side data\n");
+			} else {
+                //set flags in the packet
+                printf("Success on create cc side data\n");
+                printf("2Packet Side data elems: %d  %d  %d\n", pkt->side_data_elems, pkt->side_data[0].size, pkt->side_data[0].type);
+                printf("Packet side data: %02X %02X  vs. %02X %02X", 
+                    pkt->side_data[0].data[0], 
+                    pkt->side_data[0].data[CCSlot.CCData.DataSize-1],
+                    CCSlot.CCData.pData[0],
+                    CCSlot.CCData.pData[CCSlot.CCData.DataSize-1]
+                );
+			}
+        }
+        else {
+            printf("ERROR : Cannot extract closed captions. Result = 0x%08X (%s)\n",result, GetErrorDescription(result));
+        }
+        VHD_UnlockSlotHandle(ctx->SlotHandle);
+    }
+    else if (result != VHDERR_TIMEOUT) {
+        printf("\nERROR : Cannot lock slot on RX0 stream. Result = 0x%08X (%s)\n",result, GetErrorDescription(result));
+    }
+    else {
+        printf("\nERROR : Timeout");
+    }
+
+    return result;
+}
+
 static int read_video_data(struct deltacast_ctx* ctx, AVPacket *pkt) {
     ULONG result;
     ULONG bufferSize;
     BYTE  *pBuffer = NULL;
     int err = 0;
 
-    /* Try to lock next slot */
+    // Fill packet data with video data
     result = VHD_LockSlotHandle(ctx->StreamHandle, &ctx->SlotHandle);
 	if (result == VHDERR_NOERROR) {
         result = VHD_GetSlotBuffer(ctx->SlotHandle, VHD_SDI_BT_VIDEO, &pBuffer,&bufferSize);
@@ -399,6 +473,13 @@ static int read_video_data(struct deltacast_ctx* ctx, AVPacket *pkt) {
    		//log the error  
 	} else {
    		result = VHDERR_TIMEOUT;
+    }
+
+    // Fill video packet side data with Closed Captions data
+    if (result == VHDERR_NOERROR) {
+        result += read_cc_data(ctx, pkt);
+
+        printf("outside elems: %d  %d  %d\n", pkt->side_data_elems, pkt->side_data[0].size, pkt->side_data[0].type);
     }
 
     return result;
