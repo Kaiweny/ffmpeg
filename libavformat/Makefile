@@ -52,6 +52,7 @@ OBJS-$(CONFIG_RTPDEC)                    += rdt.o                       \
                                             rtpdec_mpeg12.o             \
                                             rtpdec_mpeg4.o              \
                                             rtpdec_mpegts.o             \
+                                            rtpdec_smpte2022.o          \
                                             rtpdec_qcelp.o              \
                                             rtpdec_qdm2.o               \
                                             rtpdec_qt.o                 \
@@ -451,6 +452,7 @@ OBJS-$(CONFIG_SMACKER_DEMUXER)           += smacker.o
 OBJS-$(CONFIG_SMJPEG_DEMUXER)            += smjpegdec.o smjpeg.o
 OBJS-$(CONFIG_SMJPEG_MUXER)              += smjpegenc.o smjpeg.o
 OBJS-$(CONFIG_SMOOTHSTREAMING_MUXER)     += smoothstreamingenc.o
+OBJS-$(CONFIG_SMPTE2022_DEMUXER)         += smpte2022.o
 OBJS-$(CONFIG_SMUSH_DEMUXER)             += smush.o
 OBJS-$(CONFIG_SOL_DEMUXER)               += sol.o pcm.o
 OBJS-$(CONFIG_SOX_DEMUXER)               += soxdec.o pcm.o

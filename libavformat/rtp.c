@@ -33,7 +33,7 @@
  */
 static const struct {
     int pt;
-    const char enc_name[6];
+    const char enc_name[12];
     enum AVMediaType codec_type;
     enum AVCodecID codec_id;
     int clock_rate;
@@ -65,6 +65,7 @@ static const struct {
   {32, "MPV",        AVMEDIA_TYPE_VIDEO,   AV_CODEC_ID_MPEG2VIDEO, 90000, -1},
   {33, "MP2T",       AVMEDIA_TYPE_DATA,    AV_CODEC_ID_MPEG2TS, 90000, -1},
   {34, "H263",       AVMEDIA_TYPE_VIDEO,   AV_CODEC_ID_H263, 90000, -1},
+  {98, "SMPTE2022",  AVMEDIA_TYPE_DATA,    AV_CODEC_ID_SMPTE2022, 90000, -1},
   {-1, "",           AVMEDIA_TYPE_UNKNOWN, AV_CODEC_ID_NONE, -1, -1}
 };
 

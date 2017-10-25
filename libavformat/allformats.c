@@ -200,6 +200,7 @@ static void register_all(void)
     REGISTER_DEMUXER (MPEGPS,           mpegps);
     REGISTER_MUXDEMUX(MPEGTS,           mpegts);
     REGISTER_DEMUXER (MPEGTSRAW,        mpegtsraw);
+    REGISTER_DEMUXER (SMPTE2022,        smpte2022);
     REGISTER_DEMUXER (MPEGVIDEO,        mpegvideo);
     REGISTER_MUXDEMUX(MPJPEG,           mpjpeg);
     REGISTER_DEMUXER (MPL2,             mpl2);

@@ -493,6 +493,12 @@ static void sdp_parse_line(AVFormatContext *s, SDPParseState *s1,
                 init_rtp_handler(handler, rtsp_st, NULL);
                 finalize_rtp_handler_init(s, rtsp_st, NULL);
             }
+        } else if (!strcmp(ff_rtp_enc_name(rtsp_st->sdp_payload_type), "SMPTE2022")) {
+            RTPDynamicProtocolHandler *handler;
+            handler = ff_rtp_handler_find_by_id(
+                            rtsp_st->sdp_payload_type, AVMEDIA_TYPE_DATA);
+            init_rtp_handler(handler, rtsp_st, NULL);
+            finalize_rtp_handler_init(s, rtsp_st, NULL);
         } else if (rt->server_type == RTSP_SERVER_WMS &&
                    codec_type == AVMEDIA_TYPE_DATA) {
             /* RTX stream, a stream that carries all the other actual

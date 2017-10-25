@@ -83,6 +83,7 @@ extern RTPDynamicProtocolHandler ff_qt_rtp_vid_handler;
 extern RTPDynamicProtocolHandler ff_quicktime_rtp_aud_handler;
 extern RTPDynamicProtocolHandler ff_quicktime_rtp_vid_handler;
 extern RTPDynamicProtocolHandler ff_svq3_dynamic_handler;
+extern RTPDynamicProtocolHandler ff_smpte2022_dynamic_handler;
 extern RTPDynamicProtocolHandler ff_theora_dynamic_handler;
 extern RTPDynamicProtocolHandler ff_vc2hq_dynamic_handler;
 extern RTPDynamicProtocolHandler ff_vorbis_dynamic_handler;
