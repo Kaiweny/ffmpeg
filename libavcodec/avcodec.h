@@ -1593,7 +1593,14 @@ enum AVPacketSideDataType {
      * If its value becomes huge, some code using it
      * needs to be updated as it assumes it to be smaller than other limits.
      */
-    AV_PKT_DATA_NB
+    AV_PKT_DATA_NB,
+
+    /**
+     * The side data should be associated with a video stream and corresponds
+     * to Closed Captions data that have been embedded in the video packet side 
+     * data.
+     */
+    AV_PKT_DATA_A53_CC
 };
 
 #define AV_PKT_DATA_QUALITY_FACTOR AV_PKT_DATA_QUALITY_STATS //DEPRECATED

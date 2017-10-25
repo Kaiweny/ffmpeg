@@ -54,7 +54,7 @@ struct deltacast_ctx {
 
 static int alloc_packet_side_data_from_buffer(AVPacket *packet, BYTE  *buffer, ULONG buffer_size) {
     // TODO Mitch: function to create side data with cc data in it
-    uint8_t* dst_data = av_packet_new_side_data(packet, AV_FRAME_DATA_A53_CC, buffer_size);
+    uint8_t* dst_data = av_packet_new_side_data(packet, AV_PKT_DATA_A53_CC, buffer_size);
     if (!dst_data) {
         av_packet_free_side_data(packet);
         return AVERROR(ENOMEM);
