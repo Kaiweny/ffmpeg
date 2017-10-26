@@ -1297,333 +1297,333 @@ static PESContext *add_pes_stream(Smpte2022Context *ts, int pid, int pcr_pid)
     return pes;
 }
 
-#define MAX_LEVEL 4
-typedef struct MP4DescrParseContext {
-    AVFormatContext *s;
-    AVIOContext pb;
-    Mp4Descr *descr;
-    Mp4Descr *active_descr;
-    int descr_count;
-    int max_descr_count;
-    int level;
-    int predefined_SLConfigDescriptor_seen;
-} MP4DescrParseContext;
+// #define MAX_LEVEL 4
+// typedef struct MP4DescrParseContext {
+//     AVFormatContext *s;
+//     AVIOContext pb;
+//     Mp4Descr *descr;
+//     Mp4Descr *active_descr;
+//     int descr_count;
+//     int max_descr_count;
+//     int level;
+//     int predefined_SLConfigDescriptor_seen;
+// } MP4DescrParseContext;
 
-static int init_MP4DescrParseContext(MP4DescrParseContext *d, AVFormatContext *s,
-                                     const uint8_t *buf, unsigned size,
-                                     Mp4Descr *descr, int max_descr_count)
-{
-    int ret;
-    if (size > (1 << 30))
-        return AVERROR_INVALIDDATA;
+// static int init_MP4DescrParseContext(MP4DescrParseContext *d, AVFormatContext *s,
+//                                      const uint8_t *buf, unsigned size,
+//                                      Mp4Descr *descr, int max_descr_count)
+// {
+//     int ret;
+//     if (size > (1 << 30))
+//         return AVERROR_INVALIDDATA;
 
-    if ((ret = ffio_init_context(&d->pb, (unsigned char *)buf, size, 0,
-                                 NULL, NULL, NULL, NULL)) < 0)
-        return ret;
+//     if ((ret = ffio_init_context(&d->pb, (unsigned char *)buf, size, 0,
+//                                  NULL, NULL, NULL, NULL)) < 0)
+//         return ret;
 
-    d->s               = s;
-    d->level           = 0;
-    d->descr_count     = 0;
-    d->descr           = descr;
-    d->active_descr    = NULL;
-    d->max_descr_count = max_descr_count;
+//     d->s               = s;
+//     d->level           = 0;
+//     d->descr_count     = 0;
+//     d->descr           = descr;
+//     d->active_descr    = NULL;
+//     d->max_descr_count = max_descr_count;
 
-    return 0;
-}
+//     return 0;
+// }
 
-static void update_offsets(AVIOContext *pb, int64_t *off, int *len)
-{
-    int64_t new_off = avio_tell(pb);
-    (*len) -= new_off - *off;
-    *off    = new_off;
-}
+// static void update_offsets(AVIOContext *pb, int64_t *off, int *len)
+// {
+//     int64_t new_off = avio_tell(pb);
+//     (*len) -= new_off - *off;
+//     *off    = new_off;
+// }
 
-static int parse_mp4_descr(MP4DescrParseContext *d, int64_t off, int len,
-                           int target_tag);
+// static int parse_mp4_descr(MP4DescrParseContext *d, int64_t off, int len,
+//                            int target_tag);
 
-static int parse_mp4_descr_arr(MP4DescrParseContext *d, int64_t off, int len)
-{
-    while (len > 0) {
-        int ret = parse_mp4_descr(d, off, len, 0);
-        if (ret < 0)
-            return ret;
-        update_offsets(&d->pb, &off, &len);
-    }
-    return 0;
-}
+// static int parse_mp4_descr_arr(MP4DescrParseContext *d, int64_t off, int len)
+// {
+//     while (len > 0) {
+//         int ret = parse_mp4_descr(d, off, len, 0);
+//         if (ret < 0)
+//             return ret;
+//         update_offsets(&d->pb, &off, &len);
+//     }
+//     return 0;
+// }
 
-static int parse_MP4IODescrTag(MP4DescrParseContext *d, int64_t off, int len)
-{
-    avio_rb16(&d->pb); // ID
-    avio_r8(&d->pb);
-    avio_r8(&d->pb);
-    avio_r8(&d->pb);
-    avio_r8(&d->pb);
-    avio_r8(&d->pb);
-    update_offsets(&d->pb, &off, &len);
-    return parse_mp4_descr_arr(d, off, len);
-}
+// static int parse_MP4IODescrTag(MP4DescrParseContext *d, int64_t off, int len)
+// {
+//     avio_rb16(&d->pb); // ID
+//     avio_r8(&d->pb);
+//     avio_r8(&d->pb);
+//     avio_r8(&d->pb);
+//     avio_r8(&d->pb);
+//     avio_r8(&d->pb);
+//     update_offsets(&d->pb, &off, &len);
+//     return parse_mp4_descr_arr(d, off, len);
+// }
 
-static int parse_MP4ODescrTag(MP4DescrParseContext *d, int64_t off, int len)
-{
-    int id_flags;
-    if (len < 2)
-        return 0;
-    id_flags = avio_rb16(&d->pb);
-    if (!(id_flags & 0x0020)) { // URL_Flag
-        update_offsets(&d->pb, &off, &len);
-        return parse_mp4_descr_arr(d, off, len); // ES_Descriptor[]
-    } else {
-        return 0;
-    }
-}
+// static int parse_MP4ODescrTag(MP4DescrParseContext *d, int64_t off, int len)
+// {
+//     int id_flags;
+//     if (len < 2)
+//         return 0;
+//     id_flags = avio_rb16(&d->pb);
+//     if (!(id_flags & 0x0020)) { // URL_Flag
+//         update_offsets(&d->pb, &off, &len);
+//         return parse_mp4_descr_arr(d, off, len); // ES_Descriptor[]
+//     } else {
+//         return 0;
+//     }
+// }
 
-static int parse_MP4ESDescrTag(MP4DescrParseContext *d, int64_t off, int len)
-{
-    int es_id = 0;
-    int ret   = 0;
+// static int parse_MP4ESDescrTag(MP4DescrParseContext *d, int64_t off, int len)
+// {
+//     int es_id = 0;
+//     int ret   = 0;
 
-    if (d->descr_count >= d->max_descr_count)
-        return AVERROR_INVALIDDATA;
-    ff_mp4_parse_es_descr(&d->pb, &es_id);
-    d->active_descr = d->descr + (d->descr_count++);
+//     if (d->descr_count >= d->max_descr_count)
+//         return AVERROR_INVALIDDATA;
+//     ff_mp4_parse_es_descr(&d->pb, &es_id);
+//     d->active_descr = d->descr + (d->descr_count++);
 
-    d->active_descr->es_id = es_id;
-    update_offsets(&d->pb, &off, &len);
-    if ((ret = parse_mp4_descr(d, off, len, MP4DecConfigDescrTag)) < 0)
-        return ret;
-    update_offsets(&d->pb, &off, &len);
-    if (len > 0)
-        ret = parse_mp4_descr(d, off, len, MP4SLDescrTag);
-    d->active_descr = NULL;
-    return ret;
-}
+//     d->active_descr->es_id = es_id;
+//     update_offsets(&d->pb, &off, &len);
+//     if ((ret = parse_mp4_descr(d, off, len, MP4DecConfigDescrTag)) < 0)
+//         return ret;
+//     update_offsets(&d->pb, &off, &len);
+//     if (len > 0)
+//         ret = parse_mp4_descr(d, off, len, MP4SLDescrTag);
+//     d->active_descr = NULL;
+//     return ret;
+// }
 
-static int parse_MP4DecConfigDescrTag(MP4DescrParseContext *d, int64_t off,
-                                      int len)
-{
-    Mp4Descr *descr = d->active_descr;
-    if (!descr)
-        return AVERROR_INVALIDDATA;
-    d->active_descr->dec_config_descr = av_malloc(len);
-    if (!descr->dec_config_descr)
-        return AVERROR(ENOMEM);
-    descr->dec_config_descr_len = len;
-    avio_read(&d->pb, descr->dec_config_descr, len);
-    return 0;
-}
+// static int parse_MP4DecConfigDescrTag(MP4DescrParseContext *d, int64_t off,
+//                                       int len)
+// {
+//     Mp4Descr *descr = d->active_descr;
+//     if (!descr)
+//         return AVERROR_INVALIDDATA;
+//     d->active_descr->dec_config_descr = av_malloc(len);
+//     if (!descr->dec_config_descr)
+//         return AVERROR(ENOMEM);
+//     descr->dec_config_descr_len = len;
+//     avio_read(&d->pb, descr->dec_config_descr, len);
+//     return 0;
+// }
 
-static int parse_MP4SLDescrTag(MP4DescrParseContext *d, int64_t off, int len)
-{
-    Mp4Descr *descr = d->active_descr;
-    int predefined;
-    if (!descr)
-        return AVERROR_INVALIDDATA;
+// static int parse_MP4SLDescrTag(MP4DescrParseContext *d, int64_t off, int len)
+// {
+//     Mp4Descr *descr = d->active_descr;
+//     int predefined;
+//     if (!descr)
+//         return AVERROR_INVALIDDATA;
 
-#define R8_CHECK_CLIP_MAX(dst, maxv) do {                       \
-    descr->sl.dst = avio_r8(&d->pb);                            \
-    if (descr->sl.dst > maxv) {                                 \
-        descr->sl.dst = maxv;                                   \
-        return AVERROR_INVALIDDATA;                             \
-    }                                                           \
-} while (0)
+// #define R8_CHECK_CLIP_MAX(dst, maxv) do {                       \
+//     descr->sl.dst = avio_r8(&d->pb);                            \
+//     if (descr->sl.dst > maxv) {                                 \
+//         descr->sl.dst = maxv;                                   \
+//         return AVERROR_INVALIDDATA;                             \
+//     }                                                           \
+// } while (0)
 
-    predefined = avio_r8(&d->pb);
-    if (!predefined) {
-        int lengths;
-        int flags = avio_r8(&d->pb);
-        descr->sl.use_au_start    = !!(flags & 0x80);
-        descr->sl.use_au_end      = !!(flags & 0x40);
-        descr->sl.use_rand_acc_pt = !!(flags & 0x20);
-        descr->sl.use_padding     = !!(flags & 0x08);
-        descr->sl.use_timestamps  = !!(flags & 0x04);
-        descr->sl.use_idle        = !!(flags & 0x02);
-        descr->sl.timestamp_res   = avio_rb32(&d->pb);
-        avio_rb32(&d->pb);
-        R8_CHECK_CLIP_MAX(timestamp_len, 63);
-        R8_CHECK_CLIP_MAX(ocr_len,       63);
-        R8_CHECK_CLIP_MAX(au_len,        31);
-        descr->sl.inst_bitrate_len   = avio_r8(&d->pb);
-        lengths                      = avio_rb16(&d->pb);
-        descr->sl.degr_prior_len     = lengths >> 12;
-        descr->sl.au_seq_num_len     = (lengths >> 7) & 0x1f;
-        descr->sl.packet_seq_num_len = (lengths >> 2) & 0x1f;
-    } else if (!d->predefined_SLConfigDescriptor_seen){
-        avpriv_report_missing_feature(d->s, "Predefined SLConfigDescriptor");
-        d->predefined_SLConfigDescriptor_seen = 1;
-    }
-    return 0;
-}
+//     predefined = avio_r8(&d->pb);
+//     if (!predefined) {
+//         int lengths;
+//         int flags = avio_r8(&d->pb);
+//         descr->sl.use_au_start    = !!(flags & 0x80);
+//         descr->sl.use_au_end      = !!(flags & 0x40);
+//         descr->sl.use_rand_acc_pt = !!(flags & 0x20);
+//         descr->sl.use_padding     = !!(flags & 0x08);
+//         descr->sl.use_timestamps  = !!(flags & 0x04);
+//         descr->sl.use_idle        = !!(flags & 0x02);
+//         descr->sl.timestamp_res   = avio_rb32(&d->pb);
+//         avio_rb32(&d->pb);
+//         R8_CHECK_CLIP_MAX(timestamp_len, 63);
+//         R8_CHECK_CLIP_MAX(ocr_len,       63);
+//         R8_CHECK_CLIP_MAX(au_len,        31);
+//         descr->sl.inst_bitrate_len   = avio_r8(&d->pb);
+//         lengths                      = avio_rb16(&d->pb);
+//         descr->sl.degr_prior_len     = lengths >> 12;
+//         descr->sl.au_seq_num_len     = (lengths >> 7) & 0x1f;
+//         descr->sl.packet_seq_num_len = (lengths >> 2) & 0x1f;
+//     } else if (!d->predefined_SLConfigDescriptor_seen){
+//         avpriv_report_missing_feature(d->s, "Predefined SLConfigDescriptor");
+//         d->predefined_SLConfigDescriptor_seen = 1;
+//     }
+//     return 0;
+// }
 
-static int parse_mp4_descr(MP4DescrParseContext *d, int64_t off, int len,
-                           int target_tag)
-{
-    int tag;
-    int len1 = ff_mp4_read_descr(d->s, &d->pb, &tag);
-    int ret = 0;
+// static int parse_mp4_descr(MP4DescrParseContext *d, int64_t off, int len,
+//                            int target_tag)
+// {
+//     int tag;
+//     int len1 = ff_mp4_read_descr(d->s, &d->pb, &tag);
+//     int ret = 0;
 
-    update_offsets(&d->pb, &off, &len);
-    if (len < 0 || len1 > len || len1 <= 0) {
-        av_log(d->s, AV_LOG_ERROR,
-               "Tag %x length violation new length %d bytes remaining %d\n",
-               tag, len1, len);
-        return AVERROR_INVALIDDATA;
-    }
+//     update_offsets(&d->pb, &off, &len);
+//     if (len < 0 || len1 > len || len1 <= 0) {
+//         av_log(d->s, AV_LOG_ERROR,
+//                "Tag %x length violation new length %d bytes remaining %d\n",
+//                tag, len1, len);
+//         return AVERROR_INVALIDDATA;
+//     }
 
-    if (d->level++ >= MAX_LEVEL) {
-        av_log(d->s, AV_LOG_ERROR, "Maximum MP4 descriptor level exceeded\n");
-        ret = AVERROR_INVALIDDATA;
-        goto done;
-    }
+//     if (d->level++ >= MAX_LEVEL) {
+//         av_log(d->s, AV_LOG_ERROR, "Maximum MP4 descriptor level exceeded\n");
+//         ret = AVERROR_INVALIDDATA;
+//         goto done;
+//     }
 
-    if (target_tag && tag != target_tag) {
-        av_log(d->s, AV_LOG_ERROR, "Found tag %x expected %x\n", tag,
-               target_tag);
-        ret = AVERROR_INVALIDDATA;
-        goto done;
-    }
+//     if (target_tag && tag != target_tag) {
+//         av_log(d->s, AV_LOG_ERROR, "Found tag %x expected %x\n", tag,
+//                target_tag);
+//         ret = AVERROR_INVALIDDATA;
+//         goto done;
+//     }
 
-    switch (tag) {
-    case MP4IODescrTag:
-        ret = parse_MP4IODescrTag(d, off, len1);
-        break;
-    case MP4ODescrTag:
-        ret = parse_MP4ODescrTag(d, off, len1);
-        break;
-    case MP4ESDescrTag:
-        ret = parse_MP4ESDescrTag(d, off, len1);
-        break;
-    case MP4DecConfigDescrTag:
-        ret = parse_MP4DecConfigDescrTag(d, off, len1);
-        break;
-    case MP4SLDescrTag:
-        ret = parse_MP4SLDescrTag(d, off, len1);
-        break;
-    }
+//     switch (tag) {
+//     case MP4IODescrTag:
+//         ret = parse_MP4IODescrTag(d, off, len1);
+//         break;
+//     case MP4ODescrTag:
+//         ret = parse_MP4ODescrTag(d, off, len1);
+//         break;
+//     case MP4ESDescrTag:
+//         ret = parse_MP4ESDescrTag(d, off, len1);
+//         break;
+//     case MP4DecConfigDescrTag:
+//         ret = parse_MP4DecConfigDescrTag(d, off, len1);
+//         break;
+//     case MP4SLDescrTag:
+//         ret = parse_MP4SLDescrTag(d, off, len1);
+//         break;
+//     }
 
 
-done:
-    d->level--;
-    avio_seek(&d->pb, off + len1, SEEK_SET);
-    return ret;
-}
+// done:
+//     d->level--;
+//     avio_seek(&d->pb, off + len1, SEEK_SET);
+//     return ret;
+// }
 
-static int mp4_read_iods(AVFormatContext *s, const uint8_t *buf, unsigned size,
-                         Mp4Descr *descr, int *descr_count, int max_descr_count)
-{
-    MP4DescrParseContext d;
-    int ret;
+// static int mp4_read_iods(AVFormatContext *s, const uint8_t *buf, unsigned size,
+//                          Mp4Descr *descr, int *descr_count, int max_descr_count)
+// {
+//     MP4DescrParseContext d;
+//     int ret;
 
-    ret = init_MP4DescrParseContext(&d, s, buf, size, descr, max_descr_count);
-    if (ret < 0)
-        return ret;
+//     ret = init_MP4DescrParseContext(&d, s, buf, size, descr, max_descr_count);
+//     if (ret < 0)
+//         return ret;
 
-    ret = parse_mp4_descr(&d, avio_tell(&d.pb), size, MP4IODescrTag);
+//     ret = parse_mp4_descr(&d, avio_tell(&d.pb), size, MP4IODescrTag);
 
-    *descr_count = d.descr_count;
-    return ret;
-}
+//     *descr_count = d.descr_count;
+//     return ret;
+// }
 
-static int mp4_read_od(AVFormatContext *s, const uint8_t *buf, unsigned size,
-                       Mp4Descr *descr, int *descr_count, int max_descr_count)
-{
-    MP4DescrParseContext d;
-    int ret;
+// static int mp4_read_od(AVFormatContext *s, const uint8_t *buf, unsigned size,
+//                        Mp4Descr *descr, int *descr_count, int max_descr_count)
+// {
+//     MP4DescrParseContext d;
+//     int ret;
 
-    ret = init_MP4DescrParseContext(&d, s, buf, size, descr, max_descr_count);
-    if (ret < 0)
-        return ret;
+//     ret = init_MP4DescrParseContext(&d, s, buf, size, descr, max_descr_count);
+//     if (ret < 0)
+//         return ret;
 
-    ret = parse_mp4_descr_arr(&d, avio_tell(&d.pb), size);
+//     ret = parse_mp4_descr_arr(&d, avio_tell(&d.pb), size);
 
-    *descr_count = d.descr_count;
-    return ret;
-}
+//     *descr_count = d.descr_count;
+//     return ret;
+// }
 
-static void m4sl_cb(Smpte2022Filter *filter, const uint8_t *section,
-                    int section_len)
-{
-    Smpte2022Context *ts = filter->u.section_filter.opaque;
-    Smpte2022SectionFilter *tssf = &filter->u.section_filter;
-    SectionHeader h;
-    const uint8_t *p, *p_end;
-    AVIOContext pb;
-    int mp4_descr_count = 0;
-    Mp4Descr mp4_descr[MAX_MP4_DESCR_COUNT] = { { 0 } };
-    int i, pid;
-    AVFormatContext *s = ts->stream;
+// static void m4sl_cb(Smpte2022Filter *filter, const uint8_t *section,
+//                     int section_len)
+// {
+//     Smpte2022Context *ts = filter->u.section_filter.opaque;
+//     Smpte2022SectionFilter *tssf = &filter->u.section_filter;
+//     SectionHeader h;
+//     const uint8_t *p, *p_end;
+//     AVIOContext pb;
+//     int mp4_descr_count = 0;
+//     Mp4Descr mp4_descr[MAX_MP4_DESCR_COUNT] = { { 0 } };
+//     int i, pid;
+//     AVFormatContext *s = ts->stream;
 
-    p_end = section + section_len - 4;
-    p = section;
-    if (parse_section_header(&h, &p, p_end) < 0)
-        return;
-    if (h.tid != M4OD_TID)
-        return;
-    if (skip_identical(&h, tssf))
-        return;
+//     p_end = section + section_len - 4;
+//     p = section;
+//     if (parse_section_header(&h, &p, p_end) < 0)
+//         return;
+//     if (h.tid != M4OD_TID)
+//         return;
+//     if (skip_identical(&h, tssf))
+//         return;
 
-    mp4_read_od(s, p, (unsigned) (p_end - p), mp4_descr, &mp4_descr_count,
-                MAX_MP4_DESCR_COUNT);
+//     mp4_read_od(s, p, (unsigned) (p_end - p), mp4_descr, &mp4_descr_count,
+//                 MAX_MP4_DESCR_COUNT);
 
-    for (pid = 0; pid < NB_PID_MAX; pid++) {
-        if (!ts->pids[pid])
-            continue;
-        for (i = 0; i < mp4_descr_count; i++) {
-            PESContext *pes;
-            AVStream *st;
-            if (ts->pids[pid]->es_id != mp4_descr[i].es_id)
-                continue;
-            if (ts->pids[pid]->type != SMPTE2022_PES) {
-                av_log(s, AV_LOG_ERROR, "pid %x is not PES\n", pid);
-                continue;
-            }
-            pes = ts->pids[pid]->u.pes_filter.opaque;
-            st  = pes->st;
-            if (!st)
-                continue;
+//     for (pid = 0; pid < NB_PID_MAX; pid++) {
+//         if (!ts->pids[pid])
+//             continue;
+//         for (i = 0; i < mp4_descr_count; i++) {
+//             PESContext *pes;
+//             AVStream *st;
+//             if (ts->pids[pid]->es_id != mp4_descr[i].es_id)
+//                 continue;
+//             if (ts->pids[pid]->type != SMPTE2022_PES) {
+//                 av_log(s, AV_LOG_ERROR, "pid %x is not PES\n", pid);
+//                 continue;
+//             }
+//             pes = ts->pids[pid]->u.pes_filter.opaque;
+//             st  = pes->st;
+//             if (!st)
+//                 continue;
 
-            pes->sl = mp4_descr[i].sl;
+//             pes->sl = mp4_descr[i].sl;
 
-            ffio_init_context(&pb, mp4_descr[i].dec_config_descr,
-                              mp4_descr[i].dec_config_descr_len, 0,
-                              NULL, NULL, NULL, NULL);
-            ff_mp4_read_dec_config_descr(s, st, &pb);
-            if (st->codecpar->codec_id == AV_CODEC_ID_AAC &&
-                st->codecpar->extradata_size > 0)
-                st->need_parsing = 0;
-            if (st->codecpar->codec_id == AV_CODEC_ID_H264 &&
-                st->codecpar->extradata_size > 0)
-                st->need_parsing = 0;
+//             ffio_init_context(&pb, mp4_descr[i].dec_config_descr,
+//                               mp4_descr[i].dec_config_descr_len, 0,
+//                               NULL, NULL, NULL, NULL);
+//             ff_mp4_read_dec_config_descr(s, st, &pb);
+//             if (st->codecpar->codec_id == AV_CODEC_ID_AAC &&
+//                 st->codecpar->extradata_size > 0)
+//                 st->need_parsing = 0;
+//             if (st->codecpar->codec_id == AV_CODEC_ID_H264 &&
+//                 st->codecpar->extradata_size > 0)
+//                 st->need_parsing = 0;
 
-            st->codecpar->codec_type = avcodec_get_type(st->codecpar->codec_id);
-            st->internal->need_context_update = 1;
-        }
-    }
-    for (i = 0; i < mp4_descr_count; i++)
-        av_free(mp4_descr[i].dec_config_descr);
-}
+//             st->codecpar->codec_type = avcodec_get_type(st->codecpar->codec_id);
+//             st->internal->need_context_update = 1;
+//         }
+//     }
+//     for (i = 0; i < mp4_descr_count; i++)
+//         av_free(mp4_descr[i].dec_config_descr);
+// }
 
-static void scte_data_cb(Smpte2022Filter *filter, const uint8_t *section,
-                    int section_len)
-{
-    AVProgram *prg = NULL;
-    Smpte2022Context *ts = filter->u.section_filter.opaque;
+// static void scte_data_cb(Smpte2022Filter *filter, const uint8_t *section,
+//                     int section_len)
+// {
+//     AVProgram *prg = NULL;
+//     Smpte2022Context *ts = filter->u.section_filter.opaque;
 
-    int idx = ff_find_stream_index(ts->stream, filter->pid);
-    if (idx < 0)
-        return;
+//     int idx = ff_find_stream_index(ts->stream, filter->pid);
+//     if (idx < 0)
+//         return;
 
-    new_data_packet(section, section_len, ts->pkt);
-    ts->pkt->stream_index = idx;
-    prg = av_find_program_from_stream(ts->stream, NULL, idx);
-    if (prg && prg->pcr_pid != -1 && prg->discard != AVDISCARD_ALL) {
-        Smpte2022Filter *f = ts->pids[prg->pcr_pid];
-        if (f && f->last_pcr != -1)
-            ts->pkt->pts = ts->pkt->dts = f->last_pcr/300;
-    }
-    ts->stop_parse = 1;
+//     new_data_packet(section, section_len, ts->pkt);
+//     ts->pkt->stream_index = idx;
+//     prg = av_find_program_from_stream(ts->stream, NULL, idx);
+//     if (prg && prg->pcr_pid != -1 && prg->discard != AVDISCARD_ALL) {
+//         Smpte2022Filter *f = ts->pids[prg->pcr_pid];
+//         if (f && f->last_pcr != -1)
+//             ts->pkt->pts = ts->pkt->dts = f->last_pcr/300;
+//     }
+//     ts->stop_parse = 1;
 
-}
+// }
 
 static const uint8_t opus_coupled_stream_cnt[9] = {
     1, 0, 1, 1, 2, 2, 2, 3, 3
@@ -1644,607 +1644,606 @@ static const uint8_t opus_channel_map[8][8] = {
     { 0,6,1,2,3,4,5,7 },
 };
 
-int ff_parse_something_descriptor(AVFormatContext *fc, AVStream *st, int stream_type,
-                              const uint8_t **pp, const uint8_t *desc_list_end,
-                              Mp4Descr *mp4_descr, int mp4_descr_count, int pid,
-                              Smpte2022Context *ts)
-{
-    const uint8_t *desc_end;
-    int desc_len, desc_tag, desc_es_id, ext_desc_tag, channels, channel_config_code;
-    char language[252];
-    int i;
-
-    desc_tag = get8(pp, desc_list_end);
-    if (desc_tag < 0)
-        return AVERROR_INVALIDDATA;
-    desc_len = get8(pp, desc_list_end);
-    if (desc_len < 0)
-        return AVERROR_INVALIDDATA;
-    desc_end = *pp + desc_len;
-    if (desc_end > desc_list_end)
-        return AVERROR_INVALIDDATA;
-
-    av_log(fc, AV_LOG_TRACE, "tag: 0x%02x len=%d\n", desc_tag, desc_len);
-
-    if ((st->codecpar->codec_id == AV_CODEC_ID_NONE || st->request_probe > 0) &&
-        stream_type == STREAM_TYPE_PRIVATE_DATA)
-        smpte2022_find_stream_type(st, desc_tag, DESC_types);
-
-    switch (desc_tag) {
-    case 0x1E: /* SL descriptor */
-        desc_es_id = get16(pp, desc_end);
-        if (desc_es_id < 0)
-            break;
-        if (ts && ts->pids[pid])
-            ts->pids[pid]->es_id = desc_es_id;
-        for (i = 0; i < mp4_descr_count; i++)
-            if (mp4_descr[i].dec_config_descr_len &&
-                mp4_descr[i].es_id == desc_es_id) {
-                AVIOContext pb;
-                ffio_init_context(&pb, mp4_descr[i].dec_config_descr,
-                                  mp4_descr[i].dec_config_descr_len, 0,
-                                  NULL, NULL, NULL, NULL);
-                ff_mp4_read_dec_config_descr(fc, st, &pb);
-                if (st->codecpar->codec_id == AV_CODEC_ID_AAC &&
-                    st->codecpar->extradata_size > 0) {
-                    st->need_parsing = 0;
-                    st->internal->need_context_update = 1;
-                }
-                if (st->codecpar->codec_id == AV_CODEC_ID_MPEG4SYSTEMS)
-                    smpte2022_open_section_filter(ts, pid, m4sl_cb, ts, 1);
-            }
-        break;
-    case 0x1F: /* FMC descriptor */
-        if (get16(pp, desc_end) < 0)
-            break;
-        if (mp4_descr_count > 0 &&
-            (st->codecpar->codec_id == AV_CODEC_ID_AAC_LATM ||
-             (st->request_probe == 0 && st->codecpar->codec_id == AV_CODEC_ID_NONE) ||
-             st->request_probe > 0) &&
-            mp4_descr->dec_config_descr_len && mp4_descr->es_id == pid) {
-            AVIOContext pb;
-            ffio_init_context(&pb, mp4_descr->dec_config_descr,
-                              mp4_descr->dec_config_descr_len, 0,
-                              NULL, NULL, NULL, NULL);
-            ff_mp4_read_dec_config_descr(fc, st, &pb);
-            if (st->codecpar->codec_id == AV_CODEC_ID_AAC &&
-                st->codecpar->extradata_size > 0) {
-                st->request_probe = st->need_parsing = 0;
-                st->codecpar->codec_type = AVMEDIA_TYPE_AUDIO;
-                st->internal->need_context_update = 1;
-            }
-        }
-        break;
-    case 0x56: /* DVB teletext descriptor */
-        {
-            uint8_t *extradata = NULL;
-            int language_count = desc_len / 5;
-
-            if (desc_len > 0 && desc_len % 5 != 0)
-                return AVERROR_INVALIDDATA;
-
-            if (language_count > 0) {
-                /* 4 bytes per language code (3 bytes) with comma or NUL byte should fit language buffer */
-                av_assert0(language_count <= sizeof(language) / 4);
-
-                if (st->codecpar->extradata == NULL) {
-                    if (ff_alloc_extradata(st->codecpar, language_count * 2)) {
-                        return AVERROR(ENOMEM);
-                    }
-                }
-
-               if (st->codecpar->extradata_size < language_count * 2)
-                   return AVERROR_INVALIDDATA;
-
-               extradata = st->codecpar->extradata;
-
-                for (i = 0; i < language_count; i++) {
-                    language[i * 4 + 0] = get8(pp, desc_end);
-                    language[i * 4 + 1] = get8(pp, desc_end);
-                    language[i * 4 + 2] = get8(pp, desc_end);
-                    language[i * 4 + 3] = ',';
-
-                    memcpy(extradata, *pp, 2);
-                    extradata += 2;
-
-                    *pp += 2;
-                }
-
-                language[i * 4 - 1] = 0;
-                av_dict_set(&st->metadata, "language", language, 0);
-                st->internal->need_context_update = 1;
-            }
-        }
-        break;
-    case 0x59: /* subtitling descriptor */
-        {
-            /* 8 bytes per DVB subtitle substream data:
-             * ISO_639_language_code (3 bytes),
-             * subtitling_type (1 byte),
-             * composition_page_id (2 bytes),
-             * ancillary_page_id (2 bytes) */
-            int language_count = desc_len / 8;
-
-            if (desc_len > 0 && desc_len % 8 != 0)
-                return AVERROR_INVALIDDATA;
-
-            if (language_count > 1) {
-                avpriv_request_sample(fc, "DVB subtitles with multiple languages");
-            }
-
-            if (language_count > 0) {
-                uint8_t *extradata;
-
-                /* 4 bytes per language code (3 bytes) with comma or NUL byte should fit language buffer */
-                av_assert0(language_count <= sizeof(language) / 4);
-
-                if (st->codecpar->extradata == NULL) {
-                    if (ff_alloc_extradata(st->codecpar, language_count * 5)) {
-                        return AVERROR(ENOMEM);
-                    }
-                }
-
-                if (st->codecpar->extradata_size < language_count * 5)
-                    return AVERROR_INVALIDDATA;
-
-                extradata = st->codecpar->extradata;
-
-                for (i = 0; i < language_count; i++) {
-                    language[i * 4 + 0] = get8(pp, desc_end);
-                    language[i * 4 + 1] = get8(pp, desc_end);
-                    language[i * 4 + 2] = get8(pp, desc_end);
-                    language[i * 4 + 3] = ',';
-
-                    /* hearing impaired subtitles detection using subtitling_type */
-                    switch (*pp[0]) {
-                    case 0x20: /* DVB subtitles (for the hard of hearing) with no monitor aspect ratio criticality */
-                    case 0x21: /* DVB subtitles (for the hard of hearing) for display on 4:3 aspect ratio monitor */
-                    case 0x22: /* DVB subtitles (for the hard of hearing) for display on 16:9 aspect ratio monitor */
-                    case 0x23: /* DVB subtitles (for the hard of hearing) for display on 2.21:1 aspect ratio monitor */
-                    case 0x24: /* DVB subtitles (for the hard of hearing) for display on a high definition monitor */
-                    case 0x25: /* DVB subtitles (for the hard of hearing) with plano-stereoscopic disparity for display on a high definition monitor */
-                        st->disposition |= AV_DISPOSITION_HEARING_IMPAIRED;
-                        break;
-                    }
-
-                    extradata[4] = get8(pp, desc_end); /* subtitling_type */
-                    memcpy(extradata, *pp, 4); /* composition_page_id and ancillary_page_id */
-                    extradata += 5;
-
-                    *pp += 4;
-                }
-
-                language[i * 4 - 1] = 0;
-                av_dict_set(&st->metadata, "language", language, 0);
-                st->internal->need_context_update = 1;
-            }
-        }
-        break;
-    case 0x0a: /* ISO 639 language descriptor */
-        for (i = 0; i + 4 <= desc_len; i += 4) {
-            language[i + 0] = get8(pp, desc_end);
-            language[i + 1] = get8(pp, desc_end);
-            language[i + 2] = get8(pp, desc_end);
-            language[i + 3] = ',';
-            switch (get8(pp, desc_end)) {
-            case 0x01:
-                st->disposition |= AV_DISPOSITION_CLEAN_EFFECTS;
-                break;
-            case 0x02:
-                st->disposition |= AV_DISPOSITION_HEARING_IMPAIRED;
-                break;
-            case 0x03:
-                st->disposition |= AV_DISPOSITION_VISUAL_IMPAIRED;
-                break;
-            }
-        }
-        if (i && language[0]) {
-            language[i - 1] = 0;
-            av_dict_set(&st->metadata, "language", language, 0);
-        }
-        break;
-    case 0x05: /* registration descriptor */
-        st->codecpar->codec_tag = bytestream_get_le32(pp);
-        av_log(fc, AV_LOG_TRACE, "reg_desc=%.4s\n", (char *)&st->codecpar->codec_tag);
-        if (st->codecpar->codec_id == AV_CODEC_ID_NONE || st->request_probe > 0) {
-            smpte2022_find_stream_type(st, st->codecpar->codec_tag, REGD_types);
-            if (st->codecpar->codec_tag == MKTAG('B', 'S', 'S', 'D'))
-                st->request_probe = 50;
-        }
-        break;
-    case 0x52: /* stream identifier descriptor */
-        st->stream_identifier = 1 + get8(pp, desc_end);
-        break;
-    case 0x26: /* metadata descriptor */
-        if (get16(pp, desc_end) == 0xFFFF)
-            *pp += 4;
-        if (get8(pp, desc_end) == 0xFF) {
-            st->codecpar->codec_tag = bytestream_get_le32(pp);
-            if (st->codecpar->codec_id == AV_CODEC_ID_NONE)
-                smpte2022_find_stream_type(st, st->codecpar->codec_tag, METADATA_types);
-        }
-        break;
-    case 0x7f: /* DVB extension descriptor */
-        ext_desc_tag = get8(pp, desc_end);
-        if (ext_desc_tag < 0)
-            return AVERROR_INVALIDDATA;
-        if (st->codecpar->codec_id == AV_CODEC_ID_OPUS &&
-            ext_desc_tag == 0x80) { /* User defined (provisional Opus) */
-            if (!st->codecpar->extradata) {
-                st->codecpar->extradata = av_mallocz(sizeof(opus_default_extradata) +
-                                                     AV_INPUT_BUFFER_PADDING_SIZE);
-                if (!st->codecpar->extradata)
-                    return AVERROR(ENOMEM);
-
-                st->codecpar->extradata_size = sizeof(opus_default_extradata);
-                memcpy(st->codecpar->extradata, opus_default_extradata, sizeof(opus_default_extradata));
-
-                channel_config_code = get8(pp, desc_end);
-                if (channel_config_code < 0)
-                    return AVERROR_INVALIDDATA;
-                if (channel_config_code <= 0x8) {
-                    st->codecpar->extradata[9]  = channels = channel_config_code ? channel_config_code : 2;
-                    st->codecpar->extradata[18] = channel_config_code ? (channels > 2) : /* Dual Mono */ 255;
-                    st->codecpar->extradata[19] = opus_stream_cnt[channel_config_code];
-                    st->codecpar->extradata[20] = opus_coupled_stream_cnt[channel_config_code];
-                    memcpy(&st->codecpar->extradata[21], opus_channel_map[channels - 1], channels);
-                } else {
-                    avpriv_request_sample(fc, "Opus in MPEG-TS - channel_config_code > 0x8");
-                }
-                st->need_parsing = AVSTREAM_PARSE_FULL;
-                st->internal->need_context_update = 1;
-            }
-        }
-        break;
-    default:
-        break;
-    }
-    *pp = desc_end;
-    return 0;
-}
-
-static int is_pes_stream(int stream_type, uint32_t prog_reg_desc)
-{
-    return !(stream_type == 0x13 ||
-             (stream_type == 0x86 && prog_reg_desc == AV_RL32("CUEI")) );
-}
-
-static void pmt_cb(Smpte2022Filter *filter, const uint8_t *section, int section_len)
-{
-    Smpte2022Context *ts = filter->u.section_filter.opaque;
-    Smpte2022SectionFilter *tssf = &filter->u.section_filter;
-    SectionHeader h1, *h = &h1;
-    PESContext *pes;
-    AVStream *st;
-    const uint8_t *p, *p_end, *desc_list_end;
-    int program_info_length, pcr_pid, pid, stream_type;
-    int desc_list_len;
-    uint32_t prog_reg_desc = 0; /* registration descriptor */
-
-    int mp4_descr_count = 0;
-    Mp4Descr mp4_descr[MAX_MP4_DESCR_COUNT] = { { 0 } };
-    int i;
-
-    av_log(ts->stream, AV_LOG_TRACE, "PMT: len %i\n", section_len);
-    hex_dump_debug(ts->stream, section, section_len);
-
-    p_end = section + section_len - 4;
-    p = section;
-    if (parse_section_header(h, &p, p_end) < 0)
-        return;
-    if (skip_identical(h, tssf))
-        return;
-
-    av_log(ts->stream, AV_LOG_TRACE, "sid=0x%x sec_num=%d/%d version=%d tid=%d\n",
-            h->id, h->sec_num, h->last_sec_num, h->version, h->tid);
-
-    if (h->tid != PMT_TID)
-        return;
-    if (!ts->scan_all_pmts && ts->skip_changes)
-        return;
-
-    if (!ts->skip_clear)
-        clear_program(ts, h->id);
-
-    pcr_pid = get16(&p, p_end);
-    if (pcr_pid < 0)
-        return;
-    pcr_pid &= 0x1fff;
-    add_pid_to_pmt(ts, h->id, pcr_pid);
-    set_pcr_pid(ts->stream, h->id, pcr_pid);
-
-    av_log(ts->stream, AV_LOG_TRACE, "pcr_pid=0x%x\n", pcr_pid);
-
-    program_info_length = get16(&p, p_end);
-    if (program_info_length < 0)
-        return;
-    program_info_length &= 0xfff;
-    while (program_info_length >= 2) {
-        uint8_t tag, len;
-        tag = get8(&p, p_end);
-        len = get8(&p, p_end);
-
-        av_log(ts->stream, AV_LOG_TRACE, "program tag: 0x%02x len=%d\n", tag, len);
-
-        if (len > program_info_length - 2)
-            // something else is broken, exit the program_descriptors_loop
-            break;
-        program_info_length -= len + 2;
-        if (tag == 0x1d) { // IOD descriptor
-            get8(&p, p_end); // scope
-            get8(&p, p_end); // label
-            len -= 2;
-            mp4_read_iods(ts->stream, p, len, mp4_descr + mp4_descr_count,
-                          &mp4_descr_count, MAX_MP4_DESCR_COUNT);
-        } else if (tag == 0x05 && len >= 4) { // registration descriptor
-            prog_reg_desc = bytestream_get_le32(&p);
-            len -= 4;
-        }
-        p += len;
-    }
-    p += program_info_length;
-    if (p >= p_end)
-        goto out;
-
-    // stop parsing after pmt, we found header
-    if (!ts->stream->nb_streams)
-        ts->stop_parse = 2;
-
-    set_pmt_found(ts, h->id);
-
-
-    for (;;) {
-        st = 0;
-        pes = NULL;
-        stream_type = get8(&p, p_end);
-        if (stream_type < 0)
-            break;
-        pid = get16(&p, p_end);
-        if (pid < 0)
-            goto out;
-        pid &= 0x1fff;
-        if (pid == ts->current_pid)
-            goto out;
-
-        /* now create stream */
-        if (ts->pids[pid] && ts->pids[pid]->type == SMPTE2022_PES) {
-            pes = ts->pids[pid]->u.pes_filter.opaque;
-            if (!pes->st) {
-                pes->st     = avformat_new_stream(pes->stream, NULL);
-                if (!pes->st)
-                    goto out;
-                pes->st->id = pes->pid;
-            }
-            st = pes->st;
-        } else if (is_pes_stream(stream_type, prog_reg_desc)) {
-            if (ts->pids[pid])
-                smpte2022_close_filter(ts, ts->pids[pid]); // wrongly added sdt filter probably
-            pes = add_pes_stream(ts, pid, pcr_pid);
-            if (pes) {
-                st = avformat_new_stream(pes->stream, NULL);
-                if (!st)
-                    goto out;
-                st->id = pes->pid;
-            }
-        } else {
-            int idx = ff_find_stream_index(ts->stream, pid);
-            if (idx >= 0) {
-                st = ts->stream->streams[idx];
-            } else {
-                st = avformat_new_stream(ts->stream, NULL);
-                if (!st)
-                    goto out;
-                st->id = pid;
-                st->codecpar->codec_type = AVMEDIA_TYPE_DATA;
-                if (stream_type == 0x86 && prog_reg_desc == AV_RL32("CUEI")) {
-                    smpte2022_find_stream_type(st, stream_type, SCTE_types);
-                    smpte2022_open_section_filter(ts, pid, scte_data_cb, ts, 1);
-                }
-            }
-        }
-
-        if (!st)
-            goto out;
-
-        if (pes && !pes->stream_type)
-            smpte2022_set_stream_info(st, pes, stream_type, prog_reg_desc);
-
-        add_pid_to_pmt(ts, h->id, pid);
-
-        av_program_add_stream_index(ts->stream, h->id, st->index);
-
-        desc_list_len = get16(&p, p_end);
-        if (desc_list_len < 0)
-            goto out;
-        desc_list_len &= 0xfff;
-        desc_list_end  = p + desc_list_len;
-        if (desc_list_end > p_end)
-            goto out;
-        for (;;) {
-            if (ff_parse_something_descriptor(ts->stream, st, stream_type, &p,
-                                          desc_list_end, mp4_descr,
-                                          mp4_descr_count, pid, ts) < 0)
-                break;
-
-            if (pes && prog_reg_desc == AV_RL32("HDMV") &&
-                stream_type == 0x83 && pes->sub_st) {
-                av_program_add_stream_index(ts->stream, h->id,
-                                            pes->sub_st->index);
-                pes->sub_st->codecpar->codec_tag = st->codecpar->codec_tag;
-            }
-        }
-        p = desc_list_end;
-    }
-
-    if (!ts->pids[pcr_pid])
-        smpte2022_open_pcr_filter(ts, pcr_pid);
-
-out:
-    for (i = 0; i < mp4_descr_count; i++)
-        av_free(mp4_descr[i].dec_config_descr);
-}
-
-static void pat_cb(Smpte2022Filter *filter, const uint8_t *section, int section_len)
-{
-    Smpte2022Context *ts = filter->u.section_filter.opaque;
-    Smpte2022SectionFilter *tssf = &filter->u.section_filter;
-    SectionHeader h1, *h = &h1;
-    const uint8_t *p, *p_end;
-    int sid, pmt_pid;
-    AVProgram *program;
-
-    av_log(ts->stream, AV_LOG_TRACE, "PAT:\n");
-    hex_dump_debug(ts->stream, section, section_len);
-
-    p_end = section + section_len - 4;
-    p     = section;
-    if (parse_section_header(h, &p, p_end) < 0)
-        return;
-    if (h->tid != PAT_TID)
-        return;
-    if (ts->skip_changes)
-        return;
-
-    if (skip_identical(h, tssf))
-        return;
-    ts->stream->ts_id = h->id;
-
-    clear_programs(ts);
-    for (;;) {
-        sid = get16(&p, p_end);
-        if (sid < 0)
-            break;
-        pmt_pid = get16(&p, p_end);
-        if (pmt_pid < 0)
-            break;
-        pmt_pid &= 0x1fff;
-
-        if (pmt_pid == ts->current_pid)
-            break;
-
-        av_log(ts->stream, AV_LOG_TRACE, "sid=0x%x pid=0x%x\n", sid, pmt_pid);
-
-        if (sid == 0x0000) {
-            /* NIT info */
-        } else {
-            Smpte2022Filter *fil = ts->pids[pmt_pid];
-            program = av_new_program(ts->stream, sid);
-            if (program) {
-                program->program_num = sid;
-                program->pmt_pid = pmt_pid;
-            }
-            if (fil)
-                if (   fil->type != SMPTE2022_SECTION
-                    || fil->pid != pmt_pid
-                    || fil->u.section_filter.section_cb != pmt_cb)
-                    smpte2022_close_filter(ts, ts->pids[pmt_pid]);
-
-            if (!ts->pids[pmt_pid])
-                smpte2022_open_section_filter(ts, pmt_pid, pmt_cb, ts, 1);
-            add_pat_entry(ts, sid);
-            add_pid_to_pmt(ts, sid, 0); // add pat pid to program
-            add_pid_to_pmt(ts, sid, pmt_pid);
-        }
-    }
-
-    if (sid < 0) {
-        int i,j;
-        for (j=0; j<ts->stream->nb_programs; j++) {
-            for (i = 0; i < ts->nb_prg; i++)
-                if (ts->prg[i].id == ts->stream->programs[j]->id)
-                    break;
-            if (i==ts->nb_prg && !ts->skip_clear)
-                clear_avprogram(ts, ts->stream->programs[j]->id);
-        }
-    }
-}
-
-static void sdt_cb(Smpte2022Filter *filter, const uint8_t *section, int section_len)
-{
-    Smpte2022Context *ts = filter->u.section_filter.opaque;
-    Smpte2022SectionFilter *tssf = &filter->u.section_filter;
-    SectionHeader h1, *h = &h1;
-    const uint8_t *p, *p_end, *desc_list_end, *desc_end;
-    int onid, val, sid, desc_list_len, desc_tag, desc_len, service_type;
-    char *name, *provider_name;
-
-    av_log(ts->stream, AV_LOG_TRACE, "SDT:\n");
-    hex_dump_debug(ts->stream, section, section_len);
-
-    p_end = section + section_len - 4;
-    p     = section;
-    if (parse_section_header(h, &p, p_end) < 0)
-        return;
-    if (h->tid != SDT_TID)
-        return;
-    if (ts->skip_changes)
-        return;
-    if (skip_identical(h, tssf))
-        return;
-
-    onid = get16(&p, p_end);
-    if (onid < 0)
-        return;
-    val = get8(&p, p_end);
-    if (val < 0)
-        return;
-    for (;;) {
-        sid = get16(&p, p_end);
-        if (sid < 0)
-            break;
-        val = get8(&p, p_end);
-        if (val < 0)
-            break;
-        desc_list_len = get16(&p, p_end);
-        if (desc_list_len < 0)
-            break;
-        desc_list_len &= 0xfff;
-        desc_list_end  = p + desc_list_len;
-        if (desc_list_end > p_end)
-            break;
-        for (;;) {
-            desc_tag = get8(&p, desc_list_end);
-            if (desc_tag < 0)
-                break;
-            desc_len = get8(&p, desc_list_end);
-            desc_end = p + desc_len;
-            if (desc_len < 0 || desc_end > desc_list_end)
-                break;
-
-            av_log(ts->stream, AV_LOG_TRACE, "tag: 0x%02x len=%d\n",
-                    desc_tag, desc_len);
-
-            switch (desc_tag) {
-            case 0x48:
-                service_type = get8(&p, p_end);
-                if (service_type < 0)
-                    break;
-                provider_name = getstr8(&p, p_end);
-                if (!provider_name)
-                    break;
-                name = getstr8(&p, p_end);
-                if (name) {
-                    AVProgram *program = av_new_program(ts->stream, sid);
-                    if (program) {
-                        av_dict_set(&program->metadata, "service_name", name, 0);
-                        av_dict_set(&program->metadata, "service_provider",
-                                    provider_name, 0);
-                    }
-                }
-                av_free(name);
-                av_free(provider_name);
-                break;
-            default:
-                break;
-            }
-            p = desc_end;
-        }
-        p = desc_list_end;
-    }
-}
-
-static int parse_pcr(int64_t *ppcr_high, int *ppcr_low,
-                     const uint8_t *packet);
+// int ff_parse_something_descriptor(AVFormatContext *fc, AVStream *st, int stream_type,
+//                               const uint8_t **pp, const uint8_t *desc_list_end,
+//                               Mp4Descr *mp4_descr, int mp4_descr_count, int pid,
+//                               Smpte2022Context *ts)
+// {
+//     const uint8_t *desc_end;
+//     int desc_len, desc_tag, desc_es_id, ext_desc_tag, channels, channel_config_code;
+//     char language[252];
+//     int i;
+
+//     desc_tag = get8(pp, desc_list_end);
+//     if (desc_tag < 0)
+//         return AVERROR_INVALIDDATA;
+//     desc_len = get8(pp, desc_list_end);
+//     if (desc_len < 0)
+//         return AVERROR_INVALIDDATA;
+//     desc_end = *pp + desc_len;
+//     if (desc_end > desc_list_end)
+//         return AVERROR_INVALIDDATA;
+
+//     av_log(fc, AV_LOG_TRACE, "tag: 0x%02x len=%d\n", desc_tag, desc_len);
+
+//     if ((st->codecpar->codec_id == AV_CODEC_ID_NONE || st->request_probe > 0) &&
+//         stream_type == STREAM_TYPE_PRIVATE_DATA)
+//         smpte2022_find_stream_type(st, desc_tag, DESC_types);
+
+//     switch (desc_tag) {
+//     case 0x1E: /* SL descriptor */
+//         desc_es_id = get16(pp, desc_end);
+//         if (desc_es_id < 0)
+//             break;
+//         if (ts && ts->pids[pid])
+//             ts->pids[pid]->es_id = desc_es_id;
+//         for (i = 0; i < mp4_descr_count; i++)
+//             if (mp4_descr[i].dec_config_descr_len &&
+//                 mp4_descr[i].es_id == desc_es_id) {
+//                 AVIOContext pb;
+//                 ffio_init_context(&pb, mp4_descr[i].dec_config_descr,
+//                                   mp4_descr[i].dec_config_descr_len, 0,
+//                                   NULL, NULL, NULL, NULL);
+//                 ff_mp4_read_dec_config_descr(fc, st, &pb);
+//                 if (st->codecpar->codec_id == AV_CODEC_ID_AAC &&
+//                     st->codecpar->extradata_size > 0) {
+//                     st->need_parsing = 0;
+//                     st->internal->need_context_update = 1;
+//                 }
+//                 if (st->codecpar->codec_id == AV_CODEC_ID_MPEG4SYSTEMS)
+//                     smpte2022_open_section_filter(ts, pid, m4sl_cb, ts, 1);
+//             }
+//         break;
+//     case 0x1F: /* FMC descriptor */
+//         if (get16(pp, desc_end) < 0)
+//             break;
+//         if (mp4_descr_count > 0 &&
+//             (st->codecpar->codec_id == AV_CODEC_ID_AAC_LATM ||
+//              (st->request_probe == 0 && st->codecpar->codec_id == AV_CODEC_ID_NONE) ||
+//              st->request_probe > 0) &&
+//             mp4_descr->dec_config_descr_len && mp4_descr->es_id == pid) {
+//             AVIOContext pb;
+//             ffio_init_context(&pb, mp4_descr->dec_config_descr,
+//                               mp4_descr->dec_config_descr_len, 0,
+//                               NULL, NULL, NULL, NULL);
+//             ff_mp4_read_dec_config_descr(fc, st, &pb);
+//             if (st->codecpar->codec_id == AV_CODEC_ID_AAC &&
+//                 st->codecpar->extradata_size > 0) {
+//                 st->request_probe = st->need_parsing = 0;
+//                 st->codecpar->codec_type = AVMEDIA_TYPE_AUDIO;
+//                 st->internal->need_context_update = 1;
+//             }
+//         }
+//         break;
+//     case 0x56: /* DVB teletext descriptor */
+//         {
+//             uint8_t *extradata = NULL;
+//             int language_count = desc_len / 5;
+
+//             if (desc_len > 0 && desc_len % 5 != 0)
+//                 return AVERROR_INVALIDDATA;
+
+//             if (language_count > 0) {
+//                 /* 4 bytes per language code (3 bytes) with comma or NUL byte should fit language buffer */
+//                 av_assert0(language_count <= sizeof(language) / 4);
+
+//                 if (st->codecpar->extradata == NULL) {
+//                     if (ff_alloc_extradata(st->codecpar, language_count * 2)) {
+//                         return AVERROR(ENOMEM);
+//                     }
+//                 }
+
+//                if (st->codecpar->extradata_size < language_count * 2)
+//                    return AVERROR_INVALIDDATA;
+
+//                extradata = st->codecpar->extradata;
+
+//                 for (i = 0; i < language_count; i++) {
+//                     language[i * 4 + 0] = get8(pp, desc_end);
+//                     language[i * 4 + 1] = get8(pp, desc_end);
+//                     language[i * 4 + 2] = get8(pp, desc_end);
+//                     language[i * 4 + 3] = ',';
+
+//                     memcpy(extradata, *pp, 2);
+//                     extradata += 2;
+
+//                     *pp += 2;
+//                 }
+
+//                 language[i * 4 - 1] = 0;
+//                 av_dict_set(&st->metadata, "language", language, 0);
+//                 st->internal->need_context_update = 1;
+//             }
+//         }
+//         break;
+//     case 0x59: /* subtitling descriptor */
+//         {
+//             /* 8 bytes per DVB subtitle substream data:
+//              * ISO_639_language_code (3 bytes),
+//              * subtitling_type (1 byte),
+//              * composition_page_id (2 bytes),
+//              * ancillary_page_id (2 bytes) */
+//             int language_count = desc_len / 8;
+
+//             if (desc_len > 0 && desc_len % 8 != 0)
+//                 return AVERROR_INVALIDDATA;
+
+//             if (language_count > 1) {
+//                 avpriv_request_sample(fc, "DVB subtitles with multiple languages");
+//             }
+
+//             if (language_count > 0) {
+//                 uint8_t *extradata;
+
+//                 /* 4 bytes per language code (3 bytes) with comma or NUL byte should fit language buffer */
+//                 av_assert0(language_count <= sizeof(language) / 4);
+
+//                 if (st->codecpar->extradata == NULL) {
+//                     if (ff_alloc_extradata(st->codecpar, language_count * 5)) {
+//                         return AVERROR(ENOMEM);
+//                     }
+//                 }
+
+//                 if (st->codecpar->extradata_size < language_count * 5)
+//                     return AVERROR_INVALIDDATA;
+
+//                 extradata = st->codecpar->extradata;
+
+//                 for (i = 0; i < language_count; i++) {
+//                     language[i * 4 + 0] = get8(pp, desc_end);
+//                     language[i * 4 + 1] = get8(pp, desc_end);
+//                     language[i * 4 + 2] = get8(pp, desc_end);
+//                     language[i * 4 + 3] = ',';
+
+//                     /* hearing impaired subtitles detection using subtitling_type */
+//                     switch (*pp[0]) {
+//                     case 0x20: /* DVB subtitles (for the hard of hearing) with no monitor aspect ratio criticality */
+//                     case 0x21: /* DVB subtitles (for the hard of hearing) for display on 4:3 aspect ratio monitor */
+//                     case 0x22: /* DVB subtitles (for the hard of hearing) for display on 16:9 aspect ratio monitor */
+//                     case 0x23: /* DVB subtitles (for the hard of hearing) for display on 2.21:1 aspect ratio monitor */
+//                     case 0x24: /* DVB subtitles (for the hard of hearing) for display on a high definition monitor */
+//                     case 0x25: /* DVB subtitles (for the hard of hearing) with plano-stereoscopic disparity for display on a high definition monitor */
+//                         st->disposition |= AV_DISPOSITION_HEARING_IMPAIRED;
+//                         break;
+//                     }
+
+//                     extradata[4] = get8(pp, desc_end); /* subtitling_type */
+//                     memcpy(extradata, *pp, 4); /* composition_page_id and ancillary_page_id */
+//                     extradata += 5;
+
+//                     *pp += 4;
+//                 }
+
+//                 language[i * 4 - 1] = 0;
+//                 av_dict_set(&st->metadata, "language", language, 0);
+//                 st->internal->need_context_update = 1;
+//             }
+//         }
+//         break;
+//     case 0x0a: /* ISO 639 language descriptor */
+//         for (i = 0; i + 4 <= desc_len; i += 4) {
+//             language[i + 0] = get8(pp, desc_end);
+//             language[i + 1] = get8(pp, desc_end);
+//             language[i + 2] = get8(pp, desc_end);
+//             language[i + 3] = ',';
+//             switch (get8(pp, desc_end)) {
+//             case 0x01:
+//                 st->disposition |= AV_DISPOSITION_CLEAN_EFFECTS;
+//                 break;
+//             case 0x02:
+//                 st->disposition |= AV_DISPOSITION_HEARING_IMPAIRED;
+//                 break;
+//             case 0x03:
+//                 st->disposition |= AV_DISPOSITION_VISUAL_IMPAIRED;
+//                 break;
+//             }
+//         }
+//         if (i && language[0]) {
+//             language[i - 1] = 0;
+//             av_dict_set(&st->metadata, "language", language, 0);
+//         }
+//         break;
+//     case 0x05: /* registration descriptor */
+//         st->codecpar->codec_tag = bytestream_get_le32(pp);
+//         av_log(fc, AV_LOG_TRACE, "reg_desc=%.4s\n", (char *)&st->codecpar->codec_tag);
+//         if (st->codecpar->codec_id == AV_CODEC_ID_NONE || st->request_probe > 0) {
+//             smpte2022_find_stream_type(st, st->codecpar->codec_tag, REGD_types);
+//             if (st->codecpar->codec_tag == MKTAG('B', 'S', 'S', 'D'))
+//                 st->request_probe = 50;
+//         }
+//         break;
+//     case 0x52: /* stream identifier descriptor */
+//         st->stream_identifier = 1 + get8(pp, desc_end);
+//         break;
+//     case 0x26: /* metadata descriptor */
+//         if (get16(pp, desc_end) == 0xFFFF)
+//             *pp += 4;
+//         if (get8(pp, desc_end) == 0xFF) {
+//             st->codecpar->codec_tag = bytestream_get_le32(pp);
+//             if (st->codecpar->codec_id == AV_CODEC_ID_NONE)
+//                 smpte2022_find_stream_type(st, st->codecpar->codec_tag, METADATA_types);
+//         }
+//         break;
+//     case 0x7f: /* DVB extension descriptor */
+//         ext_desc_tag = get8(pp, desc_end);
+//         if (ext_desc_tag < 0)
+//             return AVERROR_INVALIDDATA;
+//         if (st->codecpar->codec_id == AV_CODEC_ID_OPUS &&
+//             ext_desc_tag == 0x80) { /* User defined (provisional Opus) */
+//             if (!st->codecpar->extradata) {
+//                 st->codecpar->extradata = av_mallocz(sizeof(opus_default_extradata) +
+//                                                      AV_INPUT_BUFFER_PADDING_SIZE);
+//                 if (!st->codecpar->extradata)
+//                     return AVERROR(ENOMEM);
+
+//                 st->codecpar->extradata_size = sizeof(opus_default_extradata);
+//                 memcpy(st->codecpar->extradata, opus_default_extradata, sizeof(opus_default_extradata));
+
+//                 channel_config_code = get8(pp, desc_end);
+//                 if (channel_config_code < 0)
+//                     return AVERROR_INVALIDDATA;
+//                 if (channel_config_code <= 0x8) {
+//                     st->codecpar->extradata[9]  = channels = channel_config_code ? channel_config_code : 2;
+//                     st->codecpar->extradata[18] = channel_config_code ? (channels > 2) : /* Dual Mono */ 255;
+//                     st->codecpar->extradata[19] = opus_stream_cnt[channel_config_code];
+//                     st->codecpar->extradata[20] = opus_coupled_stream_cnt[channel_config_code];
+//                     memcpy(&st->codecpar->extradata[21], opus_channel_map[channels - 1], channels);
+//                 } else {
+//                     avpriv_request_sample(fc, "Opus in MPEG-TS - channel_config_code > 0x8");
+//                 }
+//                 st->need_parsing = AVSTREAM_PARSE_FULL;
+//                 st->internal->need_context_update = 1;
+//             }
+//         }
+//         break;
+//     default:
+//         break;
+//     }
+//     *pp = desc_end;
+//     return 0;
+// }
+
+// static int is_pes_stream(int stream_type, uint32_t prog_reg_desc)
+// {
+//     return !(stream_type == 0x13 ||
+//              (stream_type == 0x86 && prog_reg_desc == AV_RL32("CUEI")) );
+// }
+
+// static void pmt_cb(Smpte2022Filter *filter, const uint8_t *section, int section_len)
+// {
+//     Smpte2022Context *ts = filter->u.section_filter.opaque;
+//     Smpte2022SectionFilter *tssf = &filter->u.section_filter;
+//     SectionHeader h1, *h = &h1;
+//     PESContext *pes;
+//     AVStream *st;
+//     const uint8_t *p, *p_end, *desc_list_end;
+//     int program_info_length, pcr_pid, pid, stream_type;
+//     int desc_list_len;
+//     uint32_t prog_reg_desc = 0; /* registration descriptor */
+
+//     int mp4_descr_count = 0;
+//     Mp4Descr mp4_descr[MAX_MP4_DESCR_COUNT] = { { 0 } };
+//     int i;
+
+//     av_log(ts->stream, AV_LOG_TRACE, "PMT: len %i\n", section_len);
+//     hex_dump_debug(ts->stream, section, section_len);
+
+//     p_end = section + section_len - 4;
+//     p = section;
+//     if (parse_section_header(h, &p, p_end) < 0)
+//         return;
+//     if (skip_identical(h, tssf))
+//         return;
+
+//     av_log(ts->stream, AV_LOG_TRACE, "sid=0x%x sec_num=%d/%d version=%d tid=%d\n",
+//             h->id, h->sec_num, h->last_sec_num, h->version, h->tid);
+
+//     if (h->tid != PMT_TID)
+//         return;
+//     if (!ts->scan_all_pmts && ts->skip_changes)
+//         return;
+
+//     if (!ts->skip_clear)
+//         clear_program(ts, h->id);
+
+//     pcr_pid = get16(&p, p_end);
+//     if (pcr_pid < 0)
+//         return;
+//     pcr_pid &= 0x1fff;
+//     add_pid_to_pmt(ts, h->id, pcr_pid);
+//     set_pcr_pid(ts->stream, h->id, pcr_pid);
+
+//     av_log(ts->stream, AV_LOG_TRACE, "pcr_pid=0x%x\n", pcr_pid);
+
+//     program_info_length = get16(&p, p_end);
+//     if (program_info_length < 0)
+//         return;
+//     program_info_length &= 0xfff;
+//     while (program_info_length >= 2) {
+//         uint8_t tag, len;
+//         tag = get8(&p, p_end);
+//         len = get8(&p, p_end);
+
+//         av_log(ts->stream, AV_LOG_TRACE, "program tag: 0x%02x len=%d\n", tag, len);
+
+//         if (len > program_info_length - 2)
+//             // something else is broken, exit the program_descriptors_loop
+//             break;
+//         program_info_length -= len + 2;
+//         if (tag == 0x1d) { // IOD descriptor
+//             get8(&p, p_end); // scope
+//             get8(&p, p_end); // label
+//             len -= 2;
+//             mp4_read_iods(ts->stream, p, len, mp4_descr + mp4_descr_count,
+//                           &mp4_descr_count, MAX_MP4_DESCR_COUNT);
+//         } else if (tag == 0x05 && len >= 4) { // registration descriptor
+//             prog_reg_desc = bytestream_get_le32(&p);
+//             len -= 4;
+//         }
+//         p += len;
+//     }
+//     p += program_info_length;
+//     if (p >= p_end)
+//         goto out;
+
+//     // stop parsing after pmt, we found header
+//     if (!ts->stream->nb_streams)
+//         ts->stop_parse = 2;
+
+//     set_pmt_found(ts, h->id);
+
+
+//     for (;;) {
+//         st = 0;
+//         pes = NULL;
+//         stream_type = get8(&p, p_end);
+//         if (stream_type < 0)
+//             break;
+//         pid = get16(&p, p_end);
+//         if (pid < 0)
+//             goto out;
+//         pid &= 0x1fff;
+//         if (pid == ts->current_pid)
+//             goto out;
+
+//         /* now create stream */
+//         if (ts->pids[pid] && ts->pids[pid]->type == SMPTE2022_PES) {
+//             pes = ts->pids[pid]->u.pes_filter.opaque;
+//             if (!pes->st) {
+//                 pes->st     = avformat_new_stream(pes->stream, NULL);
+//                 if (!pes->st)
+//                     goto out;
+//                 pes->st->id = pes->pid;
+//             }
+//             st = pes->st;
+//         } else if (is_pes_stream(stream_type, prog_reg_desc)) {
+//             if (ts->pids[pid])
+//                 smpte2022_close_filter(ts, ts->pids[pid]); // wrongly added sdt filter probably
+//             pes = add_pes_stream(ts, pid, pcr_pid);
+//             if (pes) {
+//                 st = avformat_new_stream(pes->stream, NULL);
+//                 if (!st)
+//                     goto out;
+//                 st->id = pes->pid;
+//             }
+//         } else {
+//             int idx = ff_find_stream_index(ts->stream, pid);
+//             if (idx >= 0) {
+//                 st = ts->stream->streams[idx];
+//             } else {
+//                 st = avformat_new_stream(ts->stream, NULL);
+//                 if (!st)
+//                     goto out;
+//                 st->id = pid;
+//                 st->codecpar->codec_type = AVMEDIA_TYPE_DATA;
+//                 if (stream_type == 0x86 && prog_reg_desc == AV_RL32("CUEI")) {
+//                     smpte2022_find_stream_type(st, stream_type, SCTE_types);
+//                     smpte2022_open_section_filter(ts, pid, scte_data_cb, ts, 1);
+//                 }
+//             }
+//         }
+
+//         if (!st)
+//             goto out;
+
+//         if (pes && !pes->stream_type)
+//             smpte2022_set_stream_info(st, pes, stream_type, prog_reg_desc);
+
+//         add_pid_to_pmt(ts, h->id, pid);
+
+//         av_program_add_stream_index(ts->stream, h->id, st->index);
+
+//         desc_list_len = get16(&p, p_end);
+//         if (desc_list_len < 0)
+//             goto out;
+//         desc_list_len &= 0xfff;
+//         desc_list_end  = p + desc_list_len;
+//         if (desc_list_end > p_end)
+//             goto out;
+//         for (;;) {
+//             if (ff_parse_something_descriptor(ts->stream, st, stream_type, &p,
+//                                           desc_list_end, mp4_descr,
+//                                           mp4_descr_count, pid, ts) < 0)
+//                 break;
+
+//             if (pes && prog_reg_desc == AV_RL32("HDMV") &&
+//                 stream_type == 0x83 && pes->sub_st) {
+//                 av_program_add_stream_index(ts->stream, h->id,
+//                                             pes->sub_st->index);
+//                 pes->sub_st->codecpar->codec_tag = st->codecpar->codec_tag;
+//             }
+//         }
+//         p = desc_list_end;
+//     }
+
+//     if (!ts->pids[pcr_pid])
+//         smpte2022_open_pcr_filter(ts, pcr_pid);
+
+// out:
+//     for (i = 0; i < mp4_descr_count; i++)
+//         av_free(mp4_descr[i].dec_config_descr);
+// }
+
+// static void pat_cb(Smpte2022Filter *filter, const uint8_t *section, int section_len)
+// {
+//     Smpte2022Context *ts = filter->u.section_filter.opaque;
+//     Smpte2022SectionFilter *tssf = &filter->u.section_filter;
+//     SectionHeader h1, *h = &h1;
+//     const uint8_t *p, *p_end;
+//     int sid, pmt_pid;
+//     AVProgram *program;
+
+//     av_log(ts->stream, AV_LOG_TRACE, "PAT:\n");
+//     hex_dump_debug(ts->stream, section, section_len);
+
+//     p_end = section + section_len - 4;
+//     p     = section;
+//     if (parse_section_header(h, &p, p_end) < 0)
+//         return;
+//     if (h->tid != PAT_TID)
+//         return;
+//     if (ts->skip_changes)
+//         return;
+
+//     if (skip_identical(h, tssf))
+//         return;
+//     ts->stream->ts_id = h->id;
+
+//     clear_programs(ts);
+//     for (;;) {
+//         sid = get16(&p, p_end);
+//         if (sid < 0)
+//             break;
+//         pmt_pid = get16(&p, p_end);
+//         if (pmt_pid < 0)
+//             break;
+//         pmt_pid &= 0x1fff;
+
+//         if (pmt_pid == ts->current_pid)
+//             break;
+
+//         av_log(ts->stream, AV_LOG_TRACE, "sid=0x%x pid=0x%x\n", sid, pmt_pid);
+
+//         if (sid == 0x0000) {
+//             /* NIT info */
+//         } else {
+//             Smpte2022Filter *fil = ts->pids[pmt_pid];
+//             program = av_new_program(ts->stream, sid);
+//             if (program) {
+//                 program->program_num = sid;
+//                 program->pmt_pid = pmt_pid;
+//             }
+//             if (fil)
+//                 if (   fil->type != SMPTE2022_SECTION
+//                     || fil->pid != pmt_pid
+//                     || fil->u.section_filter.section_cb != pmt_cb)
+//                     smpte2022_close_filter(ts, ts->pids[pmt_pid]);
+
+//             if (!ts->pids[pmt_pid])
+//                 smpte2022_open_section_filter(ts, pmt_pid, pmt_cb, ts, 1);
+//             add_pat_entry(ts, sid);
+//             add_pid_to_pmt(ts, sid, 0); // add pat pid to program
+//             add_pid_to_pmt(ts, sid, pmt_pid);
+//         }
+//     }
+
+//     if (sid < 0) {
+//         int i,j;
+//         for (j=0; j<ts->stream->nb_programs; j++) {
+//             for (i = 0; i < ts->nb_prg; i++)
+//                 if (ts->prg[i].id == ts->stream->programs[j]->id)
+//                     break;
+//             if (i==ts->nb_prg && !ts->skip_clear)
+//                 clear_avprogram(ts, ts->stream->programs[j]->id);
+//         }
+//     }
+// }
+
+// static void sdt_cb(Smpte2022Filter *filter, const uint8_t *section, int section_len)
+// {
+//     Smpte2022Context *ts = filter->u.section_filter.opaque;
+//     Smpte2022SectionFilter *tssf = &filter->u.section_filter;
+//     SectionHeader h1, *h = &h1;
+//     const uint8_t *p, *p_end, *desc_list_end, *desc_end;
+//     int onid, val, sid, desc_list_len, desc_tag, desc_len, service_type;
+//     char *name, *provider_name;
+
+//     av_log(ts->stream, AV_LOG_TRACE, "SDT:\n");
+//     hex_dump_debug(ts->stream, section, section_len);
+
+//     p_end = section + section_len - 4;
+//     p     = section;
+//     if (parse_section_header(h, &p, p_end) < 0)
+//         return;
+//     if (h->tid != SDT_TID)
+//         return;
+//     if (ts->skip_changes)
+//         return;
+//     if (skip_identical(h, tssf))
+//         return;
+
+//     onid = get16(&p, p_end);
+//     if (onid < 0)
+//         return;
+//     val = get8(&p, p_end);
+//     if (val < 0)
+//         return;
+//     for (;;) {
+//         sid = get16(&p, p_end);
+//         if (sid < 0)
+//             break;
+//         val = get8(&p, p_end);
+//         if (val < 0)
+//             break;
+//         desc_list_len = get16(&p, p_end);
+//         if (desc_list_len < 0)
+//             break;
+//         desc_list_len &= 0xfff;
+//         desc_list_end  = p + desc_list_len;
+//         if (desc_list_end > p_end)
+//             break;
+//         for (;;) {
+//             desc_tag = get8(&p, desc_list_end);
+//             if (desc_tag < 0)
+//                 break;
+//             desc_len = get8(&p, desc_list_end);
+//             desc_end = p + desc_len;
+//             if (desc_len < 0 || desc_end > desc_list_end)
+//                 break;
+
+//             av_log(ts->stream, AV_LOG_TRACE, "tag: 0x%02x len=%d\n",
+//                     desc_tag, desc_len);
+
+//             switch (desc_tag) {
+//             case 0x48:
+//                 service_type = get8(&p, p_end);
+//                 if (service_type < 0)
+//                     break;
+//                 provider_name = getstr8(&p, p_end);
+//                 if (!provider_name)
+//                     break;
+//                 name = getstr8(&p, p_end);
+//                 if (name) {
+//                     AVProgram *program = av_new_program(ts->stream, sid);
+//                     if (program) {
+//                         av_dict_set(&program->metadata, "service_name", name, 0);
+//                         av_dict_set(&program->metadata, "service_provider",
+//                                     provider_name, 0);
+//                     }
+//                 }
+//                 av_free(name);
+//                 av_free(provider_name);
+//                 break;
+//             default:
+//                 break;
+//             }
+//             p = desc_end;
+//         }
+//         p = desc_list_end;
+//     }
+// }
+
+// static int parse_pcr(int64_t *ppcr_high, int *ppcr_low, const uint8_t *packet);
 
 /* handle one TS packet */
 static int handle_packet(Smpte2022Context *ts, const uint8_t *packet)
@@ -2297,14 +2296,14 @@ static int handle_packet(Smpte2022Context *ts, const uint8_t *packet)
     }
 
     p = packet + 4;
-    if (has_adaptation) {
-        int64_t pcr_h;
-        int pcr_l;
-        if (parse_pcr(&pcr_h, &pcr_l, packet) == 0)
-            tss->last_pcr = pcr_h * 300 + pcr_l;
-        /* skip adaptation field */
-        p += p[0] + 1;
-    }
+    // if (has_adaptation) {
+    //     int64_t pcr_h;
+    //     int pcr_l;
+    //     if (parse_pcr(&pcr_h, &pcr_l, packet) == 0)
+    //         tss->last_pcr = pcr_h * 300 + pcr_l;
+    //     /* skip adaptation field */
+    //     p += p[0] + 1;
+    // }
     /* if past the end of packet, ignore */
     p_end = packet + TS_PACKET_SIZE;
     if (p >= p_end || !has_payload)
@@ -2412,36 +2411,36 @@ static void reanalyze(Smpte2022Context *ts) {
 
 /* XXX: try to find a better synchro over several packets (use
  * get_packet_size() ?) */
-static int smpte2022_resync(AVFormatContext *s, int seekback, const uint8_t *current_packet)
-{
-    Smpte2022Context *ts = s->priv_data;
-    AVIOContext *pb = s->pb;
-    int c, i;
-    uint64_t pos = avio_tell(pb);
+// static int smpte2022_resync(AVFormatContext *s, int seekback, const uint8_t *current_packet)
+// {
+//     Smpte2022Context *ts = s->priv_data;
+//     AVIOContext *pb = s->pb;
+//     int c, i;
+//     uint64_t pos = avio_tell(pb);
 
-    avio_seek(pb, -FFMIN(seekback, pos), SEEK_CUR);
+//     avio_seek(pb, -FFMIN(seekback, pos), SEEK_CUR);
 
-    //Special case for files like 01c56b0dc1.ts
-    if (current_packet[0] == 0x80 && current_packet[12] == 0x47) {
-        avio_seek(pb, 12, SEEK_CUR);
-        return 0;
-    }
+//     //Special case for files like 01c56b0dc1.ts
+//     if (current_packet[0] == 0x80 && current_packet[12] == 0x47) {
+//         avio_seek(pb, 12, SEEK_CUR);
+//         return 0;
+//     }
 
-    for (i = 0; i < ts->resync_size; i++) {
-        c = avio_r8(pb);
-        if (avio_feof(pb))
-            return AVERROR_EOF;
-        if (c == 0x47) {
-            avio_seek(pb, -1, SEEK_CUR);
-            reanalyze(s->priv_data);
-            return 0;
-        }
-    }
-    av_log(s, AV_LOG_ERROR,
-           "max resync size reached, could not find sync byte\n");
-    /* no sync found */
-    return AVERROR_INVALIDDATA;
-}
+//     for (i = 0; i < ts->resync_size; i++) {
+//         c = avio_r8(pb);
+//         if (avio_feof(pb))
+//             return AVERROR_EOF;
+//         if (c == 0x47) {
+//             avio_seek(pb, -1, SEEK_CUR);
+//             reanalyze(s->priv_data);
+//             return 0;
+//         }
+//     }
+//     av_log(s, AV_LOG_ERROR,
+//            "max resync size reached, could not find sync byte\n");
+//     /* no sync found */
+//     return AVERROR_INVALIDDATA;
+// }
 
 /* return AVERROR_something if error or EOF. Return 0 if OK. */
 static int read_packet(AVFormatContext *s, uint8_t *buf, int raw_packet_size,
@@ -2458,9 +2457,9 @@ static int read_packet(AVFormatContext *s, uint8_t *buf, int raw_packet_size,
         if ((*data)[0] != 0x47) {
             /* find a new packet start */
 
-            if (smpte2022_resync(s, raw_packet_size, *data) < 0)
-                return AVERROR(EAGAIN);
-            else
+            // if (smpte2022_resync(s, raw_packet_size, *data) < 0)
+            //     return AVERROR(EAGAIN);
+            // else
                 continue;
         } else {
             break;
@@ -2573,31 +2572,31 @@ static int smpte2022_probe(AVProbeData *p)
 
 /* return the 90kHz PCR and the extension for the 27MHz PCR. return
  * (-1) if not available */
-static int parse_pcr(int64_t *ppcr_high, int *ppcr_low, const uint8_t *packet)
-{
-    int afc, len, flags;
-    const uint8_t *p;
-    unsigned int v;
+// static int parse_pcr(int64_t *ppcr_high, int *ppcr_low, const uint8_t *packet)
+// {
+//     int afc, len, flags;
+//     const uint8_t *p;
+//     unsigned int v;
 
-    afc = (packet[3] >> 4) & 3;
-    if (afc <= 1)
-        return AVERROR_INVALIDDATA;
-    p   = packet + 4;
-    len = p[0];
-    p++;
-    if (len == 0)
-        return AVERROR_INVALIDDATA;
-    flags = *p++;
-    len--;
-    if (!(flags & 0x10))
-        return AVERROR_INVALIDDATA;
-    if (len < 6)
-        return AVERROR_INVALIDDATA;
-    v          = AV_RB32(p);
-    *ppcr_high = ((int64_t) v << 1) | (p[4] >> 7);
-    *ppcr_low  = ((p[4] & 1) << 8) | p[5];
-    return 0;
-}
+//     afc = (packet[3] >> 4) & 3;
+//     if (afc <= 1)
+//         return AVERROR_INVALIDDATA;
+//     p   = packet + 4;
+//     len = p[0];
+//     p++;
+//     if (len == 0)
+//         return AVERROR_INVALIDDATA;
+//     flags = *p++;
+//     len--;
+//     if (!(flags & 0x10))
+//         return AVERROR_INVALIDDATA;
+//     if (len < 6)
+//         return AVERROR_INVALIDDATA;
+//     v          = AV_RB32(p);
+//     *ppcr_high = ((int64_t) v << 1) | (p[4] >> 7);
+//     *ppcr_low  = ((p[4] & 1) << 8) | p[5];
+//     return 0;
+// }
 
 static void seek_back(AVFormatContext *s, AVIOContext *pb, int64_t pos) {
 
@@ -2636,9 +2635,9 @@ static int smpte2022_read_header(AVFormatContext *s)
         /* first do a scan to get all the services */
         seek_back(s, pb, pos);
 
-        smpte2022_open_section_filter(ts, SDT_PID, sdt_cb, ts, 1);
+        // smpte2022_open_section_filter(ts, SDT_PID, sdt_cb, ts, 1);
 
-        smpte2022_open_section_filter(ts, PAT_PID, pat_cb, ts, 1);
+        // smpte2022_open_section_filter(ts, PAT_PID, pat_cb, ts, 1);
 
         handle_packets(ts, probesize / ts->raw_packet_size);
         /* if could not find service, enable auto_guess */
@@ -2674,27 +2673,27 @@ static int smpte2022_read_header(AVFormatContext *s)
             if (ret < 0)
                 return ret;
             pid = AV_RB16(data + 1) & 0x1fff;
-            if ((pcr_pid == -1 || pcr_pid == pid) &&
-                parse_pcr(&pcr_h, &pcr_l, data) == 0) {
+            // if ((pcr_pid == -1 || pcr_pid == pid) &&
+                // parse_pcr(&pcr_h, &pcr_l, data) == 0) {
+                // finished_reading_packet(s, ts->raw_packet_size);
+                // pcr_pid = pid;
+                // packet_count[nb_pcrs] = nb_packets;
+                // pcrs[nb_pcrs] = pcr_h * 300 + pcr_l;
+                // nb_pcrs++;
+                // if (nb_pcrs >= 2) {
+                //     if (pcrs[1] - pcrs[0] > 0) {
+                //         /* the difference needs to be positive to make sense for bitrate computation */
+                //         break;
+                //     } else {
+                //         av_log(ts->stream, AV_LOG_WARNING, "invalid pcr pair %"PRId64" >= %"PRId64"\n", pcrs[0], pcrs[1]);
+                //         pcrs[0] = pcrs[1];
+                //         packet_count[0] = packet_count[1];
+                //         nb_pcrs--;
+                //     }
+                // }
+            // } else {
                 finished_reading_packet(s, ts->raw_packet_size);
-                pcr_pid = pid;
-                packet_count[nb_pcrs] = nb_packets;
-                pcrs[nb_pcrs] = pcr_h * 300 + pcr_l;
-                nb_pcrs++;
-                if (nb_pcrs >= 2) {
-                    if (pcrs[1] - pcrs[0] > 0) {
-                        /* the difference needs to be positive to make sense for bitrate computation */
-                        break;
-                    } else {
-                        av_log(ts->stream, AV_LOG_WARNING, "invalid pcr pair %"PRId64" >= %"PRId64"\n", pcrs[0], pcrs[1]);
-                        pcrs[0] = pcrs[1];
-                        packet_count[0] = packet_count[1];
-                        nb_pcrs--;
-                    }
-                }
-            } else {
-                finished_reading_packet(s, ts->raw_packet_size);
-            }
+            // }
             nb_packets++;
         }
 
@@ -2715,53 +2714,54 @@ static int smpte2022_read_header(AVFormatContext *s)
 
 #define MAX_PACKET_READAHEAD ((128 * 1024) / 188)
 
-static int smpte2022_raw_read_packet(AVFormatContext *s, AVPacket *pkt)
-{
-    Smpte2022Context *ts = s->priv_data;
-    int ret, i;
-    int64_t pcr_h, next_pcr_h, pos;
-    int pcr_l, next_pcr_l;
-    uint8_t pcr_buf[12];
-    const uint8_t *data;
 
-    if (av_new_packet(pkt, TS_PACKET_SIZE) < 0)
-        return AVERROR(ENOMEM);
-    ret = read_packet(s, pkt->data, ts->raw_packet_size, &data);
-    pkt->pos = avio_tell(s->pb);
-    if (ret < 0) {
-        av_packet_unref(pkt);
-        return ret;
-    }
-    if (data != pkt->data)
-        memcpy(pkt->data, data, ts->raw_packet_size);
-    finished_reading_packet(s, ts->raw_packet_size);
-    if (ts->mpeg2ts_compute_pcr) {
-        /* compute exact PCR for each packet */
-        if (parse_pcr(&pcr_h, &pcr_l, pkt->data) == 0) {
-            /* we read the next PCR (XXX: optimize it by using a bigger buffer */
-            pos = avio_tell(s->pb);
-            for (i = 0; i < MAX_PACKET_READAHEAD; i++) {
-                avio_seek(s->pb, pos + i * ts->raw_packet_size, SEEK_SET);
-                avio_read(s->pb, pcr_buf, 12);
-                if (parse_pcr(&next_pcr_h, &next_pcr_l, pcr_buf) == 0) {
-                    /* XXX: not precise enough */
-                    ts->pcr_incr =
-                        ((next_pcr_h - pcr_h) * 300 + (next_pcr_l - pcr_l)) /
-                        (i + 1);
-                    break;
-                }
-            }
-            avio_seek(s->pb, pos, SEEK_SET);
-            /* no next PCR found: we use previous increment */
-            ts->cur_pcr = pcr_h * 300 + pcr_l;
-        }
-        pkt->pts      = ts->cur_pcr;
-        pkt->duration = ts->pcr_incr;
-        ts->cur_pcr  += ts->pcr_incr;
-    }
-    pkt->stream_index = 0;
-    return 0;
-}
+// static int smpte2022_raw_read_packet(AVFormatContext *s, AVPacket *pkt)
+// {
+//     Smpte2022Context *ts = s->priv_data;
+//     int ret, i;
+//     int64_t pcr_h, next_pcr_h, pos;
+//     int pcr_l, next_pcr_l;
+//     uint8_t pcr_buf[12];
+//     const uint8_t *data;
+
+//     if (av_new_packet(pkt, TS_PACKET_SIZE) < 0)
+//         return AVERROR(ENOMEM);
+//     ret = read_packet(s, pkt->data, ts->raw_packet_size, &data);
+//     pkt->pos = avio_tell(s->pb);
+//     if (ret < 0) {
+//         av_packet_unref(pkt);
+//         return ret;
+//     }
+//     if (data != pkt->data)
+//         memcpy(pkt->data, data, ts->raw_packet_size);
+//     finished_reading_packet(s, ts->raw_packet_size);
+//     if (ts->mpeg2ts_compute_pcr) {
+//         /* compute exact PCR for each packet */
+//         if (parse_pcr(&pcr_h, &pcr_l, pkt->data) == 0) {
+//             /* we read the next PCR (XXX: optimize it by using a bigger buffer */
+//             pos = avio_tell(s->pb);
+//             for (i = 0; i < MAX_PACKET_READAHEAD; i++) {
+//                 avio_seek(s->pb, pos + i * ts->raw_packet_size, SEEK_SET);
+//                 avio_read(s->pb, pcr_buf, 12);
+//                 if (parse_pcr(&next_pcr_h, &next_pcr_l, pcr_buf) == 0) {
+//                     /* XXX: not precise enough */
+//                     ts->pcr_incr =
+//                         ((next_pcr_h - pcr_h) * 300 + (next_pcr_l - pcr_l)) /
+//                         (i + 1);
+//                     break;
+//                 }
+//             }
+//             avio_seek(s->pb, pos, SEEK_SET);
+//             /* no next PCR found: we use previous increment */
+//             ts->cur_pcr = pcr_h * 300 + pcr_l;
+//         }
+//         pkt->pts      = ts->cur_pcr;
+//         pkt->duration = ts->pcr_incr;
+//         ts->cur_pcr  += ts->pcr_incr;
+//     }
+//     pkt->stream_index = 0;
+//     return 0;
+// }
 
 static int smpte2022_read_packet(AVFormatContext *s, AVPacket *pkt)
 {
@@ -2811,6 +2811,7 @@ static int smpte2022_read_close(AVFormatContext *s)
     return 0;
 }
 
+/*
 static av_unused int64_t smpte2022_get_pcr(AVFormatContext *s, int stream_index,
                               int64_t *ppos, int64_t pos_limit)
 {
@@ -2844,6 +2845,7 @@ static av_unused int64_t smpte2022_get_pcr(AVFormatContext *s, int stream_index,
 
     return AV_NOPTS_VALUE;
 }
+*/
 
 static int64_t smpte2022_get_dts(AVFormatContext *s, int stream_index,
                               int64_t *ppos, int64_t pos_limit)
@@ -2893,8 +2895,8 @@ Smpte2022Context *avpriv_smpte2022_parse_open(AVFormatContext *s)
     ts->raw_packet_size = TS_PACKET_SIZE;
     ts->stream = s;
     ts->auto_guess = 1;
-    smpte2022_open_section_filter(ts, SDT_PID, sdt_cb, ts, 1);
-    smpte2022_open_section_filter(ts, PAT_PID, pat_cb, ts, 1);
+    // smpte2022_open_section_filter(ts, SDT_PID, sdt_cb, ts, 1);
+    // smpte2022_open_section_filter(ts, PAT_PID, pat_cb, ts, 1);
 
     return ts;
 }
