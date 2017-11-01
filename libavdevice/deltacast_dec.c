@@ -49,7 +49,11 @@ struct deltacast_ctx {
     int v_channelIndex;
 
     /* Afd Slot AR Code */   
-    int afd_ARCode;
+	int afd_ARCode;
+	
+	/* Closed Caption Buffer Info */
+	BYTE  *cc_buffer;
+	ULONG cc_buffer_size;
 };
 
 static int alloc_packet_side_data_from_buffer(AVPacket *packet, BYTE  *buffer, ULONG buffer_size) {
@@ -274,7 +278,11 @@ static int deltacast_read_header(AVFormatContext *avctx) {
     struct deltacast_ctx *ctx = (struct deltacast_ctx *) avctx->priv_data;
 
     // set AFD code to uninitialized value
-    ctx->afd_ARCode = -1;
+	ctx->afd_ARCode = -1;
+	
+	// set closed caption buffer info
+	ctx->cc_buffer = malloc(MAX_CC_DATA_SIZE);
+	ctx->cc_buffer_size = 0;
 
 	int status =  start_stream(ctx);
 	if (status == 0) {
@@ -378,40 +386,23 @@ static int deltacast_read_close(AVFormatContext *avctx) {
 	return status;
 }
 
-static int read_cc_data(struct deltacast_ctx* ctx, AVPacket *pkt) {
+static int read_cc_data(struct deltacast_ctx* ctx) {
     ULONG result;
     VHD_CC_SLOT CCSlot;
-    int err = 0;
 
     /* Set CC line */
     memset(&CCSlot, 0, sizeof(VHD_CC_SLOT));
     CCSlot.CCInfo.CCType = VHD_CC_EIA_708;
 
-    /* Try to lock next slot */
-    result = VHD_LockSlotHandle(ctx->StreamHandleANC, &ctx->SlotHandle);
-    if (result == VHDERR_NOERROR) {
-        /* Extract WSS Slot */
-        result = VHD_SlotExtractClosedCaptions(ctx->SlotHandle, &CCSlot);
-        if (result == VHDERR_NOERROR) {
-            err = alloc_packet_side_data_from_buffer(pkt, CCSlot.CCData.pData, CCSlot.CCData.DataSize);
-            if (err) {
-                printf("Error on create cc side data\n");
-                result = VHDERR_OPERATIONFAILED;
-			} else {
-                //set flags in the packet
-			}
-        }
-        else {
-            printf("ERROR : Cannot extract closed captions. Result = 0x%08X (%s)\n",result, GetErrorDescription(result));
-        }
-        VHD_UnlockSlotHandle(ctx->SlotHandle);
-    }
-    else if (result != VHDERR_TIMEOUT) {
-        printf("\nERROR : Cannot lock slot on RX0 stream. Result = 0x%08X (%s)\n",result, GetErrorDescription(result));
-    }
-    else {
-        printf("\nERROR : Timeout");
-    }
+	/* Extract WSS Slot */
+	result = VHD_SlotExtractClosedCaptions(ctx->SlotHandle, &CCSlot);
+	if (result == VHDERR_NOERROR) {
+		memcpy(ctx->cc_buffer, CCSlot.CCData.pData, CCSlot.CCData.DataSize);
+		ctx->cc_buffer_size = CCSlot.CCData.DataSize;
+	}
+	else {
+		printf("ERROR : Cannot extract closed captions. Result = 0x%08X (%s)\n",result, GetErrorDescription(result));
+	}
 
     return result;
 }
@@ -468,7 +459,17 @@ static int read_video_data(struct deltacast_ctx* ctx, AVPacket *pkt) {
 
     // Fill video packet side data with Closed Captions data
     if (result == VHDERR_NOERROR) {
-        result += read_cc_data(ctx, pkt);
+		if (ctx->cc_buffer_size > 0) {
+			err = alloc_packet_side_data_from_buffer(pkt, ctx->cc_buffer, ctx->cc_buffer_size);
+			memset(ctx->cc_buffer, 0, MAX_CC_DATA_SIZE);
+			ctx->cc_buffer_size = 0;
+		}
+		if (err) {
+			printf("Error on create cc side data\n");
+			result = VHDERR_OPERATIONFAILED;
+		} else {
+			//set flags in the packet
+		}
     }
 
     return result;
@@ -502,7 +503,10 @@ static int read_audio_data(struct deltacast_ctx* ctx, AVPacket *pkt) {
         AudioBufferSize = ((VHD_AUDIOCHANNEL**)ctx->pAudioChn)[0]->DataSize;
 
         /* Extract AFD metadata */
-        read_afd_flag(ctx);
+		read_afd_flag(ctx);
+		
+		/* Extract CC data */
+		read_cc_data(ctx);
 
         /* Extract Audio */
         result = VHD_SlotExtractAudio(ctx->SlotHandle, (VHD_AUDIOINFO*)ctx->AudioInfo);
@@ -529,11 +533,11 @@ static int read_audio_data(struct deltacast_ctx* ctx, AVPacket *pkt) {
         VHD_GetStreamProperty(ctx->StreamHandleANC, VHD_CORE_SP_SLOTS_DROPPED, &ctx->audDropped);
 		//pkt->pts = ctx->audFrameCount;
 		if (ctx->interlaced)
-			pkt->pts = 2 * ctx->frameCount * 
+			pkt->pts = 2 * ctx->audFrameCount * 
 					((float)ctx->video_st->time_base.den / (float)ctx->video_st->time_base.num) * 
 					((float)ctx->video_st->avg_frame_rate.den / (float)ctx->video_st->avg_frame_rate.num);
 		else
-			pkt->pts = ctx->frameCount * 
+			pkt->pts = ctx->audFrameCount * 
 					((float)ctx->video_st->time_base.den / (float)ctx->video_st->time_base.num) * 
 					((float)ctx->video_st->avg_frame_rate.den / (float)ctx->video_st->avg_frame_rate.num);
         // reset channel to max audio buffer size
@@ -555,14 +559,15 @@ static int deltacast_read_packet(AVFormatContext *avctx, AVPacket *pkt) {
 
     // choose to read video or audio data depending on the current pts of each media type
     // i.e. make video packets have higher priority than audio packets for the current
-    // pts value. 
-    if (ctx->frameCount <= ctx->audFrameCount) {
-        pkt->stream_index = ctx->video_st->index;
-        result = read_video_data(ctx, pkt);
+	// pts value. 
+	// Reading audio frames first as it contains the CC data for the next video frame
+    if (ctx->audFrameCount <= ctx->frameCount) {
+		pkt->stream_index = ctx->audio_st->index;
+        result = read_audio_data(ctx, pkt);		
     }
     else {
-        pkt->stream_index = ctx->audio_st->index;
-        result = read_audio_data(ctx, pkt);
+        pkt->stream_index = ctx->video_st->index;
+        result = read_video_data(ctx, pkt);
     }
 
 	return result;
