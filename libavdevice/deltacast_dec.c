@@ -320,8 +320,8 @@ static int deltacast_read_header(AVFormatContext *avctx) {
         a_stream->codecpar->sample_rate = 48000;
         ctx->channels = 2; // TODO-Mitch: Hardcode temp., can be specified by user?
 		a_stream->codecpar->channels    = ctx->channels;
-		v_stream->time_base.num = 1;
-		v_stream->time_base.den = 90000;
+		a_stream->time_base.num = 1;
+		a_stream->time_base.den = 90000;
         ctx->audio_st = a_stream;
 
         // initialize deltacast ctx VHD_AUDIOINFO struct
