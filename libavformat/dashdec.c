@@ -1337,7 +1337,7 @@ static int parse_mainifest(AVFormatContext *s, const char *url, AVIOContext *in)
 cleanup:
         /*free the document */
         xmlFreeDoc(doc);
-        xmlCleanupParser();
+        // xmlCleanupParser();
 
     } else {
         av_log(s, AV_LOG_ERROR, "Unable to read to offset '%s'\n", url);
@@ -2482,6 +2482,7 @@ static int dash_close(AVFormatContext *s)
     av_freep(&c->user_agent);
     av_dict_free(&c->avio_opts);
     av_freep(&c->base_url);
+    xmlCleanupParser();
     return 0;
 }
     
