@@ -892,16 +892,7 @@ static int parse_playlist(HLSContext *c, const char *url,
                     seg->url_offset = 0;
                     seg_offset = 0;
                 }
-
-                // Actual Segment Size
-                URLContext* urlCtx;
-                //int ret = ffurl_alloc(&urlCtx, "", 0, 0);
-                if (ffurl_open(&urlCtx, seg->url, 0, 0, NULL) >= 0)
-                    seg->actual_size = ffurl_seek(urlCtx, 0, AVSEEK_SIZE);
-                else
-                    seg->actual_size = -1;
-                ffurl_close(urlCtx);
-                //av_log(NULL, AV_LOG_INFO, "Segment: url: %s,  size = %d / %d\n", seg->url, seg->size, seg->actual_size);
+                seg->actual_size = -1;
 
                 seg->init_section = cur_init_section;
             }
@@ -1325,6 +1316,11 @@ static int read_data(void *opaque, uint8_t *buf, int buf_size)
     if(v->input) {
         interal = (struct AVIOInternal*)v->input->opaque;
         urlc = (URLContext*)interal->h;
+        struct segment *seg = current_segment(v);
+        // Get actual segment size 
+        if (seg->actual_size == -1) {
+            seg->actual_size = ffurl_seek(urlc, 0, AVSEEK_SIZE);
+        }
         v->mpegts_parser_input_backup = urlc->mpegts_parser_injection;
         v->mpegts_parser_input_context_backup = urlc->mpegts_parser_injection_context;
     }
