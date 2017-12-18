@@ -12,6 +12,8 @@
 
 #define CLOCK_SYSTEM    VHD_CLOCKDIV_1001
 
+const ULONG MOCK_TIME_BASE = 1000;
+
 struct deltacast_ctx {
     AVClass *class;
     /* Deltacast SDK interfaces */
@@ -303,8 +305,10 @@ static int deltacast_read_header(AVFormatContext *avctx) {
 		v_stream->codecpar->codec_id    = AV_CODEC_ID_RAWVIDEO;
 		v_stream->codecpar->format      = AV_PIX_FMT_UYVY422;
 		v_stream->codecpar->codec_tag   = MKTAG('U', 'Y', 'V', 'Y');
-		v_stream->time_base.num = 1;
-		v_stream->time_base.den = 90000;
+        // Choose a time base which will cancel out with frame rate. This results in a
+        // PTS duration of MOCK_TIME_BASE.
+        v_stream->time_base.num = v_stream->avg_frame_rate.den; // 1
+        v_stream->time_base.den = MOCK_TIME_BASE * v_stream->avg_frame_rate.num; // 90000
         ctx->video_st=v_stream;
 
         /* #### create audio stream #### */
@@ -320,8 +324,8 @@ static int deltacast_read_header(AVFormatContext *avctx) {
         a_stream->codecpar->sample_rate = 48000;
         ctx->channels = 2; // TODO-Mitch: Hardcode temp., can be specified by user?
 		a_stream->codecpar->channels    = ctx->channels;
-		a_stream->time_base.num = 1;
-		a_stream->time_base.den = 90000;
+        a_stream->time_base.num = v_stream->avg_frame_rate.den; // 1
+        a_stream->time_base.den = MOCK_TIME_BASE * v_stream->avg_frame_rate.num; // 90000
         ctx->audio_st = a_stream;
 
         // initialize deltacast ctx VHD_AUDIOINFO struct
@@ -441,14 +445,14 @@ static int read_video_data(struct deltacast_ctx* ctx, AVPacket *pkt) {
 		VHD_UnlockSlotHandle(ctx->SlotHandle); // AB
 		VHD_GetStreamProperty(ctx->StreamHandle, VHD_CORE_SP_SLOTS_COUNT, &ctx->frameCount);
 		VHD_GetStreamProperty(ctx->StreamHandle, VHD_CORE_SP_SLOTS_DROPPED, &ctx->dropped);
-		if (ctx->interlaced)
-			pkt->pts = 2 * ctx->frameCount * 
-					((float)ctx->video_st->time_base.den / (float)ctx->video_st->time_base.num) * 
-					((float)ctx->video_st->avg_frame_rate.den / (float)ctx->video_st->avg_frame_rate.num);
-		else
-			pkt->pts = ctx->frameCount * 
-					((float)ctx->video_st->time_base.den / (float)ctx->video_st->time_base.num) * 
-					((float)ctx->video_st->avg_frame_rate.den / (float)ctx->video_st->avg_frame_rate.num);
+        // Since we control the creation of the PTS, we multiply the frame count by an
+        // arbitrary number MOCK_TIME_BASE. This allows for PTS values of whole integers.
+        // note: MOCK_TIME_BASE is made large to ensure good precision handling for 
+        // ffmpeg's frame->pkt_duration calculation.
+        if (ctx->interlaced)
+            pkt->pts = 2 * ctx->frameCount * MOCK_TIME_BASE;
+        else
+            pkt->pts = ctx->frameCount * MOCK_TIME_BASE;
 	} else if (result != VHDERR_TIMEOUT) {
 		printf("\nERROR : Timeout. Result = 0x%08X (%s)\n", result, GetErrorDescription(result));
    		//cannot lock the stream
@@ -532,14 +536,11 @@ static int read_audio_data(struct deltacast_ctx* ctx, AVPacket *pkt) {
         VHD_GetStreamProperty(ctx->StreamHandleANC, VHD_CORE_SP_SLOTS_COUNT, &ctx->audFrameCount);
         VHD_GetStreamProperty(ctx->StreamHandleANC, VHD_CORE_SP_SLOTS_DROPPED, &ctx->audDropped);
 		//pkt->pts = ctx->audFrameCount;
-		if (ctx->interlaced)
-			pkt->pts = 2 * ctx->audFrameCount * 
-					((float)ctx->video_st->time_base.den / (float)ctx->video_st->time_base.num) * 
-					((float)ctx->video_st->avg_frame_rate.den / (float)ctx->video_st->avg_frame_rate.num);
-		else
-			pkt->pts = ctx->audFrameCount * 
-					((float)ctx->video_st->time_base.den / (float)ctx->video_st->time_base.num) * 
-					((float)ctx->video_st->avg_frame_rate.den / (float)ctx->video_st->avg_frame_rate.num);
+        // See read_video_data(..) for details regarding PTS calculations.
+        if (ctx->interlaced)
+            pkt->pts = 2 * ctx->audFrameCount * MOCK_TIME_BASE;
+        else
+            pkt->pts = ctx->audFrameCount * MOCK_TIME_BASE;
         // reset channel to max audio buffer size
         ((VHD_AUDIOCHANNEL**)ctx->pAudioChn)[0]->DataSize = AudioBufferSize;
     }
