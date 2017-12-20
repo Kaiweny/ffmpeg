@@ -300,7 +300,12 @@ static int deltacast_read_header(AVFormatContext *avctx) {
 		//v_stream->time_base.den      = ctx->bmd_tb_den;
 		//v_stream->time_base.num      = ctx->bmd_tb_num;
 		v_stream->avg_frame_rate.den  = 1000 + ctx->ClockSystem;
-		v_stream->avg_frame_rate.num  = GetFPS(ctx->VideoStandard)*1000;
+        if (ctx->interlaced) {
+            v_stream->avg_frame_rate.num  = GetFPS(ctx->VideoStandard) * 1000 / 2;
+        }
+        else {
+            v_stream->avg_frame_rate.num  = GetFPS(ctx->VideoStandard) * 1000;
+        }
 		//v_stream->codecpar->bit_rate    = av_image_get_buffer_size((AVPixelFormat)st->codecpar->format, ctx->bmd_width, ctx->bmd_height, 1) * 1/av_q2d(st->time_base) * 8;
 		v_stream->codecpar->codec_id    = AV_CODEC_ID_RAWVIDEO;
 		v_stream->codecpar->format      = AV_PIX_FMT_UYVY422;
@@ -449,10 +454,7 @@ static int read_video_data(struct deltacast_ctx* ctx, AVPacket *pkt) {
         // arbitrary number MOCK_TIME_BASE. This allows for PTS values of whole integers.
         // note: MOCK_TIME_BASE is made large to ensure good precision handling for 
         // ffmpeg's frame->pkt_duration calculation.
-        if (ctx->interlaced)
-            pkt->pts = 2 * ctx->frameCount * MOCK_TIME_BASE;
-        else
-            pkt->pts = ctx->frameCount * MOCK_TIME_BASE;
+        pkt->pts = ctx->frameCount * MOCK_TIME_BASE;
 	} else if (result != VHDERR_TIMEOUT) {
 		printf("\nERROR : Timeout. Result = 0x%08X (%s)\n", result, GetErrorDescription(result));
    		//cannot lock the stream
@@ -537,10 +539,7 @@ static int read_audio_data(struct deltacast_ctx* ctx, AVPacket *pkt) {
         VHD_GetStreamProperty(ctx->StreamHandleANC, VHD_CORE_SP_SLOTS_DROPPED, &ctx->audDropped);
 		//pkt->pts = ctx->audFrameCount;
         // See read_video_data(..) for details regarding PTS calculations.
-        if (ctx->interlaced)
-            pkt->pts = 2 * ctx->audFrameCount * MOCK_TIME_BASE;
-        else
-            pkt->pts = ctx->audFrameCount * MOCK_TIME_BASE;
+        pkt->pts = ctx->audFrameCount * MOCK_TIME_BASE;
         // reset channel to max audio buffer size
         ((VHD_AUDIOCHANNEL**)ctx->pAudioChn)[0]->DataSize = AudioBufferSize;
     }
