@@ -9,7 +9,7 @@
 #define CCX_708_MAX_PACKET_LENGTH 128 //According to EIA-708B, part 5
 #define CC_708_MAX_SERVICES 63
 
-#define CCX_708_MAX_ROWS 15
+#define CCX_708_MAX_ROWS 16
 
 #define CCX_708_MAX_COLUMNS (32*2)
 
