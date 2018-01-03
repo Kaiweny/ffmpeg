@@ -1675,16 +1675,18 @@ static void cc_708_process_current_data(cc_708_ctx *cc708ctx) {
 		}
 
 		if (service_number > 0 ) {
-			cc708ctx->fsd->svcs_dp_708.service_number[service_number - 1] = service_number;
+			int service_number_index = service_number - 1;
+			cc708ctx->cur_service_number = service_number_index;
+			cc708ctx->fsd->svcs_dp_708.service_number[service_number_index] = service_number;
 			
-			(&cc708ctx->fsd->svcs_dp_708.svc_dps[service_number - 1])->svc_type = (SVC_TYPE)service_number;
-			cc708ctx->services_active[service_number - 1] = 1;
+			(&cc708ctx->fsd->svcs_dp_708.svc_dps[service_number_index])->svc_type = (SVC_TYPE)service_number;
+			cc708ctx->services_active[service_number_index] = 1;
 			
-			if(cc708ctx->decoders[service_number - 1] == NULL){
-				cc708ctx->decoders[service_number - 1] = (cc_708_service_decoder*)malloc(sizeof(cc_708_service_decoder));
+			if(cc708ctx->decoders[service_number_index] == NULL){
+				cc708ctx->decoders[service_number_index] = (cc_708_service_decoder*)malloc(sizeof(cc_708_service_decoder));
 
 				// init this decoder
-				cc_708_service_decoder* decoder = cc708ctx->decoders[service_number - 1];
+				cc_708_service_decoder* decoder = cc708ctx->decoders[service_number_index];
 				decoder->cc_count = 0;
 
 				for (int j = 0; j < CC_708_MAX_WINDOWS; j++)
@@ -1694,7 +1696,7 @@ static void cc_708_process_current_data(cc_708_ctx *cc708ctx) {
 			}
 
 			cc_708_process_service_block(cc708ctx,
-				cc708ctx->decoders[service_number - 1], pos, block_length);
+				cc708ctx->decoders[service_number_index], pos, block_length);
 
 		}
 		pos += block_length; // Skip data
