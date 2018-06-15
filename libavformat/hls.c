@@ -221,17 +221,26 @@ typedef struct HLSContext {
     char *allowed_extensions;
 } HLSContext;
 
-// Compares low-level m3u8 filenames (not including path but including extension) to check if user selected this variant
 static int is_selected(const char * current_variant_url, const char *selected_variant_url)
 {
-    char *current_variant_filename = av_basename(current_variant_url);
-    int str_len = strlen(current_variant_filename);
-    char *selected_variant_filename = av_basename(selected_variant_url);
-    int suffix_len = strlen(selected_variant_filename);
+    // selected_variant_url is expected to be a full url.
+    // current_variant_url can be anything.
+    // So check if current_variant_url matches the end of selected_variant_url
 
-    return 
-        (str_len >= suffix_len) &&
-        (0 == strcmp(current_variant_filename + (str_len-suffix_len), selected_variant_filename));
+    if (!selected_variant_url) {
+        // if no selected_variant_url specified, select all
+        return 1;
+    }
+
+    if (!current_variant_url) {
+        return 0;
+    }
+    size_t lenstr = strlen(selected_variant_url);
+    size_t lensuffix = strlen(current_variant_url);
+    if (lensuffix > lenstr) {
+        return 0;
+    }
+    return strncmp(selected_variant_url + lenstr - lensuffix, current_variant_url, lensuffix) == 0;
 }
 
 static int read_chomp_line(AVIOContext *s, char *buf, int maxlen)
@@ -2225,7 +2234,7 @@ static const AVOption hls_options[] = {
         OFFSET(allowed_extensions), AV_OPT_TYPE_STRING,
         {.str = "3gp,aac,avi,flac,mkv,m3u8,m4a,m4s,m4v,mpg,mov,mp2,mp3,mp4,mpeg,mpegts,ogg,ogv,oga,ts,vob,wav"},
         INT_MIN, INT_MAX, FLAGS},
-    {"selected_variant_id", "selected low-level manifests (variants)", 
+    {"selected_variant_id", "selected low-level manifests (variants). It has to be a full url.", 
         OFFSET(selected_variant_id), AV_OPT_TYPE_STRING, 
         {.str = ""}, INT_MIN, INT_MAX, FLAGS},
     {NULL}
