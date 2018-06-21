@@ -34,19 +34,6 @@ typedef struct {
     int w, h;
 } DNXHDParserContext;
 
-static int dnxhd_get_hr_frame_size(int cid, int w, int h)
-{
-    int result, i = ff_dnxhd_get_cid_table(cid);
-
-    if (i < 0)
-        return i;
-
-    result = ((h + 15) / 16) * ((w + 15) / 16) * ff_dnxhd_cid_table[i].packet_scale.num / ff_dnxhd_cid_table[i].packet_scale.den;
-    result = (result + 2048) / 4096 * 4096;
-
-    return FFMAX(result, 8192);
-}
-
 static int dnxhd_find_frame_end(DNXHDParserContext *dctx,
                                 const uint8_t *buf, int buf_size)
 {
@@ -81,16 +68,18 @@ static int dnxhd_find_frame_end(DNXHDParserContext *dctx,
                 dctx->w = (state >> 32) & 0xFFFF;
             } else if (dctx->cur_byte == 42) {
                 int cid = (state >> 32) & 0xFFFFFFFF;
+                int remaining;
 
                 if (cid <= 0)
                     continue;
 
-                dctx->remaining = avpriv_dnxhd_get_frame_size(cid);
-                if (dctx->remaining <= 0) {
-                    dctx->remaining = dnxhd_get_hr_frame_size(cid, dctx->w, dctx->h);
-                    if (dctx->remaining <= 0)
-                        return dctx->remaining;
+                remaining = avpriv_dnxhd_get_frame_size(cid);
+                if (remaining <= 0) {
+                    remaining = ff_dnxhd_get_hr_frame_size(cid, dctx->w, dctx->h);
+                    if (remaining <= 0)
+                        continue;
                 }
+                dctx->remaining = remaining;
                 if (buf_size - i + 47 >= dctx->remaining) {
                     int remaining = dctx->remaining;
 

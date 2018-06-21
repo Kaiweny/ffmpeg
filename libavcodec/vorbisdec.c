@@ -731,7 +731,7 @@ static int vorbis_parse_setup_hdr_residues(vorbis_context *vc)
         if (!res_setup->classifs)
             return AVERROR(ENOMEM);
 
-        ff_dlog(NULL, "    begin %"PRIu32" end %"PRIu32" part.size %d classif.s %d classbook %d \n",
+        ff_dlog(NULL, "    begin %"PRIu32" end %"PRIu32" part.size %u classif.s %"PRIu8" classbook %"PRIu8"\n",
                 res_setup->begin, res_setup->end, res_setup->partition_size,
                 res_setup->classifications, res_setup->classbook);
 
@@ -1862,6 +1862,7 @@ AVCodec ff_vorbis_decoder = {
     .decode          = vorbis_decode_frame,
     .flush           = vorbis_decode_flush,
     .capabilities    = AV_CODEC_CAP_DR1,
+    .caps_internal   = FF_CODEC_CAP_INIT_CLEANUP,
     .channel_layouts = ff_vorbis_channel_layouts,
     .sample_fmts     = (const enum AVSampleFormat[]) { AV_SAMPLE_FMT_FLTP,
                                                        AV_SAMPLE_FMT_NONE },
