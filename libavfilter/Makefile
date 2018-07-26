@@ -24,6 +24,7 @@ OBJS = allfilters.o                                                     \
        opencl_allkernels.o                                              \
        transform.o                                                      \
        video.o                                                          \
+       lavfutils.o                                                      \
 
 OBJS-$(HAVE_THREADS)                         += pthread.o
 
