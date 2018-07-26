@@ -22,15 +22,45 @@
 #include "avformat.h"
 #include "internal.h"
 #include "pcm.h"
+#include "avio.h"
+#include "avio_internal.h"
+#include "spdif.h"
 #include "libavutil/log.h"
 #include "libavutil/opt.h"
 #include "libavutil/avassert.h"
 
-typedef struct PCMAudioDemuxerContext {
-    AVClass *class;
-    int sample_rate;
-    int channels;
-} PCMAudioDemuxerContext;
+static void set_spdif(AVFormatContext *s, PCMAudioDemuxerContext *pcm)
+{
+    if (CONFIG_SPDIF_DEMUXER && s->streams[0]->codecpar->codec_tag == 1) {
+        av_log(s, AV_LOG_ERROR, "Checking for SPDIF\n");
+        enum AVCodecID codec;
+        int len = 1<<16;
+        int ret = ffio_ensure_seekback(s->pb, len);
+
+        if (ret >= 0) {
+            uint8_t *buf = av_malloc(len);
+            if (!buf) {
+                ret = AVERROR(ENOMEM);
+            } else {
+                int64_t pos = avio_tell(s->pb);
+                len = ret = avio_read(s->pb, buf, len);
+                if (len >= 0) {
+                    ret = ff_spdif_probe(buf, len, &codec);
+                    if (ret > AVPROBE_SCORE_EXTENSION) {
+                        av_log(s, AV_LOG_ERROR, "Found codec %d\n", codec);
+                        s->streams[0]->codecpar->codec_id = codec;
+                        pcm->spdif = 1;
+                    }
+                }
+                avio_seek(s->pb, pos, SEEK_SET);
+                av_free(buf);
+            }
+        }
+
+        if (ret < 0)
+            av_log(s, AV_LOG_WARNING, "Cannot check for SPDIF\n");
+    }
+}
 
 static int pcm_read_header(AVFormatContext *s)
 {
@@ -95,6 +125,9 @@ static int pcm_read_header(AVFormatContext *s)
         st->codecpar->bits_per_coded_sample * st->codecpar->channels / 8;
 
     avpriv_set_pts_info(st, 64, 1, st->codecpar->sample_rate);
+
+    set_spdif(s, s1);
+
     return 0;
 }
 

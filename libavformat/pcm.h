@@ -24,6 +24,13 @@
 
 #include "avformat.h"
 
+typedef struct PCMAudioDemuxerContext {
+    AVClass *class;
+    int sample_rate;
+    int channels;
+    int spdif;
+} PCMAudioDemuxerContext;
+
 int ff_pcm_read_packet(AVFormatContext *s, AVPacket *pkt);
 int ff_pcm_read_seek(AVFormatContext *s,
                      int stream_index, int64_t timestamp, int flags);

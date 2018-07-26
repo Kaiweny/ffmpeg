@@ -245,7 +245,7 @@ static av_cold int pcm_decode_init(AVCodecContext *avctx)
     int i;
 
     if (avctx->channels <= 0) {
-        av_log(avctx, AV_LOG_ERROR, "PCM channels out of bounds\n");
+        av_log(avctx, AV_LOG_ERROR, "PCM channels out of bounds - %d\n", avctx->channels);
         return AVERROR(EINVAL);
     }
 

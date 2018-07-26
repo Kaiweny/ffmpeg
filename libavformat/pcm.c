@@ -21,8 +21,11 @@
 
 #include "libavutil/mathematics.h"
 #include "avformat.h"
+#include "avio.h"
+#include "avio_internal.h"
 #include "internal.h"
 #include "pcm.h"
+#include "spdif.h"
 
 #define RAW_SAMPLES     1024
 
@@ -30,6 +33,12 @@ int ff_pcm_read_packet(AVFormatContext *s, AVPacket *pkt)
 {
     AVCodecParameters *par = s->streams[0]->codecpar;
     int ret, size;
+    PCMAudioDemuxerContext *pcm = s->priv_data;
+
+    if (CONFIG_SPDIF_DEMUXER && pcm->spdif == 1) {
+        av_log(s, AV_LOG_ERROR, "Reading from SPDIF\n");
+        return ff_spdif_read_packet(s, pkt);
+    }
 
     if (par->block_align <= 0)
         return AVERROR(EINVAL);
