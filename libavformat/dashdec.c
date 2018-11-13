@@ -897,6 +897,10 @@ static int parse_manifest_representation(AVFormatContext *s, const char *url,
     char *rep_id_val = xmlGetProp(representation_node, "id");
     char *rep_bandwidth_val = xmlGetProp(representation_node, "bandwidth");
     char *rep_framerate_val = xmlGetProp(representation_node, "frameRate");
+    char *rep_codecs_val = xmlGetProp(representation_node, "codecs");
+    char *rep_height_val = xmlGetProp(representation_node, "height");
+    char *rep_width_val = xmlGetProp(representation_node, "width");
+    char *rep_scanType_val = xmlGetProp(representation_node, "scanType");
     enum AVMediaType type = AVMEDIA_TYPE_UNKNOWN;
 
     // try get information from representation
@@ -1096,7 +1100,11 @@ static int parse_manifest_representation(AVFormatContext *s, const char *url,
             if (rep->fragment_duration > 0 && !rep->fragment_timescale)
                 rep->fragment_timescale = 1;
             rep->bandwidth = rep_bandwidth_val ? atoi(rep_bandwidth_val) : 0;
+            rep->height = rep_height_val ? atoi(rep_height_val) : 0;
+            rep->width = rep_width_val ? atoi(rep_width_val) : 0;
             strncpy(rep->id, rep_id_val ? rep_id_val : "", sizeof(rep->id));
+            strncpy(rep->codecs, rep_codecs_val ? rep_codecs_val : "", sizeof(rep->codecs));
+            strncpy(rep->scanType, rep_scanType_val ? rep_scanType_val : "", sizeof(rep->scanType));
             rep->framerate = av_make_q(0, 0);
             if (type == AVMEDIA_TYPE_VIDEO && rep_framerate_val) {
                 ret = av_parse_video_rate(&rep->framerate, rep_framerate_val);
@@ -1124,6 +1132,14 @@ end:
         xmlFree(rep_bandwidth_val);
     if (rep_framerate_val)
         xmlFree(rep_framerate_val);
+    if (rep_codecs_val)
+        xmlFree(rep_codecs_val);
+    if (rep_height_val)
+        xmlFree(rep_height_val);
+    if (rep_width_val)
+        xmlFree(rep_width_val);
+    if (rep_scanType_val)
+        xmlFree(rep_scanType_val);
 
     return ret;
 }
@@ -1605,6 +1621,49 @@ static struct fragment *get_current_fragment(struct representation *pls)
         }
     }
     if (c->is_live) {
+        // SSIMWAVE CODE
+        while (!(ff_check_interrupt(c->interrupt_callback))) {
+            int64_t min_seq_no = calc_min_seg_no(pls->parent, pls);
+            int64_t max_seq_no = calc_max_seg_no(pls, c);
+
+            if (pls->cur_seq_no < min_seq_no) {
+                if ( c->is_live && ( ( pls->timelines ) ||
+                                     ( pls->fragments )  ||
+                                     ( pls->tmp_url_type == TMP_URL_TYPE_NUMBER )
+                                   )
+                   ) {
+                    refresh_manifest(pls->parent);
+                }
+                // User picks which segment to fetch
+                if (c->live_start_index == 0 || !c->is_live)
+                    pls->cur_seq_no = calc_cur_seg_no(pls->parent, pls);
+                else if (c->live_start_index < 0)
+                    pls->cur_seq_no = pls->last_seq_no + c->live_start_index + 1;
+                else if (c->live_start_index > 0)
+                    pls->cur_seq_no = pls->first_seq_no + c->live_start_index - 1;
+            }
+            else if (pls->cur_seq_no == min_seq_no) { // Don't Refresh this case. @Shahzad for info!
+                // User picks which segment to fetch
+                if (c->live_start_index == 0 || !c->is_live)
+                    pls->cur_seq_no = calc_cur_seg_no(pls->parent, pls);
+                else if (c->live_start_index < 0)
+                    pls->cur_seq_no = pls->last_seq_no + c->live_start_index + 1;
+                else if (c->live_start_index > 0)
+                    pls->cur_seq_no = pls->first_seq_no + c->live_start_index - 1;
+            }
+            else if (pls->cur_seq_no > max_seq_no) {
+                if ( c->is_live && ( ( pls->timelines ) ||
+                                     ( pls->fragments )  ||
+                                     ( pls->tmp_url_type == TMP_URL_TYPE_NUMBER )
+                                   )
+                   ) {
+                    refresh_manifest(pls->parent);
+                }
+                continue;
+            }
+            break;
+        } // END SSIMWAVE CODE
+
         min_seq_no = calc_min_seg_no(pls->parent, pls);
         max_seq_no = calc_max_seg_no(pls, c);
 
