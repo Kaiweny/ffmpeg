@@ -18,28 +18,12 @@
  * License along with FFmpeg; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
- 
- /* Code prepared for ffmpeg 2.8.9 and then ported to ffmpeg 3.2.2
-  * At now it allow to play one selected representation for audio and video components.
-  * 
-  */
 
-// #define PRINTING // Only for temporary printfs rest should all be av_log
-#define HTTPS // If Defined we replace https in BaseURL with http @Ahmed
-
-
-/**
- * @file
- */
-
-#include "libavutil/avstring.h"
-#include "libavutil/avassert.h"
+#include <libxml/parser.h>
 #include "libavutil/intreadwrite.h"
-#include "libavutil/mathematics.h"
 #include "libavutil/opt.h"
-#include "libavutil/dict.h"
 #include "libavutil/time.h"
-#include "avformat.h"
+#include "libavutil/parseutils.h"
 #include "internal.h"
 #include "avio_internal.h"
 #include "dash.h"
@@ -110,7 +94,7 @@ struct representation {
     int stream_index;
 
     enum AVMediaType type;
-    char id[20];
+    char id[MAX_FIELD_LEN];
     int bandwidth;
     AVRational framerate;
     AVStream *assoc_stream; /* demuxer stream associated with this representation */
@@ -164,17 +148,11 @@ struct representation {
 
     int64_t first_seq_no_in_representation;
 
-    char id[MAX_FIELD_LEN];
     char codecs[MAX_FIELD_LEN];
     int height;
     int width;
-    int frameRate;
     char scanType[MAX_FIELD_LEN];
-    char mimeType[MAX_FIELD_LEN];
     char contentType[MAX_FIELD_LEN];
-    int bandwidth;
-
-    int needed;
 
     ffurl_read_callback mpegts_parser_input_backup;
     void* mpegts_parser_input_context_backup;
@@ -217,7 +195,14 @@ typedef struct DASHContext {
     uint64_t period_duration;
     uint64_t period_start;
 
+// SSIMWAVE ADDITIONS
+    uint32_t max_segment_duration;
+    char *video_rep_id;
+    char *audio_rep_id;
+    int live_start_index;
+// END SSIMWAVE ADDITIONS
     int is_live;
+
     AVIOInterruptCB *interrupt_callback;
     char *allowed_extensions;
     AVDictionary *avio_opts;
@@ -415,16 +400,6 @@ static void free_timelines_list(struct representation *pls)
     }
     av_freep(&pls->timelines);
     pls->n_timelines = 0;
-}
-
-/*
- * Used to reset a statically allocated AVPacket to a clean slate,
- * containing no data.
- */
-static void reset_packet(AVPacket *pkt)
-{
-    av_init_packet(pkt);
-    pkt->data = NULL;
 }
 
 static void free_representation(struct representation *pls)
@@ -1328,6 +1303,8 @@ static int parse_manifest(AVFormatContext *s, const char *url, AVIOContext *in)
             } else if (!av_strcasecmp(attr->name, (const char *)"mediaPresentationDuration")) {
                 c->media_presentation_duration = get_duration_insec(s, (const char *)val);
                 av_log(s, AV_LOG_TRACE, "c->media_presentation_duration = [%"PRId64"]\n", c->media_presentation_duration);
+            } else if (!av_strcasecmp(attr->name, (const char *)"maxSegmentDuration")) {
+                c->max_segment_duration = get_duration_insec(s, (const char *)val);
             }
             attr = attr->next;
             xmlFree(val);
@@ -1694,6 +1671,7 @@ static int open_input(DASHContext *c, struct representation *pls, struct fragmen
     AVDictionary *opts = NULL;
     char *url = NULL;
     int ret = 0;
+    URLContext* urlCtx;
 
     url = av_mallocz(c->max_url_size);
     if (!url) {
@@ -1710,13 +1688,12 @@ static int open_input(DASHContext *c, struct representation *pls, struct fragmen
     ff_make_absolute_url(url, MAX_URL_SIZE, c->base_url, seg->url);
 
     // Calculating Segment Size (in Bytes). Using ffurl_seek is much faster than avio_size
-    URLContext* urlCtx;
     if (ffurl_open(&urlCtx, url, 0, 0, NULL) >= 0)
         seg->size = ffurl_seek(urlCtx, 0, AVSEEK_SIZE);
     else
         seg->size = -1;
     ffurl_close(urlCtx);
-    av_log(NULL, AV_LOG_DEBUG, "Seg: url: %s,  size = %d\n", url, seg->size);
+    av_log(NULL, AV_LOG_DEBUG, "Seg: url: %s,  size = %"PRId64"\n", url, seg->size);
 
     av_log(pls->parent, AV_LOG_VERBOSE, "DASH request for url '%s', offset %"PRId64", playlist %d\n",
            url, seg->url_offset, pls->rep_idx);
@@ -1867,9 +1844,9 @@ restart:
 end:
 
     // replace mpegts parser callback mechanism
-    if(interal && urlc && v->input) {
-        interal = (struct AVIOInternal*)v->input->opaque;
-        urlc = (URLContext*)interal->h;
+    if(internal && urlc && v->input) {
+        internal = (struct AVIOInternal*)v->input->opaque;
+        urlc = (URLContext*)internal->h;
         urlc->mpegts_parser_injection = v->mpegts_parser_input_backup;
         urlc->mpegts_parser_injection_context = v->mpegts_parser_input_context_backup;
     }
