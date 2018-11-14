@@ -151,12 +151,11 @@ struct representation {
     char codecs[MAX_FIELD_LEN];
     int height;
     int width;
-    char scanType[MAX_FIELD_LEN];
-    char contentType[MAX_FIELD_LEN];
+    char scan_type[MAX_FIELD_LEN];
+    char mime_type[MAX_FIELD_LEN];
 
     ffurl_read_callback mpegts_parser_input_backup;
     void* mpegts_parser_input_context_backup;
-
 };
 
 typedef struct DASHContext {
@@ -197,8 +196,6 @@ typedef struct DASHContext {
 
 // SSIMWAVE ADDITIONS
     uint32_t max_segment_duration;
-    char *video_rep_id;
-    char *audio_rep_id;
     int live_start_index;
 // END SSIMWAVE ADDITIONS
     int is_live;
@@ -206,8 +203,6 @@ typedef struct DASHContext {
     AVIOInterruptCB *interrupt_callback;
     char *allowed_extensions;
     AVDictionary *avio_opts;
-    int rep_index;
-    char *selected_reps;
     int max_url_size;
 
     /* Flags for init section*/
@@ -900,7 +895,8 @@ static int parse_manifest_representation(AVFormatContext *s, const char *url,
     char *rep_codecs_val = xmlGetProp(representation_node, "codecs");
     char *rep_height_val = xmlGetProp(representation_node, "height");
     char *rep_width_val = xmlGetProp(representation_node, "width");
-    char *rep_scanType_val = xmlGetProp(representation_node, "scanType");
+    char *rep_scan_type_val = xmlGetProp(representation_node, "scanType");
+    char *rep_mime_type_val = xmlGetProp(representation_node, "mimeType");
     enum AVMediaType type = AVMEDIA_TYPE_UNKNOWN;
 
     // try get information from representation
@@ -1104,7 +1100,8 @@ static int parse_manifest_representation(AVFormatContext *s, const char *url,
             rep->width = rep_width_val ? atoi(rep_width_val) : 0;
             strncpy(rep->id, rep_id_val ? rep_id_val : "", sizeof(rep->id));
             strncpy(rep->codecs, rep_codecs_val ? rep_codecs_val : "", sizeof(rep->codecs));
-            strncpy(rep->scanType, rep_scanType_val ? rep_scanType_val : "", sizeof(rep->scanType));
+            strncpy(rep->scan_type, rep_scan_type_val ? rep_scan_type_val : "", sizeof(rep->scan_type));
+            strncpy(rep->mime_type, rep_mime_type_val ? rep_mime_type_val : "", sizeof(rep->mime_type));
             rep->framerate = av_make_q(0, 0);
             if (type == AVMEDIA_TYPE_VIDEO && rep_framerate_val) {
                 ret = av_parse_video_rate(&rep->framerate, rep_framerate_val);
@@ -1138,8 +1135,10 @@ end:
         xmlFree(rep_height_val);
     if (rep_width_val)
         xmlFree(rep_width_val);
-    if (rep_scanType_val)
-        xmlFree(rep_scanType_val);
+    if (rep_scan_type_val)
+        xmlFree(rep_scan_type_val);
+    if (rep_mime_type_val)
+        xmlFree(rep_mime_type_val);
 
     return ret;
 }
@@ -2400,8 +2399,6 @@ static const AVOption dash_options[] = {
         INT_MIN, INT_MAX, FLAGS},
 
     // Updated Patch Method Options.
-    { "video_rep_id", "selected representations"  , OFFSET(video_rep_id), AV_OPT_TYPE_STRING, {.str = ""}, INT_MIN, INT_MAX, FLAGS },
-    { "audio_rep_id", "selected representations"  , OFFSET(audio_rep_id), AV_OPT_TYPE_STRING, {.str = ""}, INT_MIN, INT_MAX, FLAGS },
     { "live_start_index", "segment index to start live streams at (negative values are from the end)", OFFSET(live_start_index), AV_OPT_TYPE_INT, {.i64 = 0}, INT_MIN, INT_MAX, FLAGS},
   
     {NULL}
