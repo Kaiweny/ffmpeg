@@ -911,26 +911,6 @@ static void init_data_points(AVFrameSideData *fsd) {
         svc_dp->svc_dps[k].abnormal_characters = 0;
         svc_dp->svc_dps[k].boundary_violation = 0;
     }
-
-    fsd->cc608_dp.roll_up_error = 0;
-    fsd->cc608_dp.unknown_command = 0;
-    fsd->cc608_dp.unknown_text_attribute = 0;
-    fsd->cc608_dp.abnormal_pac = 0;
-    fsd->cc608_dp.invalid_character = 0;
-    fsd->cc608_dp.invalid_extended_character = 0;
-    fsd->cc608_dp.dual_control_command_check = 0;
-    fsd->cc608_dp.popon_presentation_error = 0;
-    fsd->cc608_dp.parity_error = 0;
-    fsd->cc608_dp.popon_missing_error = 0;
-    fsd->cc608_dp.popon_oos_error = 0;
-    fsd->cc608_dp.rollup_missing_error = 0;
-    fsd->cc608_dp.rollup_oos_error = 0;
-    
-    //xsd
-    fsd->cc608_dp.xds_checksum_error = 0;
-    fsd->cc608_dp.xds_invalid_characters = 0;
-    fsd->cc608_dp.xds_invalid_pkt_structure = 0;
-    
 }
 
 ////
@@ -998,34 +978,8 @@ static int cc_708_init(AVCodecContext *avctx) {
     return 0;
 }
 
-static int cc_608_init(AVCodecContext *avctx) {
-    CCaption708SubContext *ccsubctxt = (CCaption708SubContext*)avctx->priv_data;
-   	//we want to extract first field
-    ccsubctxt->extract = 1;
-	ccsubctxt->cc608ctx1 = ccx_decoder_608_init_library(
-		1,
-		1,
-		0,
-		0,
-		CCX_OF_SRT,
-		ccsubctxt->cc_decode->timing
-	);
-	ccsubctxt->cc608ctx2 = ccx_decoder_608_init_library(
-		1,
-		2,
-		0,
-		0,
-		CCX_OF_SRT,
-		ccsubctxt->cc_decode->timing
-	);   	
-
-    return 0;
-}
-
 static av_cold int init_decoder(AVCodecContext *avctx) {
     if (cc_708_init(avctx))
-        return -1;
-    if (cc_608_init(avctx))
         return -1;
 
     return 0;
@@ -1795,13 +1749,9 @@ static int process_cc_data_pkt(uint8_t *cc_block, CCaption708SubContext *ctx) {
         switch (cc_type) {
             case 0:
                 //608 line 21 field 1 cc
-                ctx->current_field  = 1;
-                process608(cc_block+1, 2, ctx, &ctx->sub);
                 break;
             case 1:
                 //608 line 21 field 2 cc
-                ctx->current_field  = 2;
-                process608(cc_block+1, 2, ctx, &ctx->sub);
                 break;
             case 2: //EIA-708 - 708 packet data
                     // Fall through

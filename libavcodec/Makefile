@@ -240,7 +240,7 @@ OBJS-$(CONFIG_C93_DECODER)             += c93.o
 OBJS-$(CONFIG_CAVS_DECODER)            += cavs.o cavsdec.o cavsdsp.o \
                                           cavsdata.o
 OBJS-$(CONFIG_CCAPTION_DECODER)        += ccaption_dec.o
-OBJS-$(CONFIG_CCAPTION708_DECODER)     += ccaption608_dec.o ccaption708_dec.o cc_decoder_common.o cc_common_timing.o ccaptionXDS_dec.o
+OBJS-$(CONFIG_CCAPTION708_DECODER)     += ccaption708_dec.o cc_decoder_common.o cc_common_timing.o
 OBJS-$(CONFIG_CDGRAPHICS_DECODER)      += cdgraphics.o
 OBJS-$(CONFIG_CDXL_DECODER)            += cdxl.o
 OBJS-$(CONFIG_CFHD_DECODER)            += cfhd.o cfhddata.o

@@ -4,7 +4,6 @@
 #include "libavutil/rational.h"
 #include "cc_decoder_structs.h"
 #include "libavutil/frame.h"
-#include "ccaption608_dec.h"
 
 #define CCX_708_MAX_PACKET_LENGTH 128 //According to EIA-708B, part 5
 #define CC_708_MAX_SERVICES 63
@@ -346,15 +345,6 @@ typedef struct CCaption708SubContext {
     int expected_cc_count;
     struct cc_decode *cc_decode;
     cc_708_ctx *cc708ctx;
-    
-    cc_608_ctx *cc608ctx1;
-    cc_608_ctx *cc608ctx2;
-    
-    struct cc_subtitle sub;
-    
-       
-    int extract;
-    int current_field;
     
     int start_of_channel_pkt;
     int end_of_channel_pkt;

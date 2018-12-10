@@ -1,6 +1,5 @@
 #include "cc_decoder_common.h"
 #include "cc_common_timing.h"
-#include "ccaptionXDS_dec.h"
 //#include "cc_sequencing.h"
 
 void dinit_cc_decode(struct cc_decode **ctx) {
@@ -101,7 +100,6 @@ cc_decode* init_cc_decode() {
 
     ctx->anchor_seq_number = -1;
     // Init XDS buffers
-    ctx->xds_ctx = ccaptionXDS_dec_init(ctx->timing, 0);
 
     //ctx->vbi_decoder = NULL;
     return ctx;

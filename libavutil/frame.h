@@ -270,30 +270,6 @@ typedef struct cc_708_services {
     int abnormal_service_block;   ////boolean : default value 0 else 1 
 } cc_708_services;
 
-typedef struct cc_608_data_points {
-    int roll_up_error;     //bool default 0 else 1
-    int unknown_command;   //bool default 0 else 1
-    int unknown_text_attribute; //bool default 0 else 1
-    int abnormal_pac; //bool default 0 else 1
-    int invalid_character; //bool default 0 else 1 
-    int invalid_extended_character; //bool default 0 else 1 
-    int dual_control_command_check; //bool default 0 else 1
-    int popon_presentation_error; //bool default 0 else 1
-    int parity_error; //bool deafult  0 else 1
-    //oos - out of sequence command error
-    int popon_oos_error; //bool default 0 else 1
-    //missing command error
-    int popon_missing_error; //bool default 0 else 1
-    int rollup_oos_error; //bool default 0 else 1
-    int rollup_missing_error; //bool default 0 else 1
-    //xds
-    int xds_invalid_pkt_structure; //bool default 0 else 1
-    int xds_checksum_error; //bool default 0 else 1
-    int xds_invalid_characters; //bool default 0 else 1
-    
-} cc_608_data_points; 
-
-
 /**
  * Structure to hold side data for an AVFrame.
  *
@@ -308,8 +284,6 @@ typedef struct AVFrameSideData {
     AVBufferRef *buf;
     cc_708_channel_datapoints channel_dp_708;
     cc_708_services svcs_dp_708;
-    
-    cc_608_data_points cc608_dp;
     
 } AVFrameSideData;
 

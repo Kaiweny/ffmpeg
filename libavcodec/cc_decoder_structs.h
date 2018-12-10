@@ -95,7 +95,7 @@ typedef struct cc_decode {
     // The sequence number of the current anchor frame.  All currently read
     // B-Frames belong to this I- or P-frame.
     int anchor_seq_number;
-    struct ccaptionXDS_dec_context *xds_ctx;
+    // struct ccaptionXDS_dec_context *xds_ctx;
     //struct ccx_decoder_vbi_ctx *vbi_decoder;
 
     //int (*writedata)(const unsigned char *data, int length, void *private_data, struct cc_subtitle *sub);

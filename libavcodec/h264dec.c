@@ -56,7 +56,6 @@
 #include "thread.h"
 
 #include "ccaption708_dec.h"
-#include "ccaptionXDS_dec.h"
 
 const uint16_t ff_h264_mb_sizes[4] = { 256, 384, 512, 768 };
 
@@ -1065,9 +1064,6 @@ static int h264_decode_cc(AVCodecContext *avctx, void *data,
             cc->expected_cc_count = 20;
         
         cc->cc708ctx->fsd = fsd;
-        cc->cc_decode->xds_ctx->fsd = fsd;
-        cc->cc608ctx1->fsd = fsd;
-        cc->cc608ctx2->fsd = fsd;
         
         h->sei.a53_caption.a53_context->codec->decode(h->sei.a53_caption.a53_context,
             fsd, NULL, NULL);
