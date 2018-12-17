@@ -703,9 +703,6 @@ static av_cold int init(AVCodecParserContext *s)
     p->last_frame_num = INT_MAX;
     ff_h264dsp_init(&p->h264dsp, 8, 1);
 
-    p->sei.a53_caption.a53_context_allocated = 0;
-
-
     return 0;
 }
 

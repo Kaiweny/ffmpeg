@@ -823,9 +823,6 @@ static int compat_decode(AVCodecContext *avctx, AVFrame *frame,
             *got_frame = 1;
             frame = avci->compat_decode_frame;
 
-            if (avctx->codec->decode_cc)
-                avctx->codec->decode_cc(avctx, frame, NULL);
-
         } else {
             if (!avci->compat_decode_warned) {
                 av_log(avctx, AV_LOG_WARNING, "The deprecated avcodec_decode_* "

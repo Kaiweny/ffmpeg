@@ -31,10 +31,6 @@
 #include "h264_ps.h"
 #include "h264_sei.h"
 #include "internal.h"
-#include "libavformat/avformat.h"
-
-#include "ccaption708_dec.h"
-
 
 #define AVERROR_PS_NOT_FOUND      FFERRTAG(0xF8,'?','P','S')
 
@@ -155,30 +151,6 @@ static int decode_registered_user_data_afd(H264SEIAFD *h, GetBitContext *gb, int
     return 0;
 }
 
-static int init_a53_decoder(H264SEIA53Caption *s) {
-    AVCodec *codec;
-    int ret;
-
-    codec = avcodec_find_decoder(AV_CODEC_ID_EIA_708);
-    if (!codec) {
-        av_log(log, AV_LOG_ERROR, "Failed to find any codec\n");
-        return AVERROR(EINVAL);
-    }
-
-    s->a53_context = avcodec_alloc_context3(codec);
-    if (!s->a53_context)
-        return AVERROR(ENOMEM);
-
-    //codec context and codec private options can be passed here
-    if ((ret = avcodec_open2(s->a53_context, codec, NULL)) < 0) {
-        av_log(log, AV_LOG_ERROR, "Failed to open codec\n");
-        return ret;
-    }
-
-    codec->init(s->a53_context);
-    return 0;
-}
-
 static int decode_registered_user_data_closed_caption(H264SEIA53Caption *h,
                                                      GetBitContext *gb, void *logctx,
                                                      int size)
@@ -189,12 +161,6 @@ static int decode_registered_user_data_closed_caption(H264SEIA53Caption *h,
 
     if (size < 3)
         return AVERROR(EINVAL);
-
-    if (!h->a53_context_allocated) {
-        if (init_a53_decoder(h))
-            return -1;
-        h->a53_context_allocated = 1;
-    }
 
     user_data_type_code = get_bits(gb, 8);
     if (user_data_type_code == 0x3) {

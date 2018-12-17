@@ -55,8 +55,6 @@
 #include "rectangle.h"
 #include "thread.h"
 
-#include "ccaption708_dec.h"
-
 const uint16_t ff_h264_mb_sizes[4] = { 256, 384, 512, 768 };
 
 int avpriv_h264_has_num_reorder_frames(AVCodecContext *avctx)
@@ -1028,51 +1026,6 @@ static int h264_decode_frame(AVCodecContext *avctx, void *data,
     return get_consumed_bytes(buf_index, buf_size);
 }
 
-
-static int h264_decode_cc(AVCodecContext *avctx, void *data,
-    AVPacket *avpkt) {
-    AVFrame *pict      = data;
-    H264Context *h     = avctx->priv_data;
-    CCaption708SubContext *cc; 
-    
-
-    AVFrameSideData *fsd = av_frame_get_side_data(pict, AV_FRAME_DATA_A53_CC);
-    if (fsd) {
-        AVCodecContext* h264_sei_a53_codec_ctx = h->sei.a53_caption.a53_context;
-        if (!h264_sei_a53_codec_ctx){
-            return 0;
-        }
-        cc = (CCaption708SubContext*)h264_sei_a53_codec_ctx ->priv_data;
-        if (!cc){
-            return 0;
-        }
-
-        cc_708_ctx* temp_cc_708_ctx = cc->cc708ctx;
-        if (! temp_cc_708_ctx){
-            return 0;
-        }
-        cc_common_timing_ctx *timing = temp_cc_708_ctx->timing;
-        if (!timing){
-            return 0;
-        }
-        set_current_pts(timing, pict->pkt_pts);
-        set_fts(timing, avctx->framerate);
-
-        //logic to set expected cc_count
-        //TODO: Also account for display repetition
-        if (!pict->interlaced_frame && (avctx->framerate.num == 30000 || avctx->framerate.num == 60000))
-            cc->expected_cc_count = 20;
-        
-        cc->cc708ctx->fsd = fsd;
-        
-        h->sei.a53_caption.a53_context->codec->decode(h->sei.a53_caption.a53_context,
-            fsd, NULL, NULL);
-    }
-    return 0;
-}
-
-
-
 #define OFFSET(x) offsetof(H264Context, x)
 #define VD AV_OPT_FLAG_VIDEO_PARAM | AV_OPT_FLAG_DECODING_PARAM
 static const AVOption h264_options[] = {
@@ -1099,7 +1052,6 @@ AVCodec ff_h264_decoder = {
     .init                  = h264_decode_init,
     .close                 = h264_decode_end,
     .decode                = h264_decode_frame,
-	.decode_cc 			   = h264_decode_cc,
     .capabilities          = /*AV_CODEC_CAP_DRAW_HORIZ_BAND |*/ AV_CODEC_CAP_DR1 |
                              AV_CODEC_CAP_DELAY | AV_CODEC_CAP_SLICE_THREADS |
                              AV_CODEC_CAP_FRAME_THREADS,

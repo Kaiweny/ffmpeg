@@ -178,98 +178,6 @@ enum AVActiveFormatDescription {
     AV_AFD_SP_4_3       = 15,
 };
 
-
-#define CC_708_MAX_SERVICES 63
-
-typedef struct cc_708_channel_datapoints {
-    int dtvcc_packing_matched; //boolean : default value 1 else 0 
-    int sequence_continuity;    //boolean : default value 1 else 0
-    size_t packet_errors;       //problem parsing channel data packet
-    size_t packet_loss;
-} cc_708_channel_datapoints;
-
-typedef enum  service_type {
-    None_SVC, 
-    STD_SVC_1,
-    STD_SVC_2,
-    STD_SVC_3,
-    STD_SVC_4,
-    STD_SVC_5,
-    STD_SVC_6,
-    EXT_SVC_7,
-    EXT_SVC_8,
-    EXT_SVC_9,
-    EXT_SVC_10,
-    EXT_SVC_11,
-    EXT_SVC_12,
-    EXT_SVC_13,
-    EXT_SVC_14,
-    EXT_SVC_15,
-    EXT_SVC_16,
-    EXT_SVC_17,
-    EXT_SVC_18,
-    EXT_SVC_19,
-    EXT_SVC_20,
-    EXT_SVC_21,
-    EXT_SVC_22,
-    EXT_SVC_23,
-    EXT_SVC_24,
-    EXT_SVC_25,
-    EXT_SVC_26,
-    EXT_SVC_27,
-    EXT_SVC_28,
-    EXT_SVC_29,
-    EXT_SVC_30,
-    EXT_SVC_31,
-    EXT_SVC_32,
-    EXT_SVC_33,
-    EXT_SVC_34,
-    EXT_SVC_35,
-    EXT_SVC_36,
-    EXT_SVC_37,
-    EXT_SVC_38,
-    EXT_SVC_39,
-    EXT_SVC_40,
-    EXT_SVC_41,
-    EXT_SVC_42,
-    EXT_SVC_43,
-    EXT_SVC_44,
-    EXT_SVC_45,
-    EXT_SVC_46,
-    EXT_SVC_47,
-    EXT_SVC_48,
-    EXT_SVC_49,
-    EXT_SVC_50,
-    EXT_SVC_51,
-    EXT_SVC_52,
-    EXT_SVC_53,
-    EXT_SVC_54,
-    EXT_SVC_55,
-    EXT_SVC_56,
-    EXT_SVC_57,
-    EXT_SVC_58,
-    EXT_SVC_59,
-    EXT_SVC_60,
-    EXT_SVC_61,
-    EXT_SVC_62,
-    EXT_SVC_63,    
-} SVC_TYPE;
-
-typedef struct service_data_points {
-    enum service_type svc_type;
-    int abnormal_window_size;      //boolean : default value 0 else 1         
-    int abnormal_window_position;  //boolean : default value 0 else 1 
-    int abnormal_control_codes;    //boolean : default value 0 else 1 
-    int abnormal_characters;       //boolean : default value 0 else 1 
-    int boundary_violation;       //boolean : default value 0 else 1 
-} service_data_points;
-
-typedef struct cc_708_services {
-    service_data_points svc_dps[CC_708_MAX_SERVICES];
-    int service_number[CC_708_MAX_SERVICES]; //active service has value 1 else 0 
-    int abnormal_service_block;   ////boolean : default value 0 else 1 
-} cc_708_services;
-
 /**
  * Structure to hold side data for an AVFrame.
  *
@@ -282,9 +190,6 @@ typedef struct AVFrameSideData {
     int      size;
     AVDictionary *metadata;
     AVBufferRef *buf;
-    cc_708_channel_datapoints channel_dp_708;
-    cc_708_services svcs_dp_708;
-    
 } AVFrameSideData;
 
 /**
