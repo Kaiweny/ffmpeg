@@ -660,7 +660,6 @@ enum AVCodecID {
 
     AV_CODEC_ID_MICRODVD   = 0x17800,
     AV_CODEC_ID_EIA_608,
-    AV_CODEC_ID_EIA_708,
     AV_CODEC_ID_JACOSUB,
     AV_CODEC_ID_SAMI,
     AV_CODEC_ID_REALTEXT,
@@ -3522,7 +3521,6 @@ typedef struct AVCodec {
                    int *got_packet_ptr);
     int (*decode)(AVCodecContext *, void *outdata, int *outdata_size, AVPacket *avpkt);
     int (*close)(AVCodecContext *);
-	int (*decode_cc)(AVCodecContext *avctx, void *data, AVPacket *avpkt);
 
     /**
      * Encode API with decoupled packet/frame dataflow. The API is the
@@ -4795,7 +4793,7 @@ int avcodec_decode_video2(AVCodecContext *avctx, AVFrame *picture,
  *
  * @note The AVCodecContext MUST have been opened with @ref avcodec_open2()
  * before packets may be fed to the decoder.
- *libavcodec/h264dec.c.rej
+ * libavcodec/h264dec.c.rej
  * @param avctx the codec context
  * @param[out] sub The Preallocated AVSubtitle in which the decoded subtitle will be stored,
  *                 must be freed with avsubtitle_free if *got_sub_ptr is set.

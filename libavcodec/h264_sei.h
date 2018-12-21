@@ -119,9 +119,6 @@ typedef struct H264SEIA53Caption {
     int a53_caption_size;
     uint8_t *a53_caption;
 
-    int a53_context_allocated;
-    AVCodecContext *a53_context;
-
     AVBufferRef *buf_ref;
 } H264SEIA53Caption;
 
@@ -195,7 +192,6 @@ typedef struct H264SEIContext {
 
 struct H264ParamSets;
 
-int ff_h264_a53_decoder(H264SEIA53Caption *s);
 int ff_h264_sei_decode(H264SEIContext *h, GetBitContext *gb,
                        const struct H264ParamSets *ps, void *logctx);
 
