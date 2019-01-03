@@ -207,7 +207,7 @@ typedef struct HLSContext {
 
     int cur_seq_no;
     int live_start_index;
-    char *selected_variant_id;
+    char *selected_bandwidth;
     int first_packet;
     int64_t first_timestamp;
     int64_t cur_timestamp;
@@ -221,26 +221,18 @@ typedef struct HLSContext {
     char *allowed_extensions;
 } HLSContext;
 
-static int is_selected(const char * current_variant_url, const char *selected_variant_url)
+static int is_selected_by_bandwidth(const char * current_bandwidth, const char *selected_bandwidth)
 {
-    // selected_variant_url is expected to be a full url.
-    // current_variant_url can be anything.
-    // So check if current_variant_url matches the end of selected_variant_url
-
-    if (!selected_variant_url) {
-        // if no selected_variant_url specified, select all
+    if (!selected_bandwidth) {
+        // if no selected_bandwidth specified, select all
         return 1;
     }
 
-    if (!current_variant_url) {
+    if (!current_bandwidth) {
         return 0;
     }
-    size_t lenstr = strlen(selected_variant_url);
-    size_t lensuffix = strlen(current_variant_url);
-    if (lensuffix > lenstr) {
-        return 0;
-    }
-    return strncmp(selected_variant_url + lenstr - lensuffix, current_variant_url, lensuffix) == 0;
+
+    return strcmp(selected_bandwidth, current_bandwidth) == 0;
 }
 
 static int read_chomp_line(AVIOContext *s, char *buf, int maxlen)
@@ -835,14 +827,15 @@ static int parse_playlist(HLSContext *c, const char *url,
         } else if (av_strstart(line, "#", NULL)) {
             continue;
         } else if (line[0]) {
-            if ( is_variant && is_selected(line, c->selected_variant_id) ) {
-                av_log(c, AV_LOG_INFO, "Variant %s selected\n", line);
+            if ( is_variant && is_selected_by_bandwidth(variant_info.bandwidth, c->selected_bandwidth) ) {
+                av_log(c, AV_LOG_INFO, "Variant with bandwidth=%s selected\n", variant_info.bandwidth);
                 if (!new_variant(c, &variant_info, line, url)) {
                     ret = AVERROR(ENOMEM);
                     goto fail;
                 }
                 is_variant = 0;
             }
+
             if (is_segment) {
                 struct segment *seg;
                 if (!pls) {
@@ -2234,8 +2227,8 @@ static const AVOption hls_options[] = {
         OFFSET(allowed_extensions), AV_OPT_TYPE_STRING,
         {.str = "3gp,aac,avi,flac,mkv,m3u8,m4a,m4s,m4v,mpg,mov,mp2,mp3,mp4,mpeg,mpegts,ogg,ogv,oga,ts,vob,wav"},
         INT_MIN, INT_MAX, FLAGS},
-    {"selected_variant_id", "selected low-level manifests (variants). It has to be a full url.", 
-        OFFSET(selected_variant_id), AV_OPT_TYPE_STRING, 
+    {"selected_bandwidth", "bandwidth of selected profile (variants).", 
+        OFFSET(selected_bandwidth), AV_OPT_TYPE_STRING, 
         {.str = ""}, INT_MIN, INT_MAX, FLAGS},
     {NULL}
 };
