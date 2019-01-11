@@ -211,7 +211,7 @@ typedef struct HLSContext {
 
     int cur_seq_no;
     int live_start_index;
-    char *selected_variant_id;
+    char *selected_bandwidth;
     int first_packet;
     int64_t first_timestamp;
     int64_t cur_timestamp;
@@ -225,26 +225,18 @@ typedef struct HLSContext {
     AVIOContext *playlist_pb;
 } HLSContext;
 
-static int is_selected(const char * current_variant_url, const char *selected_variant_url)
+static int is_selected_by_bandwidth(const char * current_bandwidth, const char *selected_bandwidth)
 {
-    // selected_variant_url is expected to be a full url.
-    // current_variant_url can be anything.
-    // So check if current_variant_url matches the end of selected_variant_url
-
-    if (!selected_variant_url) {
-        // if no selected_variant_url specified, select all
+    if (!selected_bandwidth) {
+        // if no selected_bandwidth specified, select all
         return 1;
     }
 
-    if (!current_variant_url) {
+    if (!current_bandwidth) {
         return 0;
     }
-    size_t lenstr = strlen(selected_variant_url);
-    size_t lensuffix = strlen(current_variant_url);
-    if (lensuffix > lenstr) {
-        return 0;
-    }
-    return strncmp(selected_variant_url + lenstr - lensuffix, current_variant_url, lensuffix) == 0;
+
+    return strcmp(selected_bandwidth, current_bandwidth) == 0;
 }
 
 static void free_segment_dynarray(struct segment **segments, int n_segments)
@@ -893,8 +885,8 @@ static int parse_playlist(HLSContext *c, const char *url,
         } else if (av_strstart(line, "#", NULL)) {
             continue;
         } else if (line[0]) {
-            if ( is_variant && is_selected(line, c->selected_variant_id) ) {
-                av_log(c, AV_LOG_INFO, "Variant %s selected\n", line);
+            if ( is_variant && is_selected_by_bandwidth(variant_info.bandwidth, c->selected_bandwidth) ) {
+                av_log(c, AV_LOG_INFO, "Variant with %s selected\n", variant_info.bandwidth);
                 if (!new_variant(c, &variant_info, line, url)) {
                     ret = AVERROR(ENOMEM);
                     goto fail;
@@ -2396,8 +2388,8 @@ static const AVOption hls_options[] = {
         OFFSET(http_persistent), AV_OPT_TYPE_BOOL, {.i64 = 1}, 0, 1, FLAGS },
     {"http_multiple", "Use multiple HTTP connections for fetching segments",
         OFFSET(http_multiple), AV_OPT_TYPE_BOOL, {.i64 = -1}, -1, 1, FLAGS},
-    {"selected_variant_id", "selected low-level manifests (variants). It has to be a full url.", 
-        OFFSET(selected_variant_id), AV_OPT_TYPE_STRING, 
+    {"selected_bandwidth", "bandwidth of selected variant",
+        OFFSET(selected_bandwidth), AV_OPT_TYPE_STRING,
         {.str = ""}, INT_MIN, INT_MAX, FLAGS},
     {NULL}
 };
