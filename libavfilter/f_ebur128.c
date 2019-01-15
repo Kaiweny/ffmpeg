@@ -857,6 +857,14 @@ static int filter_frame(AVFilterLink *inlink, AVFrame *insamples)
 
                 SET_META_PEAK(sample, SAMPLES);
                 SET_META_PEAK(true,   TRUE);
+                if (ebur128->peak_mode & PEAK_MODE_TRUE_PEAKS) {
+                    char key[64];
+                    for (ch = 0; ch < nb_channels; ch++) {
+                         snprintf(key, sizeof(key),
+                                  META_PREFIX AV_STRINGIFY(TRUE) "_peaks_per_frame_ch%d", ch);
+                         SET_META(key, ebur128->true_peaks_per_frame[ch]);
+                    }
+                }
             }
 
             if (ebur128->scale == SCALE_TYPE_ABSOLUTE) {
