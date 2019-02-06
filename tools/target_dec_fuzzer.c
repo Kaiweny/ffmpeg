@@ -25,7 +25,7 @@
      svn co http://llvm.org/svn/llvm-project/llvm/trunk/lib/Fuzzer
      ./Fuzzer/build.sh
   * build ffmpeg for fuzzing:
-    FLAGS="-fsanitize=address -fsanitize-coverage=trace-pc-guard,trace-cmp -g" CC="clang $FLAGS" CXX="clang++ $FLAGS" ./configure  --disable-yasm
+    FLAGS="-fsanitize=address -fsanitize-coverage=trace-pc-guard,trace-cmp -g" CC="clang $FLAGS" CXX="clang++ $FLAGS" ./configure  --disable-x86asm
     make clean && make -j
   * build the fuzz target.
     Choose the value of FFMPEG_CODEC (e.g. AV_CODEC_ID_DVD_SUBTITLE) and
@@ -45,11 +45,18 @@
    https://security.googleblog.com/2016/08/guided-in-process-fuzzing-of-chrome.html
 */
 
+#include "config.h"
 #include "libavutil/avassert.h"
+#include "libavutil/imgutils.h"
 #include "libavutil/intreadwrite.h"
 
 #include "libavcodec/avcodec.h"
+#include "libavcodec/bytestream.h"
 #include "libavformat/avformat.h"
+
+int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size);
+
+extern AVCodec * codec_list[];
 
 static void error(const char *err)
 {
@@ -61,19 +68,13 @@ static AVCodec *c = NULL;
 static AVCodec *AVCodecInitialize(enum AVCodecID codec_id)
 {
     AVCodec *res;
-    av_register_all();
-    av_log_set_level(AV_LOG_PANIC);
+
     res = avcodec_find_decoder(codec_id);
     if (!res)
         error("Failed to find decoder");
     return res;
 }
 
-#if defined(FUZZ_FFMPEG_VIDEO)
-#define decode_handler avcodec_decode_video2
-#elif defined(FUZZ_FFMPEG_AUDIO)
-#define decode_handler avcodec_decode_audio4
-#elif defined(FUZZ_FFMPEG_SUBTITLE)
 static int subtitle_handler(AVCodecContext *avctx, void *frame,
                             int *got_sub_ptr, AVPacket *avpkt)
 {
@@ -84,28 +85,23 @@ static int subtitle_handler(AVCodecContext *avctx, void *frame,
     return ret;
 }
 
-#define decode_handler subtitle_handler
-#else
-#error "Specify encoder type"  // To catch mistakes
-#endif
-
 // Class to handle buffer allocation and resize for each frame
 typedef struct FuzzDataBuffer {
     size_t size_;
     uint8_t *data_;
 } FuzzDataBuffer;
 
-void FDBCreate(FuzzDataBuffer *FDB) {
+static void FDBCreate(FuzzDataBuffer *FDB) {
     FDB->size_ = 0x1000;
     FDB->data_ = av_malloc(FDB->size_);
     if (!FDB->data_)
         error("Failed memory allocation");
 }
 
-void FDBDesroy(FuzzDataBuffer *FDB) { av_free(FDB->data_); }
+static void FDBDesroy(FuzzDataBuffer *FDB) { av_free(FDB->data_); }
 
-void FDBRealloc(FuzzDataBuffer *FDB, size_t size) {
-    size_t needed = size + FF_INPUT_BUFFER_PADDING_SIZE;
+static void FDBRealloc(FuzzDataBuffer *FDB, size_t size) {
+    size_t needed = size + AV_INPUT_BUFFER_PADDING_SIZE;
     av_assert0(needed > size);
     if (needed > FDB->size_) {
         av_free(FDB->data_);
@@ -116,14 +112,14 @@ void FDBRealloc(FuzzDataBuffer *FDB, size_t size) {
     }
 }
 
-void FDBPrepare(FuzzDataBuffer *FDB, AVPacket *dst, const uint8_t *data,
+static void FDBPrepare(FuzzDataBuffer *FDB, AVPacket *dst, const uint8_t *data,
                 size_t size)
 {
     FDBRealloc(FDB, size);
     memcpy(FDB->data_, data, size);
     size_t padd = FDB->size_ - size;
-    if (padd > FF_INPUT_BUFFER_PADDING_SIZE)
-        padd = FF_INPUT_BUFFER_PADDING_SIZE;
+    if (padd > AV_INPUT_BUFFER_PADDING_SIZE)
+        padd = AV_INPUT_BUFFER_PADDING_SIZE;
     memset(FDB->data_ + size, 0, padd);
     av_init_packet(dst);
     dst->data = FDB->data_;
@@ -141,19 +137,63 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     const uint8_t *last = data;
     const uint8_t *end = data + size;
     uint32_t it = 0;
+    int (*decode_handler)(AVCodecContext *avctx, AVFrame *picture,
+                          int *got_picture_ptr,
+                          const AVPacket *avpkt) = NULL;
+    AVCodecParserContext *parser = NULL;
 
-    if (!c)
+
+    if (!c) {
+#ifdef FFMPEG_DECODER
+#define DECODER_SYMBOL0(CODEC) ff_##CODEC##_decoder
+#define DECODER_SYMBOL(CODEC) DECODER_SYMBOL0(CODEC)
+        extern AVCodec DECODER_SYMBOL(FFMPEG_DECODER);
+        codec_list[0] = &DECODER_SYMBOL(FFMPEG_DECODER);
+        avcodec_register(&DECODER_SYMBOL(FFMPEG_DECODER));
+
+        c = &DECODER_SYMBOL(FFMPEG_DECODER);
+#else
+        avcodec_register_all();
         c = AVCodecInitialize(FFMPEG_CODEC);  // Done once.
+#endif
+        av_log_set_level(AV_LOG_PANIC);
+    }
+
+    switch (c->type) {
+    case AVMEDIA_TYPE_AUDIO   : decode_handler = avcodec_decode_audio4; break;
+    case AVMEDIA_TYPE_VIDEO   : decode_handler = avcodec_decode_video2; break;
+    case AVMEDIA_TYPE_SUBTITLE: decode_handler = subtitle_handler     ; break;
+    }
 
     AVCodecContext* ctx = avcodec_alloc_context3(NULL);
-    if (!ctx)
+    AVCodecContext* parser_avctx = avcodec_alloc_context3(NULL);
+    if (!ctx || !parser_avctx)
         error("Failed memory allocation");
 
     ctx->max_pixels = 4096 * 4096; //To reduce false positive OOM and hangs
 
+    if (size > 1024) {
+        GetByteContext gbc;
+        bytestream2_init(&gbc, data + size - 1024, 1024);
+        ctx->width                              = bytestream2_get_le32(&gbc);
+        ctx->height                             = bytestream2_get_le32(&gbc);
+        ctx->bit_rate                           = bytestream2_get_le64(&gbc);
+        ctx->bits_per_coded_sample              = bytestream2_get_le32(&gbc);
+        // Try to initialize a parser for this codec, note, this may fail which just means we test without one
+        if (bytestream2_get_byte(&gbc) & 1)
+            parser = av_parser_init(c->id);
+        if (av_image_check_size(ctx->width, ctx->height, 0, ctx))
+            ctx->width = ctx->height = 0;
+        size -= 1024;
+    }
+
     int res = avcodec_open2(ctx, c, NULL);
-    if (res < 0)
-        return res;
+    if (res < 0) {
+        av_free(ctx);
+        av_free(parser_avctx);
+        return 0; // Failure of avcodec_open2() does not imply that a issue was found
+    }
+    parser_avctx->codec_id = ctx->codec_id;
 
     FDBCreate(&buffer);
     int got_frame;
@@ -162,7 +202,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
         error("Failed memory allocation");
 
     // Read very simple container
-    AVPacket avpkt;
+    AVPacket avpkt, parsepkt;
     while (data < end && it < maxiteration) {
         // Search for the TAG
         while (data + sizeof(fuzz_tag) < end) {
@@ -173,12 +213,34 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
         if (data + sizeof(fuzz_tag) > end)
             data = end;
 
-        FDBPrepare(&buffer, &avpkt, last, data - last);
+        FDBPrepare(&buffer, &parsepkt, last, data - last);
         data += sizeof(fuzz_tag);
         last = data;
 
-        // Iterate through all data
-        while (avpkt.size > 0 && it++ < maxiteration) {
+        while (parsepkt.size > 0) {
+
+            if (parser) {
+                av_init_packet(&avpkt);
+                int ret = av_parser_parse2(parser, parser_avctx, &avpkt.data, &avpkt.size,
+                                           parsepkt.data, parsepkt.size,
+                                           parsepkt.pts, parsepkt.dts, parsepkt.pos);
+                parsepkt.data += ret;
+                parsepkt.size -= ret;
+                parsepkt.pos  += ret;
+                avpkt.pts = parser->pts;
+                avpkt.dts = parser->dts;
+                avpkt.pos = parser->pos;
+                if ( parser->key_frame == 1 ||
+                    (parser->key_frame == -1 && parser->pict_type == AV_PICTURE_TYPE_I))
+                    avpkt.flags |= AV_PKT_FLAG_KEY;
+                avpkt.flags |= parsepkt.flags & AV_PKT_FLAG_DISCARD;
+            } else {
+                avpkt = parsepkt;
+                parsepkt.size = 0;
+            }
+
+          // Iterate through all data
+          while (avpkt.size > 0 && it++ < maxiteration) {
             av_frame_unref(frame);
             int ret = decode_handler(ctx, frame, &got_frame, &avpkt);
 
@@ -191,6 +253,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
                 ret = avpkt.size;
             avpkt.data += ret;
             avpkt.size -= ret;
+          }
         }
     }
 
@@ -206,6 +269,9 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     av_frame_free(&frame);
     avcodec_free_context(&ctx);
     av_freep(&ctx);
+    avcodec_free_context(&parser_avctx);
+    av_freep(&parser_avctx);
+    av_parser_close(parser);
     FDBDesroy(&buffer);
     return 0;
 }

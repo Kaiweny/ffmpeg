@@ -63,6 +63,7 @@ typedef struct TM2Context {
     AVFrame *pic;
 
     GetBitContext gb;
+    int error;
     BswapDSPContext bdsp;
 
     uint8_t *buffer;
@@ -298,15 +299,15 @@ static int tm2_read_stream(TM2Context *ctx, const uint8_t *buf, int stream_id, i
     /* get stream length in dwords */
     bytestream2_init(&gb, buf, buf_size);
     len  = bytestream2_get_be32(&gb);
-    skip = len * 4 + 4;
 
     if (len == 0)
         return 4;
 
-    if (len >= INT_MAX / 4 - 1 || len < 0 || skip > buf_size) {
+    if (len >= INT_MAX / 4 - 1 || len < 0 || len * 4 + 4 > buf_size) {
         av_log(ctx->avctx, AV_LOG_ERROR, "Error, invalid stream size.\n");
         return AVERROR_INVALIDDATA;
     }
+    skip = len * 4 + 4;
 
     toks = bytestream2_get_be32(&gb);
     if (toks & 1) {
@@ -376,6 +377,10 @@ static int tm2_read_stream(TM2Context *ctx, const uint8_t *buf, int stream_id, i
             }
         }
     } else {
+        if (len < 0) {
+            ret = AVERROR_INVALIDDATA;
+            goto end;
+        }
         for (i = 0; i < toks; i++) {
             ctx->tokens[stream_id][i] = codes.recode[0];
             if (stream_id <= TM2_MOT && ctx->tokens[stream_id][i] >= TM2_DELTAS) {
@@ -398,6 +403,7 @@ static inline int GET_TOK(TM2Context *ctx,int type)
 {
     if (ctx->tok_ptrs[type] >= ctx->tok_lens[type]) {
         av_log(ctx->avctx, AV_LOG_ERROR, "Read token from stream %i out of bounds (%i>=%i)\n", type, ctx->tok_ptrs[type], ctx->tok_lens[type]);
+        ctx->error = 1;
         return 0;
     }
     if (type <= TM2_MOT) {
@@ -441,15 +447,15 @@ static inline int GET_TOK(TM2Context *ctx,int type)
 
 /* recalculate last and delta values for next blocks */
 #define TM2_RECALC_BLOCK(CHR, stride, last, CD) {\
-    CD[0] = CHR[1] - last[1];\
-    CD[1] = (int)CHR[stride + 1] - (int)CHR[1];\
+    CD[0] = (unsigned)CHR[         1] - (unsigned)last[1];\
+    CD[1] = (unsigned)CHR[stride + 1] - (unsigned) CHR[1];\
     last[0] = (int)CHR[stride + 0];\
     last[1] = (int)CHR[stride + 1];}
 
 /* common operations - add deltas to 4x4 block of luma or 2x2 blocks of chroma */
 static inline void tm2_apply_deltas(TM2Context *ctx, int* Y, int stride, int *deltas, int *last)
 {
-    int ct, d;
+    unsigned ct, d;
     int i, j;
 
     for (j = 0; j < 4; j++){
@@ -465,7 +471,7 @@ static inline void tm2_apply_deltas(TM2Context *ctx, int* Y, int stride, int *de
     }
 }
 
-static inline void tm2_high_chroma(int *data, int stride, int *last, int *CD, int *deltas)
+static inline void tm2_high_chroma(int *data, int stride, int *last, unsigned *CD, int *deltas)
 {
     int i, j;
     for (j = 0; j < 2; j++) {
@@ -809,6 +815,8 @@ static int tm2_decode_blocks(TM2Context *ctx, AVFrame *p)
             default:
                 av_log(ctx->avctx, AV_LOG_ERROR, "Skipping unknown block type %i\n", type);
             }
+            if (ctx->error)
+                return AVERROR_INVALIDDATA;
         }
     }
 
@@ -888,6 +896,8 @@ static int decode_frame(AVCodecContext *avctx,
     AVFrame * const p    = l->pic;
     int offset           = TM2_HEADER_SIZE;
     int i, t, ret;
+
+    l->error = 0;
 
     av_fast_padded_malloc(&l->buffer, &l->buffer_size, buf_size);
     if (!l->buffer) {

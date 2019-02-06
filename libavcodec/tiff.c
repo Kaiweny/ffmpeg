@@ -74,6 +74,8 @@ typedef struct TiffContext {
     int deinvert_buf_size;
     uint8_t *yuv_line;
     unsigned int yuv_line_size;
+    uint8_t *fax_buffer;
+    unsigned int fax_buffer_size;
 
     int geotag_count;
     TiffGeoTag *geotags;
@@ -227,9 +229,9 @@ static int add_metadata(int count, int type,
                         const char *name, const char *sep, TiffContext *s, AVFrame *frame)
 {
     switch(type) {
-    case TIFF_DOUBLE: return ff_tadd_doubles_metadata(count, name, sep, &s->gb, s->le, avpriv_frame_get_metadatap(frame));
-    case TIFF_SHORT : return ff_tadd_shorts_metadata(count, name, sep, &s->gb, s->le, 0, avpriv_frame_get_metadatap(frame));
-    case TIFF_STRING: return ff_tadd_string_metadata(count, name, &s->gb, s->le, avpriv_frame_get_metadatap(frame));
+    case TIFF_DOUBLE: return ff_tadd_doubles_metadata(count, name, sep, &s->gb, s->le, &frame->metadata);
+    case TIFF_SHORT : return ff_tadd_shorts_metadata(count, name, sep, &s->gb, s->le, 0, &frame->metadata);
+    case TIFF_STRING: return ff_tadd_string_metadata(count, name, &s->gb, s->le, &frame->metadata);
     default         : return AVERROR_INVALIDDATA;
     };
 }
@@ -452,8 +454,10 @@ static int tiff_unpack_fax(TiffContext *s, uint8_t *dst, int stride,
 {
     int i, ret = 0;
     int line;
-    uint8_t *src2 = av_malloc((unsigned)size +
-                              AV_INPUT_BUFFER_PADDING_SIZE);
+    uint8_t *src2;
+
+    av_fast_padded_malloc(&s->fax_buffer, &s->fax_buffer_size, size);
+    src2 = s->fax_buffer;
 
     if (!src2) {
         av_log(s->avctx, AV_LOG_ERROR,
@@ -475,7 +479,6 @@ static int tiff_unpack_fax(TiffContext *s, uint8_t *dst, int stride,
             horizontal_fill(s->bpp, dst, 1, dst, 0, width, 0);
             dst += stride;
         }
-    av_free(src2);
     return ret;
 }
 
@@ -1111,6 +1114,8 @@ static int tiff_decode_tag(TiffContext *s, AVFrame *frame)
                 if (s->geotags[i].count == 0
                     || s->geotags[i].offset + s->geotags[i].count > count) {
                     av_log(s->avctx, AV_LOG_WARNING, "Invalid GeoTIFF key %d\n", s->geotags[i].key);
+                } else if (s->geotags[i].val) {
+                    av_log(s->avctx, AV_LOG_WARNING, "Duplicate GeoTIFF key %d\n", s->geotags[i].key);
                 } else {
                     char *ap = doubles2str(&dp[s->geotags[i].offset], s->geotags[i].count, ", ");
                     if (!ap) {
@@ -1258,7 +1263,7 @@ static int decode_frame(AVCodecContext *avctx,
             av_log(avctx, AV_LOG_WARNING, "Type of GeoTIFF key %d is wrong\n", s->geotags[i].key);
             continue;
         }
-        ret = av_dict_set(avpriv_frame_get_metadatap(p), keyname, s->geotags[i].val, 0);
+        ret = av_dict_set(&p->metadata, keyname, s->geotags[i].val, 0);
         if (ret<0) {
             av_log(avctx, AV_LOG_ERROR, "Writing metadata with key '%s' failed\n", keyname);
             return ret;
@@ -1298,9 +1303,12 @@ static int decode_frame(AVCodecContext *avctx,
 
     planes = s->planar ? s->bppcount : 1;
     for (plane = 0; plane < planes; plane++) {
+        int remaining = avpkt->size;
         stride = p->linesize[plane];
         dst = p->data[plane];
         for (i = 0; i < s->height; i += s->rps) {
+            if (i)
+                dst += s->rps * stride;
             if (s->stripsizesoff)
                 ssize = ff_tget(&stripsizes, s->sstype, le);
             else
@@ -1311,17 +1319,17 @@ static int decode_frame(AVCodecContext *avctx,
             else
                 soff = s->stripoff;
 
-            if (soff > avpkt->size || ssize > avpkt->size - soff) {
+            if (soff > avpkt->size || ssize > avpkt->size - soff || ssize > remaining) {
                 av_log(avctx, AV_LOG_ERROR, "Invalid strip size/offset\n");
                 return AVERROR_INVALIDDATA;
             }
+            remaining -= ssize;
             if ((ret = tiff_unpack_strip(s, p, dst, stride, avpkt->data + soff, ssize, i,
                                          FFMIN(s->rps, s->height - i))) < 0) {
                 if (avctx->err_recognition & AV_EF_EXPLODE)
                     return ret;
                 break;
             }
-            dst += s->rps * stride;
         }
         if (s->predictor == 2) {
             if (s->photometric == TIFF_PHOTOMETRIC_YCBCR) {
@@ -1365,10 +1373,11 @@ static int decode_frame(AVCodecContext *avctx,
         }
 
         if (s->photometric == TIFF_PHOTOMETRIC_WHITE_IS_ZERO) {
+            int c = (s->avctx->pix_fmt == AV_PIX_FMT_PAL8 ? (1<<s->bpp) - 1 : 255);
             dst = p->data[plane];
             for (i = 0; i < s->height; i++) {
                 for (j = 0; j < stride; j++)
-                    dst[j] = (s->avctx->pix_fmt == AV_PIX_FMT_PAL8 ? (1<<s->bpp) - 1 : 255) - dst[j];
+                    dst[j] = c - dst[j];
                 dst += stride;
             }
         }
@@ -1396,6 +1405,8 @@ static av_cold int tiff_init(AVCodecContext *avctx)
     s->subsampling[1] = 1;
     s->avctx  = avctx;
     ff_lzw_decode_open(&s->lzw);
+    if (!s->lzw)
+        return AVERROR(ENOMEM);
     ff_ccitt_unpack_init();
 
     return 0;
@@ -1409,6 +1420,9 @@ static av_cold int tiff_end(AVCodecContext *avctx)
 
     ff_lzw_decode_close(&s->lzw);
     av_freep(&s->deinvert_buf);
+    s->deinvert_buf_size = 0;
+    av_freep(&s->fax_buffer);
+    s->fax_buffer_size = 0;
     return 0;
 }
 

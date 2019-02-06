@@ -145,7 +145,7 @@ static int compute_crc_of_packets(AVFormatContext *fmt_ctx, int video_stream,
         }
         av_packet_unref(&pkt);
         av_init_packet(&pkt);
-    } while ((!end_of_stream || got_frame) && (no_seeking || (fr->pts + av_frame_get_pkt_duration(fr) <= ts_end)));
+    } while ((!end_of_stream || got_frame) && (no_seeking || (fr->pts + fr->pkt_duration <= ts_end)));
 
     av_packet_unref(&pkt);
     av_freep(&byte_buffer);
@@ -278,8 +278,6 @@ int main(int argc, char **argv)
         av_log(NULL, AV_LOG_ERROR, "Incorrect input\n");
         return 1;
     }
-
-    av_register_all();
 
     if (seek_test(argv[1], argv[2], argv[3]) != 0)
         return 1;

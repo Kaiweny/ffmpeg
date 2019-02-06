@@ -22,11 +22,6 @@
 #define SWSCALE_SWSCALE_INTERNAL_H
 
 #include "config.h"
-
-#if HAVE_ALTIVEC_H
-#include <altivec.h>
-#endif
-
 #include "version.h"
 
 #include "libavutil/avassert.h"
@@ -36,6 +31,7 @@
 #include "libavutil/log.h"
 #include "libavutil/pixfmt.h"
 #include "libavutil/pixdesc.h"
+#include "libavutil/ppc/util_altivec.h"
 
 #define STR(s) AV_TOSTRING(s) // AV_STRINGIFY is too long
 
@@ -339,6 +335,8 @@ typedef struct SwsContext {
 
     uint32_t pal_yuv[256];
     uint32_t pal_rgb[256];
+
+    float uint2float_lut[256];
 
     /**
      * @name Scaled horizontal lines ring buffer.
@@ -680,6 +678,17 @@ static av_always_inline int isPlanarYUV(enum AVPixelFormat pix_fmt)
     return ((desc->flags & AV_PIX_FMT_FLAG_PLANAR) && isYUV(pix_fmt));
 }
 
+/*
+ * Identity semi-planar YUV formats. Specifically, those are YUV formats
+ * where the second and third components (U & V) are on the same plane.
+ */
+static av_always_inline int isSemiPlanarYUV(enum AVPixelFormat pix_fmt)
+{
+    const AVPixFmtDescriptor *desc = av_pix_fmt_desc_get(pix_fmt);
+    av_assert0(desc);
+    return (isPlanarYUV(pix_fmt) && desc->comp[1].plane == desc->comp[2].plane);
+}
+
 static av_always_inline int isRGB(enum AVPixelFormat pix_fmt)
 {
     const AVPixFmtDescriptor *desc = av_pix_fmt_desc_get(pix_fmt);
@@ -757,6 +766,13 @@ static av_always_inline int isAnyRGB(enum AVPixelFormat pix_fmt)
             pix_fmt == AV_PIX_FMT_MONOBLACK || pix_fmt == AV_PIX_FMT_MONOWHITE;
 }
 
+static av_always_inline int isFloat(enum AVPixelFormat pix_fmt)
+{
+    const AVPixFmtDescriptor *desc = av_pix_fmt_desc_get(pix_fmt);
+    av_assert0(desc);
+    return desc->flags & AV_PIX_FMT_FLAG_FLOAT;
+}
+
 static av_always_inline int isALPHA(enum AVPixelFormat pix_fmt)
 {
     const AVPixFmtDescriptor *desc = av_pix_fmt_desc_get(pix_fmt);
@@ -799,9 +815,17 @@ static av_always_inline int isPlanarRGB(enum AVPixelFormat pix_fmt)
 
 static av_always_inline int usePal(enum AVPixelFormat pix_fmt)
 {
-    const AVPixFmtDescriptor *desc = av_pix_fmt_desc_get(pix_fmt);
-    av_assert0(desc);
-    return (desc->flags & AV_PIX_FMT_FLAG_PAL) || (desc->flags & AV_PIX_FMT_FLAG_PSEUDOPAL);
+    switch (pix_fmt) {
+    case AV_PIX_FMT_PAL8:
+    case AV_PIX_FMT_BGR4_BYTE:
+    case AV_PIX_FMT_BGR8:
+    case AV_PIX_FMT_GRAY8:
+    case AV_PIX_FMT_RGB4_BYTE:
+    case AV_PIX_FMT_RGB8:
+        return 1;
+    default:
+        return 0;
+    }
 }
 
 extern const uint64_t ff_dither4[2];

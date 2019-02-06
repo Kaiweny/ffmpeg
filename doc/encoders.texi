@@ -64,7 +64,6 @@ to find an optimal combination by adding or subtracting a specific value from
 all quantizers and adjusting some individual quantizer a little.  Will tune
 itself based on whether @option{aac_is}, @option{aac_ms} and @option{aac_pns}
 are enabled.
-This is the default choice for a coder.
 
 @item anmr
 Average noise to mask ratio (ANMR) trellis-based solution.
@@ -77,10 +76,10 @@ Not currently recommended.
 @item fast
 Constant quantizer method.
 
-This method sets a constant quantizer for all bands. This is the fastest of all
-the methods and has no rate control or support for @option{aac_is} or
-@option{aac_pns}.
-Not recommended.
+Uses a cheaper version of twoloop algorithm that doesn't try to do as many
+clever adjustments. Worse with low bitrates (less than 64kbps), but is better
+and much faster at higher bitrates.
+This is the default choice for a coder
 
 @end table
 
@@ -92,12 +91,12 @@ using the value "enable", which is mainly useful for debugging or disabled using
 
 @item aac_is
 Sets intensity stereo coding tool usage. By default, it's enabled and will
-automatically toggle IS for similar pairs of stereo bands if it's benefitial.
+automatically toggle IS for similar pairs of stereo bands if it's beneficial.
 Can be disabled for debugging by setting the value to "disable".
 
 @item aac_pns
 Uses perceptual noise substitution to replace low entropy high frequency bands
-with imperceivable white noise during the decoding process. By default, it's
+with imperceptible white noise during the decoding process. By default, it's
 enabled, but can be disabled for debugging purposes by using "disable".
 
 @item aac_tns
@@ -599,7 +598,7 @@ Channel mode
 @item auto
 The mode is chosen automatically for each frame
 @item indep
-Chanels are independently coded
+Channels are independently coded
 @item left_side
 @item right_side
 @item mid_side
@@ -981,6 +980,11 @@ fewer.
 Other values include 0 for mono and stereo, 1 for surround sound with masking
 and LFE bandwidth optimizations, and 255 for independent streams with an
 unspecified channel layout.
+
+@item apply_phase_inv (N.A.) (requires libopus >= 1.2)
+If set to 0, disables the use of phase inversion for intensity stereo,
+improving the quality of mono downmixes, but slightly reducing normal stereo
+quality. The default is 1 (phase inversion enabled).
 
 @end table
 
@@ -1666,7 +1670,7 @@ option to 2.
 Enable frame parallel decodability features.
 @item aq-mode
 Set adaptive quantization mode (0: off (default), 1: variance 2: complexity, 3:
-cyclic refresh).
+cyclic refresh, 4: equator360).
 @item colorspace @emph{color-space}
 Set input color space. The VP9 bitstream supports signaling the following
 colorspaces:
@@ -1679,6 +1683,15 @@ colorspaces:
 @item @samp{smpte240m} @emph{smpte240}
 @item @samp{bt2020_ncl} @emph{bt2020}
 @end table
+@item row-mt @var{boolean}
+Enable row based multi-threading.
+@item tune-content
+Set content type: default (0), screen (1), film (2).
+@item corpus-complexity
+Corpus VBR mode is a variant of standard VBR where the complexity distribution
+midpoint is passed in rather than calculated for a specific clip or chunk.
+
+The valid range is [0, 10000]. 0 (default) uses standard VBR.
 @end table
 
 @end table
@@ -1791,7 +1804,7 @@ the documentation of the undocumented generic options, see
 @ref{codec-options,,the Codec Options chapter}.
 
 To get a more accurate and extensive documentation of the libx264
-options, invoke the command @command{x264 --full-help} or consult
+options, invoke the command @command{x264 --fullhelp} or consult
 the libx264 documentation.
 
 @table @option
@@ -2104,7 +2117,7 @@ is kept undocumented for some reason.
 
 For example to specify libx264 encoding options with @command{ffmpeg}:
 @example
-ffmpeg -i foo.mpg -vcodec libx264 -x264opts keyint=123:min-keyint=20 -an out.mkv
+ffmpeg -i foo.mpg -c:v libx264 -x264opts keyint=123:min-keyint=20 -an out.mkv
 @end example
 
 @item a53cc @var{boolean}
@@ -2145,6 +2158,12 @@ Set the x265 preset.
 
 @item tune
 Set the x265 tune parameter.
+
+@item profile
+Set profile restrictions.
+
+@item crf
+Set the quality for constant quality mode.
 
 @item forced-idr
 Normally, when forcing a I-frame type, the encoder can select any type
@@ -2346,6 +2365,11 @@ Never write it.
 @itemx always
 Always write it.
 @end table
+@item video_format @var{integer}
+Specifies the video_format written into the sequence display extension
+indicating the source of the video pictures. The default is @samp{unspecified},
+can be @samp{component}, @samp{pal}, @samp{ntsc}, @samp{secam} or @samp{mac}.
+For maximum compatibility, use @samp{component}.
 @end table
 
 @section png
@@ -2379,6 +2403,7 @@ Select the ProRes profile to encode
 @item standard
 @item hq
 @item 4444
+@item 4444xq
 @end table
 
 @item quant_mat @var{integer}
@@ -2525,6 +2550,182 @@ encoder use CAVLC instead of CABAC.
 dia size for the iterative motion estimation
 @end table
 
+@section VAAPI encoders
+
+Wrappers for hardware encoders accessible via VAAPI.
+
+These encoders only accept input in VAAPI hardware surfaces.  If you have input
+in software frames, use the @option{hwupload} filter to upload them to the GPU.
+
+The following standard libavcodec options are used:
+@itemize
+@item
+@option{g} / @option{gop_size}
+@item
+@option{bf} / @option{max_b_frames}
+@item
+@option{profile}
+
+If not set, this will be determined automatically from the format of the input
+frames and the profiles supported by the driver.
+@item
+@option{level}
+@item
+@option{b} / @option{bit_rate}
+@item
+@option{maxrate} / @option{rc_max_rate}
+@item
+@option{bufsize} / @option{rc_buffer_size}
+@item
+@option{rc_init_occupancy} / @option{rc_initial_buffer_occupancy}
+@item
+@option{compression_level}
+
+Speed / quality tradeoff: higher values are faster / worse quality.
+@item
+@option{q} / @option{global_quality}
+
+Size / quality tradeoff: higher values are smaller / worse quality.
+@item
+@option{qmin}
+@item
+@option{qmax}
+@item
+@option{i_qfactor} / @option{i_quant_factor}
+@item
+@option{i_qoffset} / @option{i_quant_offset}
+@item
+@option{b_qfactor} / @option{b_quant_factor}
+@item
+@option{b_qoffset} / @option{b_quant_offset}
+@item
+@option{slices}
+@end itemize
+
+All encoders support the following options:
+@itemize
+@item
+@option{low_power}
+
+Some drivers/platforms offer a second encoder for some codecs intended to use
+less power than the default encoder; setting this option will attempt to use
+that encoder.  Note that it may support a reduced feature set, so some other
+options may not be available in this mode.
+@end itemize
+
+Each encoder also has its own specific options:
+@table @option
+
+@item h264_vaapi
+@option{profile} sets the value of @emph{profile_idc} and the @emph{constraint_set*_flag}s.
+@option{level} sets the value of @emph{level_idc}.
+
+@table @option
+@item coder
+Set entropy encoder (default is @emph{cabac}).  Possible values:
+
+@table @samp
+@item ac
+@item cabac
+Use CABAC.
+
+@item vlc
+@item cavlc
+Use CAVLC.
+@end table
+
+@item aud
+Include access unit delimiters in the stream (not included by default).
+
+@item sei
+Set SEI message types to include.
+Some combination of the following values:
+@table @samp
+@item identifier
+Include a @emph{user_data_unregistered} message containing information about
+the encoder.
+@item timing
+Include picture timing parameters (@emph{buffering_period} and
+@emph{pic_timing} messages).
+@item recovery_point
+Include recovery points where appropriate (@emph{recovery_point} messages).
+@end table
+
+@end table
+
+@item hevc_vaapi
+@option{profile} and @option{level} set the values of
+@emph{general_profile_idc} and @emph{general_level_idc} respectively.
+
+@table @option
+@item aud
+Include access unit delimiters in the stream (not included by default).
+
+@item tier
+Set @emph{general_tier_flag}.  This may affect the level chosen for the stream
+if it is not explicitly specified.
+
+@item sei
+Set SEI message types to include.
+Some combination of the following values:
+@table @samp
+@item hdr
+Include HDR metadata if the input frames have it
+(@emph{mastering_display_colour_volume} and @emph{content_light_level}
+messages).
+@end table
+
+@end table
+
+@item mjpeg_vaapi
+Only baseline DCT encoding is supported.  The encoder always uses the standard
+quantisation and huffman tables - @option{global_quality} scales the standard
+quantisation table (range 1-100).
+
+For YUV, 4:2:0, 4:2:2 and 4:4:4 subsampling modes are supported.  RGB is also
+supported, and will create an RGB JPEG.
+
+@table @option
+@item jfif
+Include JFIF header in each frame (not included by default).
+@item huffman
+Include standard huffman tables (on by default).  Turning this off will save
+a few hundred bytes in each output frame, but may lose compatibility with some
+JPEG decoders which don't fully handle MJPEG.
+@end table
+
+@item mpeg2_vaapi
+@option{profile} and @option{level} set the value of @emph{profile_and_level_indication}.
+
+@item vp8_vaapi
+B-frames are not supported.
+
+@option{global_quality} sets the @emph{q_idx} used for non-key frames (range 0-127).
+
+@table @option
+@item loop_filter_level
+@item loop_filter_sharpness
+Manually set the loop filter parameters.
+@end table
+
+@item vp9_vaapi
+@option{global_quality} sets the @emph{q_idx} used for P-frames (range 0-255).
+
+@table @option
+@item loop_filter_level
+@item loop_filter_sharpness
+Manually set the loop filter parameters.
+@end table
+
+B-frames are supported, but the output stream is always in encode order rather than display
+order.  If B-frames are enabled, it may be necessary to use the @option{vp9_raw_reorder}
+bitstream filter to modify the output stream to display frames in the correct order.
+
+Only normal frames are produced - the @option{vp9_superframe} bitstream filter may be
+required to produce a stream usable with all decoders.
+
+@end table
+
 @section vc2
 
 SMPTE VC-2 (previously BBC Dirac Pro). This codec was primarily aimed at
@@ -2588,6 +2789,52 @@ reduce perception. Use in bogus benchmarks.
 Reduces detail but attempts to preserve color at extremely low bitrates.
 @end itemize
 
+@end table
+
+@section libxavs2
+
+xavs2 AVS2-P2/IEEE1857.4 encoder wrapper.
+
+This encoder requires the presence of the libxavs2 headers and library
+during configuration. You need to explicitly configure the build with
+@option{--enable-libxavs2}.
+
+@subsection Options
+
+@table @option
+@item lcu_row_threads
+Set the number of parallel threads for rows from 1 to 8 (default 5).
+
+@item initial_qp
+Set the xavs2 quantization parameter from 1 to 63 (default 34). This is
+used to set the initial qp for the first frame.
+
+@item qp
+Set the xavs2 quantization parameter from 1 to 63 (default 34). This is
+used to set the qp value under constant-QP mode.
+
+@item max_qp
+Set the max qp for rate control from 1 to 63 (default 55).
+
+@item min_qp
+Set the min qp for rate control from 1 to 63 (default 20).
+
+@item speed_level
+Set the Speed level from 0 to 9 (default 0). Higher is better but slower.
+
+@item log_level
+Set the log level from -1 to 3 (default 0). -1: none, 0: error,
+1: warning, 2: info, 3: debug.
+
+@item xavs2-params
+Set xavs2 options using a list of @var{key}=@var{value} couples separated
+by ":".
+
+For example to specify libxavs2 encoding options with @option{-xavs2-params}:
+
+@example
+ffmpeg -i input -c:v libxavs2 -xavs2-params preset_level=5 output.avs2
+@end example
 @end table
 
 @c man end VIDEO ENCODERS

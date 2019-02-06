@@ -35,7 +35,6 @@
 #include "h264_ps.h"
 #include "golomb.h"
 
-#define MAX_LOG2_MAX_FRAME_NUM    (12 + 4)
 #define MIN_LOG2_MAX_FRAME_NUM    4
 
 #define EXTENDED_SAR       255
@@ -168,11 +167,13 @@ static inline int decode_vui_parameters(GetBitContext *gb, AVCodecContext *avctx
             sps->color_primaries = get_bits(gb, 8); /* colour_primaries */
             sps->color_trc       = get_bits(gb, 8); /* transfer_characteristics */
             sps->colorspace      = get_bits(gb, 8); /* matrix_coefficients */
-            if (sps->color_primaries >= AVCOL_PRI_NB)
+
+            // Set invalid values to "unspecified"
+            if (!av_color_primaries_name(sps->color_primaries))
                 sps->color_primaries = AVCOL_PRI_UNSPECIFIED;
-            if (sps->color_trc >= AVCOL_TRC_NB)
+            if (!av_color_transfer_name(sps->color_trc))
                 sps->color_trc = AVCOL_TRC_UNSPECIFIED;
-            if (sps->colorspace >= AVCOL_SPC_NB)
+            if (!av_color_space_name(sps->colorspace))
                 sps->colorspace = AVCOL_SPC_UNSPECIFIED;
         }
     }
@@ -346,7 +347,7 @@ int ff_h264_decode_seq_parameter_set(GetBitContext *gb, AVCodecContext *avctx,
 
     sps->data_size = gb->buffer_end - gb->buffer;
     if (sps->data_size > sizeof(sps->data)) {
-        av_log(avctx, AV_LOG_WARNING, "Truncating likely oversized SPS\n");
+        av_log(avctx, AV_LOG_DEBUG, "Truncating likely oversized SPS\n");
         sps->data_size = sizeof(sps->data);
     }
     memcpy(sps->data, gb->buffer, sps->data_size);
@@ -530,15 +531,6 @@ int ff_h264_decode_seq_parameter_set(GetBitContext *gb, AVCodecContext *avctx,
                           sps->chroma_format_idc == 2) ? 1 : 0;
             int step_x = 1 << hsub;
             int step_y = (2 - sps->frame_mbs_only_flag) << vsub;
-
-            if (crop_left & (0x1F >> (sps->bit_depth_luma > 8)) &&
-                !(avctx->flags & AV_CODEC_FLAG_UNALIGNED)) {
-                crop_left &= ~(0x1F >> (sps->bit_depth_luma > 8));
-                av_log(avctx, AV_LOG_WARNING,
-                       "Reducing left cropping to %d "
-                       "chroma samples to preserve alignment.\n",
-                       crop_left);
-            }
 
             if (crop_left  > (unsigned)INT_MAX / 4 / step_x ||
                 crop_right > (unsigned)INT_MAX / 4 / step_x ||
@@ -752,7 +744,7 @@ int ff_h264_decode_picture_parameter_set(GetBitContext *gb, AVCodecContext *avct
 
     pps->data_size = gb->buffer_end - gb->buffer;
     if (pps->data_size > sizeof(pps->data)) {
-        av_log(avctx, AV_LOG_WARNING, "Truncating likely oversized PPS "
+        av_log(avctx, AV_LOG_DEBUG, "Truncating likely oversized PPS "
                "(%"SIZE_SPECIFIER" > %"SIZE_SPECIFIER")\n",
                pps->data_size, sizeof(pps->data));
         pps->data_size = sizeof(pps->data);

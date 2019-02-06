@@ -30,7 +30,6 @@
 
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
-#include <libavfilter/avfiltergraph.h>
 #include <libavfilter/buffersink.h>
 #include <libavfilter/buffersrc.h>
 #include <libavutil/opt.h>
@@ -173,6 +172,9 @@ static int open_output_file(const char *filename)
                 enc_ctx->time_base = (AVRational){1, enc_ctx->sample_rate};
             }
 
+            if (ofmt_ctx->oformat->flags & AVFMT_GLOBALHEADER)
+                enc_ctx->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
+
             /* Third parameter can be used to pass settings to encoder */
             ret = avcodec_open2(enc_ctx, encoder, NULL);
             if (ret < 0) {
@@ -184,8 +186,6 @@ static int open_output_file(const char *filename)
                 av_log(NULL, AV_LOG_ERROR, "Failed to copy encoder parameters to output stream #%u\n", i);
                 return ret;
             }
-            if (ofmt_ctx->oformat->flags & AVFMT_GLOBALHEADER)
-                enc_ctx->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
 
             out_stream->time_base = enc_ctx->time_base;
             stream_ctx[i].enc_ctx = enc_ctx;
@@ -228,8 +228,8 @@ static int init_filter(FilteringContext* fctx, AVCodecContext *dec_ctx,
 {
     char args[512];
     int ret = 0;
-    AVFilter *buffersrc = NULL;
-    AVFilter *buffersink = NULL;
+    const AVFilter *buffersrc = NULL;
+    const AVFilter *buffersink = NULL;
     AVFilterContext *buffersrc_ctx = NULL;
     AVFilterContext *buffersink_ctx = NULL;
     AVFilterInOut *outputs = avfilter_inout_alloc();
@@ -518,9 +518,6 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    av_register_all();
-    avfilter_register_all();
-
     if ((ret = open_input_file(argv[1])) < 0)
         goto end;
     if ((ret = open_output_file(argv[2])) < 0)
@@ -558,7 +555,7 @@ int main(int argc, char **argv)
             }
 
             if (got_frame) {
-                frame->pts = av_frame_get_best_effort_timestamp(frame);
+                frame->pts = frame->best_effort_timestamp;
                 ret = filter_encode_write_frame(frame, stream_index);
                 av_frame_free(&frame);
                 if (ret < 0)

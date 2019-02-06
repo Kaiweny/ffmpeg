@@ -17,13 +17,15 @@
 /dict
 /display
 /error
+/encryption_info
 /eval
 /fifo
 /file
-/float_dsp
 /hash
 /hmac
+/hwdevice
 /imgutils
+/integer
 /lfg
 /lls
 /log
@@ -35,6 +37,7 @@
 /pca
 /pixdesc
 /pixelutils
+/pixfmt_best
 /random_seed
 /rational
 /ripemd
