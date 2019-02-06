@@ -1560,8 +1560,8 @@ static int64_t calc_cur_seg_no(struct representation *pls, DASHContext *c)
             if (num == -1)
                 num = pls->first_seq_no;
         }
-        else {
-            num = pls->first_seq_no + (((GetCurrentTimeInSec() - c->availabilityStartTimeSec) - c->presentationDelaySec - pls->presentationTimeOffset) * pls->segmentTimescalce) / pls->segmentDuration;
+        else if (pls->segmentDuration) {
+            num = pls->first_seq_no + (((GetCurrentTimeInSec() - c->availabilityStartTimeSec - c->presentationDelaySec) * pls->segmentTimescalce) - pls->presentationTimeOffset) / pls->segmentDuration;
             #ifdef PRINTING
             printf("pls->first_seq_no = %d\n", pls->first_seq_no);
             printf("pls->segmentTimescalce = %d\n", pls->segmentTimescalce);
@@ -1572,6 +1572,9 @@ static int64_t calc_cur_seg_no(struct representation *pls, DASHContext *c)
             printf("c->availabilityStartTimeSec = %d\n", c->availabilityStartTimeSec);
             printf("num = %d\n", num);
             #endif // PRINTING
+        }
+        else {
+            num = pls->first_seq_no;
         }
 
     } else {
@@ -1584,16 +1587,16 @@ static int64_t calc_min_seg_no(struct representation *pls, DASHContext *c)
 {
     int64_t num = 0;
 
-    if (c->is_live && pls->segmentDuration) { 
-        num = pls->first_seq_no + (((GetCurrentTimeInSec() - c->availabilityStartTimeSec) - c->timeShiftBufferDepthSec - pls->presentationTimeOffset) * pls->segmentTimescalce)  / pls->segmentDuration;
-
+    if (c->is_live && pls->segmentDuration) {
+        num = pls->first_seq_no + (((GetCurrentTimeInSec() - c->availabilityStartTimeSec - c->timeShiftBufferDepthSec) * pls->segmentTimescalce) - pls->presentationTimeOffset) / pls->segmentDuration;
     } else {
         num = pls->first_seq_no;
     }
     return num;
 }
 
-static int64_t calc_max_seg_no(struct representation *pls, DASHContext *c) {
+static int64_t calc_max_seg_no(struct representation *pls, DASHContext *c)
+{
     
     int64_t num = 0;
 
@@ -1605,13 +1608,15 @@ static int64_t calc_max_seg_no(struct representation *pls, DASHContext *c) {
             num += pls->timelines[i]->r;
         }
     }
-    else if (c->is_live) {
-        num = pls->first_seq_no + (((GetCurrentTimeInSec() - c->availabilityStartTimeSec)) * pls->segmentTimescalce - pls->presentationTimeOffset)  / pls->segmentDuration;
+    else if (c->is_live && pls->segmentDuration) {
+        num = pls->first_seq_no + (((GetCurrentTimeInSec() - c->availabilityStartTimeSec) * pls->segmentTimescalce) - pls->presentationTimeOffset) / pls->segmentDuration;
     }
-    else {
+    else if (pls->segmentDuration) {
         num = pls->first_seq_no + (c->mediaPresentationDurationSec * pls->segmentTimescalce) / pls->segmentDuration;
     }
-
+    else {
+        num = pls->first_seq_no;
+    }
     return num;
 }
 
