@@ -21,7 +21,7 @@ OBJS = allfilters.o                                                     \
        graphparser.o                                                    \
        transform.o                                                      \
        video.o                                                          \
-       lavfutils.o                                                          \
+       lavfutils.o                                                      \
 
 OBJS-$(HAVE_THREADS)                         += pthread.o
 

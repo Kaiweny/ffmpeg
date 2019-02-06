@@ -886,13 +886,14 @@ static int parse_playlist(HLSContext *c, const char *url,
             continue;
         } else if (line[0]) {
             if ( is_variant && is_selected_by_bandwidth(variant_info.bandwidth, c->selected_bandwidth) ) {
-                av_log(c, AV_LOG_INFO, "Variant with %s selected\n", variant_info.bandwidth);
+                av_log(c, AV_LOG_INFO, "Variant with bandwidth=%s selected\n", variant_info.bandwidth);
                 if (!new_variant(c, &variant_info, line, url)) {
                     ret = AVERROR(ENOMEM);
                     goto fail;
                 }
                 is_variant = 0;
             }
+
             if (is_segment) {
                 struct segment *seg;
                 if (!pls) {
