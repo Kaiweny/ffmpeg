@@ -1414,7 +1414,7 @@ static int64_t calc_cur_seg_no(AVFormatContext *s, struct representation *pls)
         } else if (pls->fragment_duration){
             av_log(s, AV_LOG_TRACE, "in fragment_duration mode fragment_timescale = %"PRId64", presentation_timeoffset = %"PRId64"\n", pls->fragment_timescale, pls->presentation_timeoffset);
             if (pls->presentation_timeoffset) {
-                num = pls->first_seq_no + (((get_current_time_in_sec() - c->availability_start_time) * pls->fragment_timescale)-pls->presentation_timeoffset) / pls->fragment_duration - c->min_buffer_time;
+                num = pls->first_seq_no + (((get_current_time_in_sec() - c->availability_start_time) * pls->fragment_timescale) - pls->presentation_timeoffset) / pls->fragment_duration - c->min_buffer_time;
             } else if (c->publish_time > 0 && !c->availability_start_time) {
                 if (c->min_buffer_time) {
                     num = pls->first_seq_no + (((c->publish_time + pls->fragment_duration) - c->suggested_presentation_delay) * pls->fragment_timescale) / pls->fragment_duration - c->min_buffer_time;
@@ -1438,7 +1438,7 @@ static int64_t calc_min_seg_no(AVFormatContext *s, struct representation *pls)
 
     if (c->is_live && pls->fragment_duration) {
         av_log(s, AV_LOG_TRACE, "in live mode\n");
-        num = pls->first_seq_no + (((get_current_time_in_sec() - c->availability_start_time) - c->time_shift_buffer_depth) * pls->fragment_timescale) / pls->fragment_duration;
+        num = pls->first_seq_no + ((((get_current_time_in_sec() - c->availability_start_time) - c->time_shift_buffer_depth) * pls->fragment_timescale) - pls->presentation_timeoffset) / pls->fragment_duration;
     } else {
         num = pls->first_seq_no;
     }
@@ -1463,7 +1463,7 @@ static int64_t calc_max_seg_no(struct representation *pls, DASHContext *c)
             }
         }
     } else if (c->is_live && pls->fragment_duration) {
-        num = pls->first_seq_no + (((get_current_time_in_sec() - c->availability_start_time)) * pls->fragment_timescale)  / pls->fragment_duration;
+        num = pls->first_seq_no + (((get_current_time_in_sec() - c->availability_start_time) * pls->fragment_timescale) - pls->presentation_timeoffset)  / pls->fragment_duration;
     } else if (pls->fragment_duration) {
         num = pls->first_seq_no + (c->media_presentation_duration * pls->fragment_timescale) / pls->fragment_duration;
     }
