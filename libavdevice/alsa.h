@@ -45,6 +45,17 @@ typedef void (*ff_reorder_func)(const void *, void *, int);
 
 #define ALSA_BUFFER_SIZE_MAX 131072
 
+typedef struct SpdifData {
+    int enabled;
+    uint8_t *buffer;
+    size_t buffer_size;
+    int buffer_write_pointer;
+    int buffer_read_pointer;
+    int buffer_allocated_size;
+    uint8_t *avio_ctx_buffer;
+    size_t avio_ctx_buffer_size;
+} SpdifData;
+
 typedef struct AlsaData {
     AVClass *class;
     snd_pcm_t *h;
@@ -58,13 +69,7 @@ typedef struct AlsaData {
     void *reorder_buf;
     int reorder_buf_size; ///< in frames
     int64_t timestamp; ///< current timestamp, without latency applied.
-    int spdif;
-    uint8_t *spdif_buffer;
-    size_t spdif_buffer_size;
-    int spdif_buffer_pos;
-    int spdif_buffer_allocated_size;
-    uint8_t *avio_ctx_buffer;
-    size_t avio_ctx_buffer_size;
+    SpdifData spdif;
 } AlsaData;
 
 /**

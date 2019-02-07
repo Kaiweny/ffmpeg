@@ -154,13 +154,18 @@ static void writeout(AVIOContext *s, const uint8_t *data, int len)
 {
     if (!s->error) {
         int ret = 0;
-        if (s->write_data_type)
+        if (s->write_data_type) {
             ret = s->write_data_type(s->opaque, (uint8_t *)data,
                                      len,
                                      s->current_type,
                                      s->last_time);
-        else if (s->write_packet)
+
+            av_log(s, AV_LOG_ERROR, "WRITEOUT-1\n");
+        }
+        else if (s->write_packet) {
             ret = s->write_packet(s->opaque, (uint8_t *)data, len);
+            av_log(s, AV_LOG_ERROR, "WRITEOUT-2\n");
+        }
         if (ret < 0) {
             s->error = ret;
         } else {

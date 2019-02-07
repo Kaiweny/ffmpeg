@@ -59,7 +59,42 @@
 #include "avdevice.h"
 #include "alsa.h"
 
-static void set_spdif(AVFormatContext *s, AlsaData *alsa, AVPacket* pkt)
+static int write_packet(SpdifData* s, uint8_t *buf, int buf_size)
+{
+    unsigned new_size, new_allocated_size;
+
+    /* reallocate buffer if needed */
+    new_size = s->buffer_write_pointer + buf_size;
+    new_allocated_size = s->buffer_allocated_size;
+    av_log(s, AV_LOG_WARNING, "Write Packet new_size:%d - new_allocated_size:%d\n", new_size, new_allocated_size);
+    if (new_size < s->buffer_write_pointer || new_size > INT_MAX/2)
+        return -1;
+    while (new_size > new_allocated_size) {
+        if (!new_allocated_size)
+            new_allocated_size = new_size;
+        else
+            new_allocated_size += new_allocated_size / 2 + 1;
+    }
+
+    av_log(s, AV_LOG_WARNING, "Write Packet new_allocated_size:%d - buffer_size:%d\n", new_allocated_size, s->buffer_size);
+    if (new_allocated_size > s->buffer_size) {
+        int err;
+        if ((err = av_reallocp(&s->buffer_size, new_allocated_size)) < 0) {
+            s->buffer_allocated_size = 0;
+            s->buffer_size = 0;
+            return err;
+        }
+        s->buffer_allocated_size = new_allocated_size;
+    }
+    av_log(s, AV_LOG_WARNING, "Write Packet copy data from %p to %p + %d (size:%d) - %p\n", buf, s->buffer, s->buffer_write_pointer, buf_size, s);
+    memcpy(s->buffer + s->buffer_write_pointer, buf, buf_size);
+    s->buffer_write_pointer = new_size;
+    if (s->buffer_write_pointer > s->buffer_size)
+        s->buffer_size = s->buffer_write_pointer;
+    return buf_size;
+}
+
+static void set_spdif(AVFormatContext *s, SpdifData *spdif, AVPacket* pkt)
 {
     if (CONFIG_SPDIF_DEMUXER) {
         enum AVCodecID codec;
@@ -67,7 +102,7 @@ static void set_spdif(AVFormatContext *s, AlsaData *alsa, AVPacket* pkt)
         int ret = ffio_ensure_seekback(s->pb, len);
         if (ret >= 0) {
             av_log(s, AV_LOG_WARNING, "SPDIF writing packet size %d\n", pkt->size);
-            avio_write(s->pb, pkt->data, pkt->size);
+            write_packet(spdif, pkt->data, pkt->size);
             //for (int i = 0; i < pkt->size; i++) {
             //    av_log(s, AV_LOG_WARNING, "%02x ", pkt->data[i]);
             //    if (i && (i % 15) == 0) {
@@ -85,7 +120,7 @@ static void set_spdif(AVFormatContext *s, AlsaData *alsa, AVPacket* pkt)
                     ret = ff_spdif_probe(buf, len, &codec);
                     if (ret > AVPROBE_SCORE_EXTENSION) {
                         s->streams[0]->codecpar->codec_id = codec;
-                        alsa->spdif = 1;
+                        spdif->enabled = 1;
                         av_log(s, AV_LOG_WARNING, "Setting SPDIF to format %d\n", codec);
                     }
                     else {
@@ -108,77 +143,45 @@ static void set_spdif(AVFormatContext *s, AlsaData *alsa, AVPacket* pkt)
 static int read_packet(void *opaque, uint8_t *buf, int buf_size)
 {
     AlsaData *s = (AlsaData *)opaque;
-    av_log(s, AV_LOG_WARNING, "In Read Packet %d - %d\n", buf_size, s->spdif_buffer_size);
-    buf_size = FFMIN(buf_size, s->spdif_buffer_size);
+    SpdifData *spdif = &s->spdif;
+    av_log(s, AV_LOG_WARNING, "In Read Packet %d - %d\n", buf_size, spdif->buffer_size);
+    buf_size = FFMIN(buf_size, spdif->buffer_size);
 
     if (!buf_size)
         return AVERROR_EOF;
 
-    memcpy(buf, s->spdif_buffer, buf_size);
-    s->spdif_buffer      += buf_size;
-    s->spdif_buffer_size -= buf_size;
+    memcpy(buf, spdif->buffer, buf_size);
+    spdif->buffer      += buf_size;
+    spdif->buffer_size -= buf_size;
 
-    return buf_size;
-}
-
-static int write_packet(void *opaque, uint8_t *buf, int buf_size)
-{
-    AlsaData *s = (AlsaData *)opaque;
-    unsigned new_size, new_allocated_size;
-
-    /* reallocate buffer if needed */
-    new_size = s->spdif_buffer_pos + buf_size;
-    new_allocated_size = s->spdif_buffer_allocated_size;
-    av_log(s, AV_LOG_WARNING, "Write Packet new_size:%d - new_allocated_size:%d\n", new_size, new_allocated_size);
-    if (new_size < s->spdif_buffer_pos || new_size > INT_MAX/2)
-        return -1;
-    while (new_size > new_allocated_size) {
-        if (!new_allocated_size)
-            new_allocated_size = new_size;
-        else
-            new_allocated_size += new_allocated_size / 2 + 1;
-    }
-
-    av_log(s, AV_LOG_WARNING, "Write Packet new_allocated_size:%d - spdif_buffer_size:%d\n", new_allocated_size, s->spdif_buffer_size);
-    if (new_allocated_size > s->spdif_buffer_size) {
-        int err;
-        if ((err = av_reallocp(&s->spdif_buffer_size, new_allocated_size)) < 0) {
-            s->spdif_buffer_allocated_size = 0;
-            s->spdif_buffer_size = 0;
-            return err;
-        }
-        s->spdif_buffer_allocated_size = new_allocated_size;
-    }
-    av_log(s, AV_LOG_WARNING, "Write Packet copy data from %p to %p + %d (size:%d) - %p\n", buf, s->spdif_buffer, s->spdif_buffer_pos, buf_size, s);
-    memcpy(s->spdif_buffer + s->spdif_buffer_pos, buf, buf_size);
-    s->spdif_buffer_pos = new_size;
-    if (s->spdif_buffer_pos > s->spdif_buffer_size)
-        s->spdif_buffer_size = s->spdif_buffer_pos;
     return buf_size;
 }
 
 static int64_t seek(void *opaque, int64_t offset, int whence)
 {
     AlsaData *s = (AlsaData *)opaque;
+    SpdifData *spdif = &s->spdif;
 
     if (whence == SEEK_CUR) {
-        av_log(s, AV_LOG_WARNING, "SEEKCUR from %d to %d\n", offset, s->spdif_buffer_pos);
-        offset += s->spdif_buffer_pos;
+        av_log(s, AV_LOG_WARNING, "SEEKCUR from %d to %d\n", offset, spdif->buffer_read_pointer);
+        offset += spdif->buffer_read_pointer;
     }
     else if (whence == SEEK_END) {
-        av_log(s, AV_LOG_WARNING, "SEEKEND from %d to %d\n", offset, s->spdif_buffer_size);
-        offset += s->spdif_buffer_size;
+        av_log(s, AV_LOG_WARNING, "SEEKEND from %d to %d\n", offset, spdif->buffer_size);
+        offset += spdif->buffer_size;
     }
     if (offset < 0 || offset > 0x7fffffffLL)
         return -1;
-    av_log(s, AV_LOG_WARNING, "SEEK position set from %d to %d\n", s->spdif_buffer_pos, offset);
-    s->spdif_buffer_pos = offset;
+    av_log(s, AV_LOG_WARNING, "SEEK position set from %d to %d\n", spdif->buffer_read_pointer, offset);
+    spdif->buffer_read_pointer = offset;
     return 0;
 }
 
 static av_cold int audio_read_header(AVFormatContext *s1)
 {
     AlsaData *s = s1->priv_data;
+    SpdifData *spdif = &s->spdif;
+
     AVStream *st;
     int ret;
     enum AVCodecID codec_id;
@@ -211,16 +214,15 @@ static av_cold int audio_read_header(AVFormatContext *s1)
         goto fail;
 
     if (CONFIG_SPDIF_DEMUXER) {
-        s->spdif_buffer_size = 1 << 16;
-        s->spdif_buffer_allocated_size = 1 << 16;
-        s->spdif_buffer = av_malloc(s->spdif_buffer_size);
-        s->avio_ctx_buffer_size = 4096;
-        s->avio_ctx_buffer = av_malloc(s->avio_ctx_buffer_size);
-        AVIOContext *avio_ctx = avio_alloc_context(s->avio_ctx_buffer, s->avio_ctx_buffer_size,
-            AVIO_FLAG_WRITE, s, &read_packet, &write_packet, &seek);
-        avio_ctx->direct = AVIO_FLAG_DIRECT;
+        spdif->buffer_size = 1 << 16;
+        spdif->buffer_allocated_size = 1 << 16;
+        spdif->buffer = av_malloc(spdif->buffer_size);
+        spdif->avio_ctx_buffer_size = 4096;
+        spdif->avio_ctx_buffer = av_malloc(spdif->avio_ctx_buffer_size);
+        AVIOContext *avio_ctx = avio_alloc_context(spdif->avio_ctx_buffer, spdif->avio_ctx_buffer_size,
+            AVIO_FLAG_READ, spdif, &read_packet, NULL, &seek);
         s1->pb = avio_ctx;
-        av_log(s, AV_LOG_WARNING, "Alloc'd spdif buffer %p in %p\n", s->spdif_buffer, s);
+        av_log(s, AV_LOG_WARNING, "Alloc'd spdif buffer %p in %p\n", spdif->buffer, spdif);
     }
     return 0;
 
@@ -232,6 +234,7 @@ fail:
 static int audio_read_packet(AVFormatContext *s1, AVPacket *pkt)
 {
     AlsaData *s  = s1->priv_data;
+    SpdifData *spdif  = &s->spdif;
     int res;
     int64_t dts;
     snd_pcm_sframes_t delay = 0;
@@ -256,9 +259,9 @@ static int audio_read_packet(AVFormatContext *s1, AVPacket *pkt)
         ff_timefilter_reset(s->timefilter);
     }
 
-    set_spdif(s1, s, pkt);
+    set_spdif(s1, spdif, pkt);
 
-    if (CONFIG_SPDIF_DEMUXER && s->spdif == 1) {
+    if (CONFIG_SPDIF_DEMUXER && spdif->enabled == 1) {
         // Copy it to pb
         av_log(s, AV_LOG_WARNING, "Copying SPDIF to packet %d\n", pkt->size);
         av_packet_unref(pkt);
