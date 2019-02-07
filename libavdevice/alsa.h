@@ -58,6 +58,13 @@ typedef struct AlsaData {
     void *reorder_buf;
     int reorder_buf_size; ///< in frames
     int64_t timestamp; ///< current timestamp, without latency applied.
+    int spdif;
+    uint8_t *spdif_buffer;
+    size_t spdif_buffer_size;
+    int spdif_buffer_pos;
+    int spdif_buffer_allocated_size;
+    uint8_t *avio_ctx_buffer;
+    size_t avio_ctx_buffer_size;
 } AlsaData;
 
 /**
