@@ -59,100 +59,106 @@
 #include "avdevice.h"
 #include "alsa.h"
 
-static int write_packet(SpdifData* s, uint8_t *buf, int buf_size)
+static int write_spdif_packet(AlsaData *s, uint8_t *buf, int buf_size)
 {
-    unsigned new_size, new_allocated_size;
+    SpdifData *spdif = &s->spdif;
 
-    /* reallocate buffer if needed */
-    new_size = s->buffer_write_pointer + buf_size;
-    new_allocated_size = s->buffer_allocated_size;
-    av_log(s, AV_LOG_WARNING, "Write Packet new_size:%d - new_allocated_size:%d\n", new_size, new_allocated_size);
-    if (new_size < s->buffer_write_pointer || new_size > INT_MAX/2)
-        return -1;
-    while (new_size > new_allocated_size) {
-        if (!new_allocated_size)
-            new_allocated_size = new_size;
-        else
-            new_allocated_size += new_allocated_size / 2 + 1;
+    av_log(s, AV_LOG_WARNING, "Write: Amount:%d,Used Space:%d,Free Space:%d\n", buf_size, av_fifo_size(spdif->buffer), av_fifo_space(spdif->buffer));
+
+    if (0 == av_fifo_space(spdif->buffer)) {
+        return AVERROR(ENOMEM);
     }
 
-    av_log(s, AV_LOG_WARNING, "Write Packet new_allocated_size:%d - buffer_size:%d\n", new_allocated_size, s->buffer_size);
-    if (new_allocated_size > s->buffer_size) {
-        int err;
-        if ((err = av_reallocp(&s->buffer_size, new_allocated_size)) < 0) {
-            s->buffer_allocated_size = 0;
-            s->buffer_size = 0;
-            return err;
-        }
-        s->buffer_allocated_size = new_allocated_size;
-    }
-    av_log(s, AV_LOG_WARNING, "Write Packet copy data from %p to %p + %d (size:%d) - %p\n", buf, s->buffer, s->buffer_write_pointer, buf_size, s);
-    memcpy(s->buffer + s->buffer_write_pointer, buf, buf_size);
-    s->buffer_write_pointer = new_size;
-    if (s->buffer_write_pointer > s->buffer_size)
-        s->buffer_size = s->buffer_write_pointer;
+    buf_size = FFMIN(buf_size, av_fifo_space(spdif->buffer));
+
+    av_fifo_generic_write(spdif->buffer, buf, buf_size, NULL);
+
     return buf_size;
 }
 
 static void set_spdif(AVFormatContext *s, SpdifData *spdif, AVPacket* pkt)
 {
-    if (CONFIG_SPDIF_DEMUXER) {
-        enum AVCodecID codec;
-        int len = 1<<16;
-        int ret = ffio_ensure_seekback(s->pb, len);
-        if (ret >= 0) {
-            av_log(s, AV_LOG_WARNING, "SPDIF writing packet size %d\n", pkt->size);
-            write_packet(spdif, pkt->data, pkt->size);
-            //for (int i = 0; i < pkt->size; i++) {
-            //    av_log(s, AV_LOG_WARNING, "%02x ", pkt->data[i]);
-            //    if (i && (i % 15) == 0) {
-            //        av_log(s, AV_LOG_WARNING, "\n");
-            //    }
-            //}
-            uint8_t *buf = av_malloc(len);
-            if (!buf) {
-                ret = AVERROR(ENOMEM);
-            } else {
-                int64_t pos = avio_tell(s->pb);
-                av_log(s, AV_LOG_WARNING, "SPDIF buffer at position %"PRIi64"\n", pos);
-                len = ret = avio_read(s->pb, buf, len);
-                if (len >= 0) {
-                    ret = ff_spdif_probe(buf, len, &codec);
-                    if (ret > AVPROBE_SCORE_EXTENSION) {
-                        s->streams[0]->codecpar->codec_id = codec;
-                        spdif->enabled = 1;
-                        av_log(s, AV_LOG_WARNING, "Setting SPDIF to format %d\n", codec);
-                    }
-                    else {
-                        av_log(s, AV_LOG_WARNING, "SPDIF check returns %d vs %d\n", ret, AVPROBE_SCORE_EXTENSION);
-                    }
-                    avio_seek(s->pb, pos, SEEK_SET);
-                    av_free(buf);
+    enum AVCodecID codec;
+    int len = 1<<16;
+    int ret = ffio_ensure_seekback(s->pb, len);
+    AlsaData *alsa = s->priv_data;
+    if (ret >= 0) {
+        uint8_t *buf = av_malloc(len);
+        av_log(s, AV_LOG_WARNING, "SPDIF writing %d bytes\n", pkt->size);
+        write_spdif_packet(alsa, pkt->data, pkt->size);
+        //av_log(s, AV_LOG_WARNING, "\n 0 | ");
+        //for (int i = 0; i < pkt->size; i++) {
+        //    av_log(s, AV_LOG_WARNING, "%02x ", pkt->data[i]);
+        //    if (i && (i % 16) == 0) {
+        //        av_log(s, AV_LOG_WARNING, "\n %d | ", i);
+        //    }
+        //}
+        //av_log(s, AV_LOG_WARNING, "\n");
+        if (!buf) {
+            ret = AVERROR(ENOMEM);
+        } else {
+            int64_t pos = avio_tell(s->pb);
+            av_log(s, AV_LOG_WARNING, "SPDIF buffer at position:%"PRIi64", len:%d\n", pos, len);
+            len = ret = avio_read(s->pb, buf, len);
+            av_log(s, AV_LOG_WARNING, "SPDIF Read %d\n", len);
+            if (len >= 0) {
+                //av_log(s, AV_LOG_WARNING, "\n 0 | ");
+                //for (int i = 0; i < len; i++) {
+                //    av_log(s, AV_LOG_WARNING, "%02x ", buf[i]);
+                //    if (i && (i % 16) == 0) {
+                //        av_log(s, AV_LOG_WARNING, "\n %d | ", i);
+                //    }
+                //}
+                //av_log(s, AV_LOG_WARNING, "\n");
+                ret = ff_spdif_probe(buf, len, &codec);
+                if (ret > AVPROBE_SCORE_EXTENSION) {
+                    s->streams[0]->codecpar->codec_id = codec;
+                    spdif->enabled = 1;
+                    av_log(s, AV_LOG_WARNING, "Setting SPDIF to format %d\n", codec);
                 }
                 else {
-                    av_log(s, AV_LOG_WARNING, "SPDIF Failed reading %d\n", len);
+                    av_log(s, AV_LOG_WARNING, "SPDIF check returns %d vs %d\n", ret, AVPROBE_SCORE_EXTENSION);
+                    //av_log(s, AV_LOG_WARNING, "\n 0 | ");
+                    //for (int i = 0; i < len; i++) {
+                    //    av_log(s, AV_LOG_WARNING, "%02x ", buf[i]);
+                    //    if (i && (i % 16) == 0) {
+                    //        av_log(s, AV_LOG_WARNING, "\n %d | ", i);
+                    //    }
+                    //}
+                    //av_log(s, AV_LOG_WARNING, "\n");
+                }
+                if (AVPROBE_SCORE_EXTENSION == ret) {
+                    exit(-1);
                 }
             }
+            else {
+                av_log(s, AV_LOG_WARNING, "SPDIF Failed reading %d\n", len);
+            }
+            avio_seek(s->pb, pos, SEEK_SET);
+            av_free(buf);
         }
-
-        if (ret < 0)
-            av_log(s, AV_LOG_WARNING, "Cannot check for SPDIF\n");
     }
+
+    if (ret < 0)
+        av_log(s, AV_LOG_WARNING, "Cannot check for SPDIF\n");
 }
 
-static int read_packet(void *opaque, uint8_t *buf, int buf_size)
+static int read_spdif_packet(void *opaque, uint8_t *buf, int buf_size)
 {
     AlsaData *s = (AlsaData *)opaque;
     SpdifData *spdif = &s->spdif;
-    av_log(s, AV_LOG_WARNING, "In Read Packet %d - %d\n", buf_size, spdif->buffer_size);
-    buf_size = FFMIN(buf_size, spdif->buffer_size);
+
+    buf_size = FFMIN(buf_size, av_fifo_size(spdif->buffer) - spdif->read_len);
 
     if (!buf_size)
         return AVERROR_EOF;
 
-    memcpy(buf, spdif->buffer, buf_size);
-    spdif->buffer      += buf_size;
-    spdif->buffer_size -= buf_size;
+    av_log(s, AV_LOG_WARNING, "Read Packet\n");
+    av_log(s, AV_LOG_WARNING, "Output buffer:%p,size:%d\n", buf, buf_size);
+    av_log(s, AV_LOG_WARNING, "Input buffer:%p size:%d,buffer read:%d\n", spdif->buffer->rptr, av_fifo_size(spdif->buffer), spdif->read_len);
+    // LOOK AT ME HERE, MULTIPLE READS ARE NOT BEING POPULATED INTO THE BUFFER PROPERLY
+    av_fifo_generic_peek(spdif->buffer, buf+spdif->read_len, buf_size, NULL);
+    spdif->read_len += buf_size;
 
     return buf_size;
 }
@@ -162,18 +168,7 @@ static int64_t seek(void *opaque, int64_t offset, int whence)
     AlsaData *s = (AlsaData *)opaque;
     SpdifData *spdif = &s->spdif;
 
-    if (whence == SEEK_CUR) {
-        av_log(s, AV_LOG_WARNING, "SEEKCUR from %d to %d\n", offset, spdif->buffer_read_pointer);
-        offset += spdif->buffer_read_pointer;
-    }
-    else if (whence == SEEK_END) {
-        av_log(s, AV_LOG_WARNING, "SEEKEND from %d to %d\n", offset, spdif->buffer_size);
-        offset += spdif->buffer_size;
-    }
-    if (offset < 0 || offset > 0x7fffffffLL)
-        return -1;
-    av_log(s, AV_LOG_WARNING, "SEEK position set from %d to %d\n", spdif->buffer_read_pointer, offset);
-    spdif->buffer_read_pointer = offset;
+    spdif->read_len = offset;
     return 0;
 }
 
@@ -214,16 +209,21 @@ static av_cold int audio_read_header(AVFormatContext *s1)
         goto fail;
 
     if (CONFIG_SPDIF_DEMUXER) {
-        spdif->buffer_size = 1 << 16;
-        spdif->buffer_allocated_size = 1 << 16;
-        spdif->buffer = av_malloc(spdif->buffer_size);
+        AVIOContext *avio_ctx = NULL;
+        //spdif->buffer = av_fifo_alloc(1<<16);
+        //spdif->buffer = av_fifo_alloc(ALSA_BUFFER_SIZE_MAX);
         spdif->avio_ctx_buffer_size = 4096;
+        //spdif->avio_ctx_buffer_size = ALSA_BUFFER_SIZE_MAX;
         spdif->avio_ctx_buffer = av_malloc(spdif->avio_ctx_buffer_size);
-        AVIOContext *avio_ctx = avio_alloc_context(spdif->avio_ctx_buffer, spdif->avio_ctx_buffer_size,
-            AVIO_FLAG_READ, spdif, &read_packet, NULL, &seek);
+        spdif->buffer = av_fifo_alloc(ALSA_BUFFER_SIZE_MAX);
+        // Initialize read length
+        spdif->read_len = 0;
+        avio_ctx = avio_alloc_context(spdif->avio_ctx_buffer, spdif->avio_ctx_buffer_size,
+            AVIO_FLAG_READ, s, &read_spdif_packet, NULL, &seek);
         s1->pb = avio_ctx;
         av_log(s, AV_LOG_WARNING, "Alloc'd spdif buffer %p in %p\n", spdif->buffer, spdif);
     }
+
     return 0;
 
 fail:
@@ -259,13 +259,22 @@ static int audio_read_packet(AVFormatContext *s1, AVPacket *pkt)
         ff_timefilter_reset(s->timefilter);
     }
 
-    set_spdif(s1, spdif, pkt);
+    if (CONFIG_SPDIF_DEMUXER) {
+        if (spdif->enabled == 1) {
+            // Copy it to pb
+            av_log(s, AV_LOG_WARNING, "Copying SPDIF to packet %d\n", pkt->size);
+            av_packet_unref(pkt);
 
-    if (CONFIG_SPDIF_DEMUXER && spdif->enabled == 1) {
-        // Copy it to pb
-        av_log(s, AV_LOG_WARNING, "Copying SPDIF to packet %d\n", pkt->size);
-        av_packet_unref(pkt);
-        return ff_spdif_read_packet(s1, pkt);
+            // Do logic to update buffer state (copy buffers, etc)
+            int ret = ff_spdif_read_packet(s1, pkt);
+            av_fifo_drain(spdif->buffer, spdif->read_len);
+            spdif->read_len = 0;
+
+            return ret;
+        }
+        else {
+            set_spdif(s1, spdif, pkt);
+        }
     }
 
     dts = av_gettime();

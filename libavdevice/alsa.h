@@ -32,6 +32,7 @@
 
 #include <alsa/asoundlib.h>
 #include "config.h"
+#include "libavutil/fifo.h"
 #include "libavutil/log.h"
 #include "timefilter.h"
 #include "avdevice.h"
@@ -47,13 +48,10 @@ typedef void (*ff_reorder_func)(const void *, void *, int);
 
 typedef struct SpdifData {
     int enabled;
-    uint8_t *buffer;
-    size_t buffer_size;
-    int buffer_write_pointer;
-    int buffer_read_pointer;
-    int buffer_allocated_size;
     uint8_t *avio_ctx_buffer;
     size_t avio_ctx_buffer_size;
+    AVFifoBuffer *buffer;
+    uint32_t read_len;
 } SpdifData;
 
 typedef struct AlsaData {

@@ -123,14 +123,22 @@ int ff_spdif_probe(const uint8_t *p_buf, int buf_size, enum AVCodecID *codec)
     int consecutive_codes = 0;
     int offset;
 
+    const uint8_t *old_buf = buf;
+    const uint8_t *old_buf2 = buf;
+
+    printf("PROBE %p %p %d\n", buf, expected_code, buf_size);
+
     for (; buf < probe_end; buf++) {
         state = (state << 8) | *buf;
 
         if (state == (AV_BSWAP16C(SYNCWORD1) << 16 | AV_BSWAP16C(SYNCWORD2))
                 && buf[1] < 0x37) {
+            printf("Sync Code at %p %d %d\n", buf, buf - old_buf2, buf - old_buf);
+            old_buf = buf;
             sync_codes++;
 
             if (buf == expected_code) {
+                printf("Found Start Coded at %p\n", buf);
                 if (++consecutive_codes >= 2)
                     return AVPROBE_SCORE_MAX;
             } else
@@ -149,6 +157,7 @@ int ff_spdif_probe(const uint8_t *p_buf, int buf_size, enum AVCodecID *codec)
                     break;
                 expected_code = buf + offset;
                 buf = expected_code - 7;
+                printf("Next Code %p %p %d %s\n", buf, expected_code, offset, avcodec_get_name(*codec));
             }
         }
     }
