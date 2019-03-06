@@ -50,8 +50,9 @@ typedef struct SpdifData {
     int enabled;
     uint8_t *avio_ctx_buffer;
     size_t avio_ctx_buffer_size;
-    AVFifoBuffer *buffer;
-    uint32_t read_len;
+    uint8_t *buffer;
+    uint32_t read_offset;
+    uint32_t write_offset;
 } SpdifData;
 
 typedef struct AlsaData {

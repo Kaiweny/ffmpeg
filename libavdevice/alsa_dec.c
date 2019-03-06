@@ -63,50 +63,60 @@ static int write_spdif_packet(AlsaData *s, uint8_t *buf, int buf_size)
 {
     SpdifData *spdif = &s->spdif;
 
-    av_log(s, AV_LOG_WARNING, "Write: Amount:%d,Used Space:%d,Free Space:%d\n", buf_size, av_fifo_size(spdif->buffer), av_fifo_space(spdif->buffer));
+    uint32_t used_space = spdif->write_offset;
+    uint32_t free_space = ALSA_BUFFER_SIZE_MAX - spdif->write_offset;
+    av_log(s, AV_LOG_WARNING, "Write: Amount:%d,Used Space:%d,Free Space:%d\n", buf_size, used_space, free_space);
 
-    if (0 == av_fifo_space(spdif->buffer)) {
+    if (0 == free_space) {
         return AVERROR(ENOMEM);
     }
 
-    buf_size = FFMIN(buf_size, av_fifo_space(spdif->buffer));
+    buf_size = FFMIN(buf_size, free_space);
 
-    av_fifo_generic_write(spdif->buffer, buf, buf_size, NULL);
+    //av_fifo_generic_write(spdif->buffer, buf, buf_size, NULL);
+    memcpy(spdif->buffer + spdif->write_offset, buf, buf_size);
+    spdif->write_offset += buf_size;
 
     return buf_size;
 }
 
+static void print_buffer(uint8_t *buf, int buf_size) {
+}
+
 static void set_spdif(AVFormatContext *s, SpdifData *spdif, AVPacket* pkt)
 {
+    AlsaData *alsa = s->priv_data;
+    AVIOContext *pb;
     enum AVCodecID codec;
     int len = 1<<16;
-    int ret = ffio_ensure_seekback(s->pb, len);
-    AlsaData *alsa = s->priv_data;
+    av_log(s, AV_LOG_WARNING, "SPDIF writing %d bytes\n", pkt->size);
+    int ret = write_spdif_packet(alsa, pkt->data, pkt->size);
     if (ret >= 0) {
+        pb = avio_alloc_context(spdif->buffer,
+                                spdif->write_offset,
+                                0, NULL, NULL, NULL, NULL);
         uint8_t *buf = av_malloc(len);
-        av_log(s, AV_LOG_WARNING, "SPDIF writing %d bytes\n", pkt->size);
-        write_spdif_packet(alsa, pkt->data, pkt->size);
-        //av_log(s, AV_LOG_WARNING, "\n 0 | ");
+        //av_log(s, AV_LOG_WARNING, "\n +   0 | ");
         //for (int i = 0; i < pkt->size; i++) {
         //    av_log(s, AV_LOG_WARNING, "%02x ", pkt->data[i]);
-        //    if (i && (i % 16) == 0) {
-        //        av_log(s, AV_LOG_WARNING, "\n %d | ", i);
+        //    if (((i+1) % 16) == 0) {
+        //        av_log(s, AV_LOG_WARNING, "\n +%4d | ", i);
         //    }
         //}
         //av_log(s, AV_LOG_WARNING, "\n");
         if (!buf) {
             ret = AVERROR(ENOMEM);
         } else {
-            int64_t pos = avio_tell(s->pb);
+            int64_t pos = avio_tell(pb);
             av_log(s, AV_LOG_WARNING, "SPDIF buffer at position:%"PRIi64", len:%d\n", pos, len);
-            len = ret = avio_read(s->pb, buf, len);
-            av_log(s, AV_LOG_WARNING, "SPDIF Read %d\n", len);
+            len = ret = avio_read(pb, buf, len);
+            av_log(s, AV_LOG_WARNING, "SPDIF Read %d %p\n", len, buf);
             if (len >= 0) {
-                //av_log(s, AV_LOG_WARNING, "\n 0 | ");
+                //av_log(s, AV_LOG_WARNING, "\n +   0 | ");
                 //for (int i = 0; i < len; i++) {
                 //    av_log(s, AV_LOG_WARNING, "%02x ", buf[i]);
-                //    if (i && (i % 16) == 0) {
-                //        av_log(s, AV_LOG_WARNING, "\n %d | ", i);
+                //    if (((i+1) % 16) == 0) {
+                //        av_log(s, AV_LOG_WARNING, "\n +%4d | ", i+1);
                 //    }
                 //}
                 //av_log(s, AV_LOG_WARNING, "\n");
@@ -118,23 +128,31 @@ static void set_spdif(AVFormatContext *s, SpdifData *spdif, AVPacket* pkt)
                 }
                 else {
                     av_log(s, AV_LOG_WARNING, "SPDIF check returns %d vs %d\n", ret, AVPROBE_SCORE_EXTENSION);
-                    //av_log(s, AV_LOG_WARNING, "\n 0 | ");
+                    //av_log(s, AV_LOG_WARNING, "\n +   0 | ");
                     //for (int i = 0; i < len; i++) {
                     //    av_log(s, AV_LOG_WARNING, "%02x ", buf[i]);
-                    //    if (i && (i % 16) == 0) {
-                    //        av_log(s, AV_LOG_WARNING, "\n %d | ", i);
+                    //    if (((i+1) % 16) == 0) {
+                    //        av_log(s, AV_LOG_WARNING, "\n +%4d | ", i+1);
                     //    }
                     //}
                     //av_log(s, AV_LOG_WARNING, "\n");
                 }
                 if (AVPROBE_SCORE_EXTENSION == ret) {
+                    av_log(s, AV_LOG_WARNING, "\n +   0 | ");
+                    for (int i = 0; i < len; i++) {
+                        av_log(s, AV_LOG_WARNING, "%02x ", buf[i]);
+                        if (((i+1) % 16) == 0) {
+                            av_log(s, AV_LOG_WARNING, "\n +%4d | ", i+1);
+                        }
+                    }
+                    av_log(s, AV_LOG_WARNING, "\n");
                     exit(-1);
                 }
             }
             else {
                 av_log(s, AV_LOG_WARNING, "SPDIF Failed reading %d\n", len);
             }
-            avio_seek(s->pb, pos, SEEK_SET);
+            avio_seek(pb, pos, SEEK_SET);
             av_free(buf);
         }
     }
@@ -148,17 +166,20 @@ static int read_spdif_packet(void *opaque, uint8_t *buf, int buf_size)
     AlsaData *s = (AlsaData *)opaque;
     SpdifData *spdif = &s->spdif;
 
-    buf_size = FFMIN(buf_size, av_fifo_size(spdif->buffer) - spdif->read_len);
+    uint32_t used_space = spdif->write_offset;
+
+    buf_size = FFMIN(buf_size, used_space - spdif->read_offset);
+    av_log(s, AV_LOG_WARNING, "Read Packet:%p\n", buf);
 
     if (!buf_size)
         return AVERROR_EOF;
 
     av_log(s, AV_LOG_WARNING, "Read Packet\n");
     av_log(s, AV_LOG_WARNING, "Output buffer:%p,size:%d\n", buf, buf_size);
-    av_log(s, AV_LOG_WARNING, "Input buffer:%p size:%d,buffer read:%d\n", spdif->buffer->rptr, av_fifo_size(spdif->buffer), spdif->read_len);
-    // LOOK AT ME HERE, MULTIPLE READS ARE NOT BEING POPULATED INTO THE BUFFER PROPERLY
-    av_fifo_generic_peek(spdif->buffer, buf+spdif->read_len, buf_size, NULL);
-    spdif->read_len += buf_size;
+    av_log(s, AV_LOG_WARNING, "Input buffer:%p size:%d,buffer read:%d\n", spdif->buffer, used_space, spdif->read_offset);
+
+    memcpy(buf+spdif->read_offset, spdif->buffer+spdif->read_offset, buf_size);
+    spdif->read_offset += buf_size;
 
     return buf_size;
 }
@@ -167,8 +188,9 @@ static int64_t seek(void *opaque, int64_t offset, int whence)
 {
     AlsaData *s = (AlsaData *)opaque;
     SpdifData *spdif = &s->spdif;
+    av_log(s, AV_LOG_WARNING, "SEEKING TO %d\n", offset);
 
-    spdif->read_len = offset;
+    spdif->read_offset = offset;
     return 0;
 }
 
@@ -212,12 +234,14 @@ static av_cold int audio_read_header(AVFormatContext *s1)
         AVIOContext *avio_ctx = NULL;
         //spdif->buffer = av_fifo_alloc(1<<16);
         //spdif->buffer = av_fifo_alloc(ALSA_BUFFER_SIZE_MAX);
-        spdif->avio_ctx_buffer_size = 4096;
+        spdif->avio_ctx_buffer_size = ALSA_BUFFER_SIZE_MAX;
         //spdif->avio_ctx_buffer_size = ALSA_BUFFER_SIZE_MAX;
         spdif->avio_ctx_buffer = av_malloc(spdif->avio_ctx_buffer_size);
-        spdif->buffer = av_fifo_alloc(ALSA_BUFFER_SIZE_MAX);
+        //spdif->buffer = av_fifo_alloc(ALSA_BUFFER_SIZE_MAX);
+        spdif->buffer = av_malloc(ALSA_BUFFER_SIZE_MAX);
         // Initialize read length
-        spdif->read_len = 0;
+        spdif->read_offset = 0;
+        spdif->write_offset = 0;
         avio_ctx = avio_alloc_context(spdif->avio_ctx_buffer, spdif->avio_ctx_buffer_size,
             AVIO_FLAG_READ, s, &read_spdif_packet, NULL, &seek);
         s1->pb = avio_ctx;
@@ -263,13 +287,17 @@ static int audio_read_packet(AVFormatContext *s1, AVPacket *pkt)
         if (spdif->enabled == 1) {
             // Copy it to pb
             av_log(s, AV_LOG_WARNING, "Copying SPDIF to packet %d\n", pkt->size);
-            av_packet_unref(pkt);
+            AVPacket *spdif_pkt = NULL;
+            //av_packet_unref(pkt);
 
             // Do logic to update buffer state (copy buffers, etc)
-            int ret = ff_spdif_read_packet(s1, pkt);
-            av_fifo_drain(spdif->buffer, spdif->read_len);
-            spdif->read_len = 0;
+            int ret = ff_spdif_read_packet(s1, spdif_pkt);
+            //av_fifo_drain(spdif->buffer, spdif->read_len);
+            spdif->read_offset = 0;
 
+            av_log(s, AV_LOG_WARNING, "Created spdif packet %p\n", spdif_pkt);
+
+            exit(-1);
             return ret;
         }
         else {

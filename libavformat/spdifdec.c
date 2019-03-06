@@ -151,6 +151,7 @@ int ff_spdif_probe(const uint8_t *p_buf, int buf_size, enum AVCodecID *codec)
             probe_end = FFMIN(buf + SPDIF_MAX_OFFSET, p_buf + buf_size - 1);
 
             /* skip directly to the next sync code */
+            printf("Skipping for type 0x%02x\n", (buf[2] << 8) | buf[1]);
             if (!spdif_get_offset_and_codec(NULL, (buf[2] << 8) | buf[1],
                                             &buf[5], &offset, codec)) {
                 if (buf + offset >= p_buf + buf_size)
