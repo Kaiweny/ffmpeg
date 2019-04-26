@@ -17,8 +17,8 @@ const ULONG MOCK_TIME_BASE = 1000;
 struct deltacast_ctx {
     AVClass *class;
     /* Deltacast SDK interfaces */
-	HANDLE BoardHandle, StreamHandle, StreamHandleANC, SlotHandle;
-    ULONG ChnType, VideoStandard, Interface, ClockSystem;	
+    HANDLE BoardHandle, StreamHandle, StreamHandleANC, SlotHandle;
+    ULONG ChnType, VideoStandard, Interface, ClockSystem;    
 
     /* Deltacast mode information */
 
@@ -40,22 +40,22 @@ struct deltacast_ctx {
     ULONG pairs;
 
     AVStream *video_st;
-	int width;
-	int height;
-	BOOL32 interlaced;
-	BOOL32 isHD;
+    int width;
+    int height;
+    BOOL32 interlaced;
+    BOOL32 isHD;
     int fps;
-	
+    
     /* Options */
-    /* video channel index */	
+    /* video channel index */    
     int v_channelIndex;
 
     /* Afd Slot AR Code */   
-	int afd_ARCode;
-	
-	/* Closed Caption Buffer Info */
-	BYTE  *cc_buffer;
-	ULONG cc_buffer_size;
+    int afd_ARCode;
+    
+    /* Closed Caption Buffer Info */
+    BYTE  *cc_buffer;
+    ULONG cc_buffer_size;
 };
 
 static int alloc_packet_side_data_from_buffer(AVPacket *packet, BYTE  *buffer, ULONG buffer_size) {
@@ -70,123 +70,122 @@ static int alloc_packet_side_data_from_buffer(AVPacket *packet, BYTE  *buffer, U
 }
 
 static int alloc_packet_from_buffer(AVPacket *packet, BYTE  *buffer, ULONG buffer_size) {
-	packet->buf = av_buffer_alloc(buffer_size + AV_INPUT_BUFFER_PADDING_SIZE);
-	if (!packet->buf) {
-		printf("Error av_buffer_alloc\n");
-		return AVERROR(ENOMEM);
-	}
-	memcpy(packet->buf->data, buffer, buffer_size + AV_INPUT_BUFFER_PADDING_SIZE);
-	packet->data = packet->buf->data;
-	packet->size = buffer_size;
-	return 0;
+    packet->buf = av_buffer_alloc(buffer_size + AV_INPUT_BUFFER_PADDING_SIZE);
+    if (!packet->buf) {
+        return AVERROR(ENOMEM);
+    }
+    memcpy(packet->buf->data, buffer, buffer_size + AV_INPUT_BUFFER_PADDING_SIZE);
+    packet->data = packet->buf->data;
+    packet->size = buffer_size;
+    return 0;
 }
 
 static int start_stream(struct deltacast_ctx *ctx) {
-	int status = 1;
+    int status = 1;
     ULONG Result,DllVersion,NbBoards;
     ULONG BrdId = 0;
-    ULONG NbRxRequired, NbTxRequired;       
+    ULONG NbRxRequired, NbTxRequired;
 
-	VHD_CORE_BOARDPROPERTY CHNTYPE;
-	VHD_CORE_BOARDPROPERTY CHNSTATUS;
-	VHD_SDI_BOARDPROPERTY CLOCKDIV;
+    VHD_CORE_BOARDPROPERTY CHNTYPE;
+    VHD_CORE_BOARDPROPERTY CHNSTATUS;
+    VHD_SDI_BOARDPROPERTY CLOCKDIV;
     VHD_STREAMTYPE STRMTYPE;
 
     VHD_VBILINE pCaptureLines[VHD_MAXNB_VBICAPTURELINE];
 
-	int ind = ctx->v_channelIndex;	
+    int ind = ctx->v_channelIndex;
 
-	switch(ind) {
-		case 0:
-			CHNTYPE = VHD_CORE_BP_RX0_TYPE; 
-			CHNSTATUS = VHD_CORE_BP_RX0_STATUS;
-			CLOCKDIV = VHD_SDI_BP_RX0_CLOCK_DIV;
-			STRMTYPE = VHD_ST_RX0;		
-		break;
-		case 1:
-			CHNTYPE = VHD_CORE_BP_RX1_TYPE; 
-			CHNSTATUS = VHD_CORE_BP_RX1_STATUS;
-			CLOCKDIV = VHD_SDI_BP_RX1_CLOCK_DIV;
-			STRMTYPE = VHD_ST_RX1;		
-		break;
-		case 2:
-			CHNTYPE = VHD_CORE_BP_RX2_TYPE; 
-			CHNSTATUS = VHD_CORE_BP_RX2_STATUS;
-			CLOCKDIV = VHD_SDI_BP_RX2_CLOCK_DIV;
-			STRMTYPE = VHD_ST_RX2;		
-		break;
-		case 3:
-			CHNTYPE = VHD_CORE_BP_RX3_TYPE; 
-			CHNSTATUS = VHD_CORE_BP_RX3_STATUS;
-			CLOCKDIV = VHD_SDI_BP_RX3_CLOCK_DIV;
-			STRMTYPE = VHD_ST_RX3;		
-		break;
-		case 4:
-			CHNTYPE = VHD_CORE_BP_RX4_TYPE; 
-			CHNSTATUS = VHD_CORE_BP_RX4_STATUS;
-			CLOCKDIV = VHD_SDI_BP_RX4_CLOCK_DIV;
-			STRMTYPE = VHD_ST_RX4;		
-		break;
-		case 5:
-			CHNTYPE = VHD_CORE_BP_RX5_TYPE; 
-			CHNSTATUS = VHD_CORE_BP_RX5_STATUS;
-			CLOCKDIV = VHD_SDI_BP_RX5_CLOCK_DIV;
-			STRMTYPE = VHD_ST_RX5;		
-		break;
-		case 6:
-			CHNTYPE = VHD_CORE_BP_RX6_TYPE; 
-			CHNSTATUS = VHD_CORE_BP_RX6_STATUS;
-			CLOCKDIV = VHD_SDI_BP_RX6_CLOCK_DIV;
-			STRMTYPE = VHD_ST_RX6;		
-		break;
-		case 7:
-			CHNTYPE = VHD_CORE_BP_RX7_TYPE; 
-			CHNSTATUS = VHD_CORE_BP_RX7_STATUS;
-			CLOCKDIV = VHD_SDI_BP_RX7_CLOCK_DIV;
-			STRMTYPE = VHD_ST_RX7;		
-		break;
-		default:
-		break;	
-	}
+    switch(ind) {
+        case 0:
+            CHNTYPE = VHD_CORE_BP_RX0_TYPE;
+            CHNSTATUS = VHD_CORE_BP_RX0_STATUS;
+            CLOCKDIV = VHD_SDI_BP_RX0_CLOCK_DIV;
+            STRMTYPE = VHD_ST_RX0;
+        break;
+        case 1:
+            CHNTYPE = VHD_CORE_BP_RX1_TYPE;
+            CHNSTATUS = VHD_CORE_BP_RX1_STATUS;
+            CLOCKDIV = VHD_SDI_BP_RX1_CLOCK_DIV;
+            STRMTYPE = VHD_ST_RX1;
+        break;
+        case 2:
+            CHNTYPE = VHD_CORE_BP_RX2_TYPE;
+            CHNSTATUS = VHD_CORE_BP_RX2_STATUS;
+            CLOCKDIV = VHD_SDI_BP_RX2_CLOCK_DIV;
+            STRMTYPE = VHD_ST_RX2;
+        break;
+        case 3:
+            CHNTYPE = VHD_CORE_BP_RX3_TYPE;
+            CHNSTATUS = VHD_CORE_BP_RX3_STATUS;
+            CLOCKDIV = VHD_SDI_BP_RX3_CLOCK_DIV;
+            STRMTYPE = VHD_ST_RX3;
+        break;
+        case 4:
+            CHNTYPE = VHD_CORE_BP_RX4_TYPE;
+            CHNSTATUS = VHD_CORE_BP_RX4_STATUS;
+            CLOCKDIV = VHD_SDI_BP_RX4_CLOCK_DIV;
+            STRMTYPE = VHD_ST_RX4;
+        break;
+        case 5:
+            CHNTYPE = VHD_CORE_BP_RX5_TYPE;
+            CHNSTATUS = VHD_CORE_BP_RX5_STATUS;
+            CLOCKDIV = VHD_SDI_BP_RX5_CLOCK_DIV;
+            STRMTYPE = VHD_ST_RX5;
+        break;
+        case 6:
+            CHNTYPE = VHD_CORE_BP_RX6_TYPE;
+            CHNSTATUS = VHD_CORE_BP_RX6_STATUS;
+            CLOCKDIV = VHD_SDI_BP_RX6_CLOCK_DIV;
+            STRMTYPE = VHD_ST_RX6;
+        break;
+        case 7:
+            CHNTYPE = VHD_CORE_BP_RX7_TYPE;
+            CHNSTATUS = VHD_CORE_BP_RX7_STATUS;
+            CLOCKDIV = VHD_SDI_BP_RX7_CLOCK_DIV;
+            STRMTYPE = VHD_ST_RX7;
+        break;
+        default:
+        break;
+    }
 
-	NbRxRequired = 1;
-	NbTxRequired = 0;
-	//TODO: For Error conditions in the else part we should log errors
-	Result = VHD_GetApiInfo(&DllVersion,&NbBoards);
-	if (Result == VHDERR_NOERROR) {
-		if (NbBoards > 0) {
-			if (SetNbChannels(BrdId, NbRxRequired, NbTxRequired)) {
+    NbRxRequired = 1;
+    NbTxRequired = 0;
+    //TODO: For Error conditions in the else part we should log errors
+    Result = VHD_GetApiInfo(&DllVersion,&NbBoards);
+    if (Result == VHDERR_NOERROR) {
+        if (NbBoards > 0) {
+            if (SetNbChannels(BrdId, NbRxRequired, NbTxRequired)) {
                 Result = VHD_OpenBoardHandle(BrdId, &ctx->BoardHandle, NULL, 0);
-				if (Result == VHDERR_NOERROR) {
+                if (Result == VHDERR_NOERROR) {
                     VHD_GetBoardProperty(ctx->BoardHandle, CHNTYPE, &ctx->ChnType);
-					if((ctx->ChnType == VHD_CHNTYPE_SDSDI) || (ctx->ChnType == VHD_CHNTYPE_HDSDI) || (ctx->ChnType == VHD_CHNTYPE_3GSDI)) {
-						VHD_SetBoardProperty(ctx->BoardHandle, VHD_CORE_BP_BYPASS_RELAY_3, FALSE); // RELAY_3 or RELAY_0
-						WaitForChannelLocked(ctx->BoardHandle, CHNSTATUS);    
+                	if((ctx->ChnType == VHD_CHNTYPE_SDSDI) || (ctx->ChnType == VHD_CHNTYPE_HDSDI) || (ctx->ChnType == VHD_CHNTYPE_3GSDI)) {
+                		VHD_SetBoardProperty(ctx->BoardHandle, VHD_CORE_BP_BYPASS_RELAY_3, FALSE); // RELAY_3 or RELAY_0
+                		WaitForChannelLocked(ctx->BoardHandle, CHNSTATUS);    
                         Result = VHD_GetBoardProperty(ctx->BoardHandle, CLOCKDIV, &ctx->ClockSystem);
-						if(Result == VHDERR_NOERROR) {
+                		if(Result == VHDERR_NOERROR) {
                             Result = VHD_OpenStreamHandle(ctx->BoardHandle, STRMTYPE, VHD_SDI_STPROC_DISJOINED_VIDEO, NULL, &ctx->StreamHandle, NULL);
                             Result += VHD_OpenStreamHandle(ctx->BoardHandle, STRMTYPE, VHD_SDI_STPROC_DISJOINED_ANC, NULL, &ctx->StreamHandleANC, NULL);
-							if (Result == VHDERR_NOERROR) {
+                			if (Result == VHDERR_NOERROR) {
                                 Result = VHD_GetStreamProperty(ctx->StreamHandle, VHD_SDI_SP_VIDEO_STANDARD, &ctx->VideoStandard);
                                 Result += VHD_GetStreamProperty(ctx->StreamHandleANC, VHD_SDI_SP_VIDEO_STANDARD, &ctx->VideoStandard);
-								if ((Result == VHDERR_NOERROR) && (ctx->VideoStandard != NB_VHD_VIDEOSTANDARDS)) {
-									if (GetVideoCharacteristics(ctx->VideoStandard, &ctx->width, &ctx->height, &ctx->interlaced, &ctx->isHD)) {
+                				if ((Result == VHDERR_NOERROR) && (ctx->VideoStandard != NB_VHD_VIDEOSTANDARDS)) {
+                					if (GetVideoCharacteristics(ctx->VideoStandard, &ctx->width, &ctx->height, &ctx->interlaced, &ctx->isHD)) {
                                         Result = VHD_GetStreamProperty(ctx->StreamHandle, VHD_SDI_SP_INTERFACE, &ctx->Interface);
                                         Result += VHD_GetStreamProperty(ctx->StreamHandleANC, VHD_SDI_SP_INTERFACE, &ctx->Interface);
-										if((Result == VHDERR_NOERROR) && (ctx->Interface != NB_VHD_INTERFACE)) {
-											VHD_SetStreamProperty(ctx->StreamHandle, VHD_SDI_SP_VIDEO_STANDARD, ctx->VideoStandard);
-											VHD_SetStreamProperty(ctx->StreamHandle, VHD_CORE_SP_TRANSFER_SCHEME, VHD_TRANSFER_SLAVED);
+                						if((Result == VHDERR_NOERROR) && (ctx->Interface != NB_VHD_INTERFACE)) {
+                							VHD_SetStreamProperty(ctx->StreamHandle, VHD_SDI_SP_VIDEO_STANDARD, ctx->VideoStandard);
+                							VHD_SetStreamProperty(ctx->StreamHandle, VHD_CORE_SP_TRANSFER_SCHEME, VHD_TRANSFER_SLAVED);
                                             VHD_SetStreamProperty(ctx->StreamHandle, VHD_SDI_SP_INTERFACE, ctx->Interface);
 
                                             VHD_SetStreamProperty(ctx->StreamHandleANC, VHD_SDI_SP_VIDEO_STANDARD, ctx->VideoStandard);
-											VHD_SetStreamProperty(ctx->StreamHandleANC, VHD_CORE_SP_TRANSFER_SCHEME, VHD_TRANSFER_SLAVED);
+                							VHD_SetStreamProperty(ctx->StreamHandleANC, VHD_CORE_SP_TRANSFER_SCHEME, VHD_TRANSFER_SLAVED);
                                             VHD_SetStreamProperty(ctx->StreamHandleANC, VHD_SDI_SP_INTERFACE, ctx->Interface);
 
-											VHD_SetStreamProperty(ctx->StreamHandle,VHD_CORE_SP_BUFFERQUEUE_DEPTH,32); // AB
+                							VHD_SetStreamProperty(ctx->StreamHandle,VHD_CORE_SP_BUFFERQUEUE_DEPTH,32); // AB
                                             VHD_SetStreamProperty(ctx->StreamHandle,VHD_CORE_SP_DELAY,1); // AB
                                             
                                             if (ctx->interlaced) {// Merge top and bottom fields (interleave lines) 
-												VHD_SetStreamProperty(ctx->StreamHandle,VHD_CORE_SP_FIELD_MERGE,TRUE); // AB
+                								VHD_SetStreamProperty(ctx->StreamHandle,VHD_CORE_SP_FIELD_MERGE,TRUE); // AB
                                             }
                                             
                                             /* Set line to capture: While in extraction mode (VHD_SlotExtractClosedCaption), setting default 
@@ -207,49 +206,49 @@ static int start_stream(struct deltacast_ctx *ctx) {
                                                 // log error
                                             }
 
-										} else {
-											//log error
-										}
-									} else {
-										//log error
-									}
-								} else {
-								
-								}
-							} else {
-								//log error
-							}
-						} else {
-							//log error
-						}
-						//VHD_SetBoardProperty(ctx->BoardHandle, VHD_CORE_BP_BYPASS_RELAY_0, TRUE);
-					} else {
-						//log error
-					}
-				} else {
-					//log error
-				}
-			} else {
-				//log error
-			}
-		} else {
-			//log error
-		}
-	} else {
-		//log error
-	}
-	return status;
+                						} else {
+                							//log error
+                						}
+                					} else {
+                						//log error
+                					}
+                				} else {
+                				
+                				}
+                			} else {
+                				//log error
+                			}
+                		} else {
+                			//log error
+                		}
+                		//VHD_SetBoardProperty(ctx->BoardHandle, VHD_CORE_BP_BYPASS_RELAY_0, TRUE);
+                	} else {
+                		//log error
+                	}
+                } else {
+                	//log error
+                }
+            } else {
+                //log error
+            }
+        } else {
+            //log error
+        }
+    } else {
+        //log error
+    }
+    return status;
 }
 
 static int stop_video_stream(struct deltacast_ctx *ctx) {
-	VHD_StopStream(ctx->StreamHandle);
+    VHD_StopStream(ctx->StreamHandle);
     VHD_CloseStreamHandle(ctx->StreamHandle);
     VHD_StopStream(ctx->StreamHandleANC);
     VHD_CloseStreamHandle(ctx->StreamHandleANC);
 
-	VHD_CloseBoardHandle(ctx->BoardHandle);
+    VHD_CloseBoardHandle(ctx->BoardHandle);
 
-	return 0;
+    return 0;
 }
 
 static int free_audio_data(struct deltacast_ctx *ctx) {
@@ -267,49 +266,87 @@ static int free_audio_data(struct deltacast_ctx *ctx) {
     free((VHD_AUDIOINFO*)ctx->AudioInfo);
     ctx->AudioInfo = NULL;
 
-	return 0;
+    return 0;
+}
+
+static int GetFPS(ULONG VideoStandard) {
+    int fps = 0;
+
+    switch (VideoStandard)
+    {
+      case VHD_VIDEOSTD_S259M_NTSC: fps = 30; break;
+      case VHD_VIDEOSTD_S259M_PAL: fps = 25; break;
+      case VHD_VIDEOSTD_S296M_720p_50Hz:
+      case VHD_VIDEOSTD_S274M_1080i_50Hz:
+      case VHD_VIDEOSTD_S274M_1080p_50Hz:
+      case VHD_VIDEOSTD_S2048M_2048p_50Hz: fps = 50; break;
+      case VHD_VIDEOSTD_S296M_720p_60Hz:
+      case VHD_VIDEOSTD_S274M_1080i_60Hz:
+      case VHD_VIDEOSTD_S274M_1080p_60Hz:
+      case VHD_VIDEOSTD_S2048M_2048p_60Hz: fps = 60; break;
+      case VHD_VIDEOSTD_S296M_720p_24Hz:
+      case VHD_VIDEOSTD_S274M_1080p_24Hz:
+      case VHD_VIDEOSTD_S274M_1080psf_24Hz:
+      case VHD_VIDEOSTD_S2048M_2048p_24Hz:
+      case VHD_VIDEOSTD_S2048M_2048psf_24Hz: fps = 24; break;
+      case VHD_VIDEOSTD_S296M_720p_25Hz:
+      case VHD_VIDEOSTD_S274M_1080p_25Hz:
+      case VHD_VIDEOSTD_S274M_1080psf_25Hz:
+      case VHD_VIDEOSTD_S2048M_2048p_25Hz:
+      case VHD_VIDEOSTD_S2048M_2048psf_25Hz: fps = 25; break;
+      case VHD_VIDEOSTD_S296M_720p_30Hz:
+      case VHD_VIDEOSTD_S274M_1080p_30Hz:
+      case VHD_VIDEOSTD_S274M_1080psf_30Hz:
+      case VHD_VIDEOSTD_S2048M_2048p_30Hz:
+      case VHD_VIDEOSTD_S2048M_2048psf_30Hz: fps = 30; break;
+      case VHD_VIDEOSTD_S2048M_2048p_48Hz: fps = 48; break;
+      default: fps = 0; break;
+    }
+
+    return fps;
 }
 
 static int deltacast_read_header(AVFormatContext *avctx) {
+    struct deltacast_ctx *ctx = (struct deltacast_ctx *) avctx->priv_data;
+
     AVStream *v_stream;
     AVStream *a_stream;
 
     // Keep side data for closed captions embedding into video packet
     avctx->flags = AVFMT_FLAG_KEEP_SIDE_DATA;
 
-    struct deltacast_ctx *ctx = (struct deltacast_ctx *) avctx->priv_data;
-
     // set AFD code to uninitialized value
-	ctx->afd_ARCode = -1;
-	
-	// set closed caption buffer info
-	ctx->cc_buffer = malloc(MAX_CC_DATA_SIZE);
-	ctx->cc_buffer_size = 0;
+    ctx->afd_ARCode = -1;
 
-	int status =  start_stream(ctx);
-	if (status == 0) {
+    // set closed caption buffer info
+    ctx->cc_buffer = malloc(MAX_CC_DATA_SIZE);
+    ctx->cc_buffer_size = 0;
+
+    int status =  start_stream(ctx);
+    if (status == 0) {
         /* #### create video stream #### */
         v_stream = avformat_new_stream(avctx, NULL);
-    	if (!v_stream) {
-        	av_log(avctx, AV_LOG_ERROR, "Cannot add stream\n");
-        	goto error;
-		}
-		v_stream->codecpar->codec_type  = AVMEDIA_TYPE_VIDEO;
-		v_stream->codecpar->width       = ctx->width;
-		v_stream->codecpar->height      = ctx->height;
-		//v_stream->time_base.den      = ctx->bmd_tb_den;
-		//v_stream->time_base.num      = ctx->bmd_tb_num;
-		v_stream->avg_frame_rate.den  = 1000 + ctx->ClockSystem;
+        if (!v_stream) {
+            av_log(avctx, AV_LOG_ERROR, "Cannot add stream\n");
+            goto error;
+        }
+        v_stream->codecpar->codec_type  = AVMEDIA_TYPE_VIDEO;
+        v_stream->codecpar->width       = ctx->width;
+        v_stream->codecpar->height      = ctx->height;
+        //v_stream->time_base.den      = ctx->bmd_tb_den;
+        //v_stream->time_base.num      = ctx->bmd_tb_num;
+        v_stream->avg_frame_rate.den  = 1000 + ctx->ClockSystem;
         if (ctx->interlaced) {
             v_stream->avg_frame_rate.num  = GetFPS(ctx->VideoStandard) * 1000 / 2;
         }
         else {
             v_stream->avg_frame_rate.num  = GetFPS(ctx->VideoStandard) * 1000;
         }
-		//v_stream->codecpar->bit_rate    = av_image_get_buffer_size((AVPixelFormat)st->codecpar->format, ctx->bmd_width, ctx->bmd_height, 1) * 1/av_q2d(st->time_base) * 8;
-		v_stream->codecpar->codec_id    = AV_CODEC_ID_RAWVIDEO;
-		v_stream->codecpar->format      = AV_PIX_FMT_UYVY422;
-		v_stream->codecpar->codec_tag   = MKTAG('U', 'Y', 'V', 'Y');
+        av_log(avctx, AV_LOG_ERROR, "Video Standard %d (%d) %d/%d\n", ctx->VideoStandard, GetFPS(ctx->VideoStandard), v_stream->avg_frame_rate.num, v_stream->avg_frame_rate.den);
+        //v_stream->codecpar->bit_rate    = av_image_get_buffer_size((AVPixelFormat)st->codecpar->format, ctx->bmd_width, ctx->bmd_height, 1) * 1/av_q2d(st->time_base) * 8;
+        v_stream->codecpar->codec_id    = AV_CODEC_ID_RAWVIDEO;
+        v_stream->codecpar->format      = AV_PIX_FMT_UYVY422;
+        v_stream->codecpar->codec_tag   = MKTAG('U', 'Y', 'V', 'Y');
         // Choose a time base which will cancel out with frame rate. This results in a
         // PTS duration of MOCK_TIME_BASE.
         v_stream->time_base.num = v_stream->avg_frame_rate.den; // 1
@@ -320,7 +357,7 @@ static int deltacast_read_header(AVFormatContext *avctx) {
         a_stream = avformat_new_stream(avctx, NULL);
         if (!a_stream) {
             av_log(avctx, AV_LOG_ERROR, "Cannot add stream\n");
-        	goto error;
+            goto error;
         }
         a_stream->codecpar->codec_type  = AVMEDIA_TYPE_AUDIO;
         a_stream->codecpar->codec_id    = AV_CODEC_ID_PCM_S16LE;
@@ -328,7 +365,7 @@ static int deltacast_read_header(AVFormatContext *avctx) {
         a_stream->codecpar->channel_layout = AV_CH_LAYOUT_STEREO;
         a_stream->codecpar->sample_rate = 48000;
         ctx->channels = 2; // TODO-Mitch: Hardcode temp., can be specified by user?
-		a_stream->codecpar->channels    = ctx->channels;
+        a_stream->codecpar->channels    = ctx->channels;
         a_stream->time_base.num = v_stream->avg_frame_rate.den; // 1
         a_stream->time_base.den = MOCK_TIME_BASE * v_stream->avg_frame_rate.num; // 90000
         ctx->audio_st = a_stream;
@@ -343,10 +380,10 @@ static int deltacast_read_header(AVFormatContext *avctx) {
             ctx->pairs = (ctx->channels / 2) + (ctx->channels % 2); // stereo pair includes 2 channels
             pAudioChn = (VHD_AUDIOCHANNEL**)malloc(sizeof(VHD_AUDIOCHANNEL*) * ctx->pairs);
         } else {
-            printf("\nERROR : Invalid number of Audio Channels. %d Channels Requested > 16 Channel Limit\n", ctx->channels);
+            av_log(avctx, AV_LOG_ERROR, "ERROR : Invalid number of Audio Channels. %d Channels Requested > 16 Channel Limit\n", ctx->channels);
             status = VHDERR_BADARG;
         }
-        
+
         // Configure Audio info: 48kHz - 16 bits audio reception on required channels
         memset(AudioInfo, 0, sizeof(VHD_AUDIOINFO));
         int grp = 0;
@@ -382,41 +419,51 @@ static int deltacast_read_header(AVFormatContext *avctx) {
         ctx->pAudioChn = pAudioChn;
     }
 
-	return status;
+    return status;
 
-error:	
-	return AVERROR(EIO);
+error:    
+    return AVERROR(EIO);
 }
 
 static int deltacast_read_close(AVFormatContext *avctx) {
-	struct deltacast_ctx *ctx = (struct deltacast_ctx *) avctx->priv_data;
+    struct deltacast_ctx *ctx = (struct deltacast_ctx *) avctx->priv_data;
     int status = stop_video_stream(ctx);
     free_audio_data(ctx);
-	return status;
+    return status;
 }
 
-static int read_cc_data(struct deltacast_ctx* ctx) {
+#define CC_LINE1 21
+#define CC_LINE2 284
+
+static int read_cc_data(AVFormatContext *avctx, struct deltacast_ctx* ctx) {
     ULONG result;
     VHD_CC_SLOT CCSlot;
 
     /* Set CC line */
     memset(&CCSlot, 0, sizeof(VHD_CC_SLOT));
-    CCSlot.CCInfo.CCType = VHD_CC_EIA_708;
+    if (ctx->VideoStandard == VHD_VIDEOSTD_S259M_NTSC) {
+        CCSlot.CCInfo.CCType = VHD_CC_EIA_608B;
+        CCSlot.CCInfo.pLineNumber[0] = CC_LINE1;
+        CCSlot.CCInfo.pLineNumber[1] = CC_LINE2;
+    }
+    else {
+        CCSlot.CCInfo.CCType = VHD_CC_EIA_708;
+    }
 
-	/* Extract WSS Slot */
-	result = VHD_SlotExtractClosedCaptions(ctx->SlotHandle, &CCSlot);
-	if (result == VHDERR_NOERROR) {
-		memcpy(ctx->cc_buffer, CCSlot.CCData.pData, CCSlot.CCData.DataSize);
-		ctx->cc_buffer_size = CCSlot.CCData.DataSize;
-	}
-	else {
-		printf("ERROR : Cannot extract closed captions. Result = 0x%08X (%s)\n",result, GetErrorDescription(result));
-	}
+    /* Extract WSS Slot */
+    result = VHD_SlotExtractClosedCaptions(ctx->SlotHandle, &CCSlot);
+    if (result == VHDERR_NOERROR) {
+        memcpy(ctx->cc_buffer, CCSlot.CCData.pData, CCSlot.CCData.DataSize);
+        ctx->cc_buffer_size = CCSlot.CCData.DataSize;
+    }
+    else {
+        av_log(avctx, AV_LOG_ERROR, "ERROR : Cannot extract closed captions. Result = 0x%08X (%s)\n",result, GetErrorDescription(result));
+    }
 
     return result;
 }
 
-static int read_video_data(struct deltacast_ctx* ctx, AVPacket *pkt) {
+static int read_video_data(AVFormatContext *avctx, struct deltacast_ctx* ctx, AVPacket *pkt) {
     ULONG result;
     ULONG bufferSize;
     BYTE  *pBuffer = NULL;
@@ -424,58 +471,53 @@ static int read_video_data(struct deltacast_ctx* ctx, AVPacket *pkt) {
 
     // Fill packet data with video data
     result = VHD_LockSlotHandle(ctx->StreamHandle, &ctx->SlotHandle);
-	if (result == VHDERR_NOERROR) {
+    if (result == VHDERR_NOERROR) {
         result = VHD_GetSlotBuffer(ctx->SlotHandle, VHD_SDI_BT_VIDEO, &pBuffer,&bufferSize);
 
-		//printf("Read Buffer Size = %d\n", bufferSize);
+           if (result == VHDERR_NOERROR) {
+            /*err = av_packet_from_data(pkt, pBuffer, bufferSize);
+            if (err) {
+                //log error
+            } else {
+                //set flags in the packet
+            }*/
 
-   		if (result == VHDERR_NOERROR) {
-			/*err = av_packet_from_data(pkt, pBuffer, bufferSize);
-			if (err) {
-				//log error
-			} else {
-				//set flags in the packet
-			}*/	
-	
-			err = alloc_packet_from_buffer(pkt, pBuffer, bufferSize);
-			if (err) {
-				//log error
-			} else {
-				//set flags in the packet
-			}
-			
-		} else {
-			printf("\nERROR : Cannot get slot buffer. Result = 0x%08X (%s)\n", result, GetErrorDescription(result));
-	   	}
-		VHD_UnlockSlotHandle(ctx->SlotHandle); // AB
-		VHD_GetStreamProperty(ctx->StreamHandle, VHD_CORE_SP_SLOTS_COUNT, &ctx->frameCount);
-		VHD_GetStreamProperty(ctx->StreamHandle, VHD_CORE_SP_SLOTS_DROPPED, &ctx->dropped);
+            err = alloc_packet_from_buffer(pkt, pBuffer, bufferSize);
+            if (err) {
+                //log error
+            } else {
+                //set flags in the packet
+            }
+        } else {
+            av_log(avctx, AV_LOG_ERROR, "ERROR : Cannot get slot buffer. Result = 0x%08X (%s)\n", result, GetErrorDescription(result));
+        }
+        VHD_UnlockSlotHandle(ctx->SlotHandle); // AB
+        VHD_GetStreamProperty(ctx->StreamHandle, VHD_CORE_SP_SLOTS_COUNT, &ctx->frameCount);
+        VHD_GetStreamProperty(ctx->StreamHandle, VHD_CORE_SP_SLOTS_DROPPED, &ctx->dropped);
         // Since we control the creation of the PTS, we multiply the frame count by an
         // arbitrary number MOCK_TIME_BASE. This allows for PTS values of whole integers.
-        // note: MOCK_TIME_BASE is made large to ensure good precision handling for 
+        // note: MOCK_TIME_BASE is made large to ensure good precision handling for
         // ffmpeg's frame->pkt_duration calculation.
         pkt->pts = ctx->frameCount * MOCK_TIME_BASE;
-	} else if (result != VHDERR_TIMEOUT) {
-		printf("\nERROR : Timeout. Result = 0x%08X (%s)\n", result, GetErrorDescription(result));
-   		//cannot lock the stream
-   		//log the error  
-	} else {
-   		result = VHDERR_TIMEOUT;
+    } else if (result != VHDERR_TIMEOUT) {
+        av_log(avctx, AV_LOG_ERROR, "ERROR : Timeout. Result = 0x%08X (%s)\n", result, GetErrorDescription(result));
+    } else {
+        result = VHDERR_TIMEOUT;
     }
 
     // Fill video packet side data with Closed Captions data
     if (result == VHDERR_NOERROR) {
-		if (ctx->cc_buffer_size > 0) {
-			err = alloc_packet_side_data_from_buffer(pkt, ctx->cc_buffer, ctx->cc_buffer_size);
-			memset(ctx->cc_buffer, 0, MAX_CC_DATA_SIZE);
-			ctx->cc_buffer_size = 0;
-		}
-		if (err) {
-			printf("Error on create cc side data\n");
-			result = VHDERR_OPERATIONFAILED;
-		} else {
-			//set flags in the packet
-		}
+        if (ctx->cc_buffer_size > 0) {
+            err = alloc_packet_side_data_from_buffer(pkt, ctx->cc_buffer, ctx->cc_buffer_size);
+            memset(ctx->cc_buffer, 0, MAX_CC_DATA_SIZE);
+            ctx->cc_buffer_size = 0;
+        }
+        if (err) {
+            av_log(avctx, AV_LOG_ERROR, "Error on create cc side data\n");
+            result = VHDERR_OPERATIONFAILED;
+        } else {
+            //set flags in the packet
+        }
     }
 
     return result;
@@ -497,7 +539,7 @@ static int read_afd_flag(struct deltacast_ctx* ctx) {
     return result;
 }
 
-static int read_audio_data(struct deltacast_ctx* ctx, AVPacket *pkt) {
+static int read_audio_data(AVFormatContext *avctx, struct deltacast_ctx* ctx, AVPacket *pkt) {
     ULONG result;
     ULONG AudioBufferSize;
     int err = 0;
@@ -509,10 +551,10 @@ static int read_audio_data(struct deltacast_ctx* ctx, AVPacket *pkt) {
         AudioBufferSize = ((VHD_AUDIOCHANNEL**)ctx->pAudioChn)[0]->DataSize;
 
         /* Extract AFD metadata */
-		read_afd_flag(ctx);
-		
-		/* Extract CC data */
-		read_cc_data(ctx);
+        read_afd_flag(ctx);
+
+        /* Extract CC data */
+        read_cc_data(avctx, ctx);
 
         /* Extract Audio */
         result = VHD_SlotExtractAudio(ctx->SlotHandle, (VHD_AUDIOINFO*)ctx->AudioInfo);
@@ -521,14 +563,14 @@ static int read_audio_data(struct deltacast_ctx* ctx, AVPacket *pkt) {
             err = alloc_packet_from_buffer(pkt,
                                            ((VHD_AUDIOCHANNEL**)ctx->pAudioChn)[0]->pData,
                                            ((VHD_AUDIOCHANNEL**)ctx->pAudioChn)[0]->DataSize);
-			if (err) {
-				//log error
-			} else {
-				//set flags in the packet
-			}
+            if (err) {
+                //log error
+            } else {
+                //set flags in the packet
+            }
 
         } else {
-            printf("ERROR!:: Unable to Extract Audio from slot!, Result = 0x%08X\n", result);
+            av_log(avctx, AV_LOG_ERROR, "ERROR!:: Unable to Extract Audio from slot!, Result = 0x%08X\n", result);
         }
 
         /* Unlock slot */
@@ -537,40 +579,40 @@ static int read_audio_data(struct deltacast_ctx* ctx, AVPacket *pkt) {
         /* Get some statistics */
         VHD_GetStreamProperty(ctx->StreamHandleANC, VHD_CORE_SP_SLOTS_COUNT, &ctx->audFrameCount);
         VHD_GetStreamProperty(ctx->StreamHandleANC, VHD_CORE_SP_SLOTS_DROPPED, &ctx->audDropped);
-		//pkt->pts = ctx->audFrameCount;
+        //pkt->pts = ctx->audFrameCount;
         // See read_video_data(..) for details regarding PTS calculations.
         pkt->pts = ctx->audFrameCount * MOCK_TIME_BASE;
         // reset channel to max audio buffer size
         ((VHD_AUDIOCHANNEL**)ctx->pAudioChn)[0]->DataSize = AudioBufferSize;
     }
     else if (result != VHDERR_TIMEOUT) {
-       printf("\nERROR : Cannot lock slot on RX0 stream. Result = 0x%08X (%s)\n",result, GetErrorDescription(result));
+        av_log(avctx, AV_LOG_ERROR, "ERROR : Cannot lock slot on RX0 stream. Result = 0x%08X (%s)\n",result, GetErrorDescription(result));
     }
     else {
-        printf("\nERROR : Timeout");
+        av_log(avctx, AV_LOG_ERROR, "ERROR : Timeout");
     }
 
     return result;
 }
 
 static int deltacast_read_packet(AVFormatContext *avctx, AVPacket *pkt) {
- 	ULONG result;
-	struct deltacast_ctx *ctx = (struct deltacast_ctx *) avctx->priv_data;
+    ULONG result;
+    struct deltacast_ctx *ctx = (struct deltacast_ctx *) avctx->priv_data;
 
     // choose to read video or audio data depending on the current pts of each media type
     // i.e. make video packets have higher priority than audio packets for the current
-	// pts value. 
-	// Reading audio frames first as it contains the CC data for the next video frame
+    // pts value.
+    // Reading audio frames first as it contains the CC data for the next video frame
     if (ctx->audFrameCount <= ctx->frameCount) {
-		pkt->stream_index = ctx->audio_st->index;
-        result = read_audio_data(ctx, pkt);		
+        pkt->stream_index = ctx->audio_st->index;
+        result = read_audio_data(avctx, ctx, pkt);
     }
     else {
         pkt->stream_index = ctx->video_st->index;
-        result = read_video_data(ctx, pkt);
+        result = read_video_data(avctx, ctx, pkt);
     }
 
-	return result;
+    return result;
 }
 
 #define OFFSET(x) offsetof(struct deltacast_ctx, x)

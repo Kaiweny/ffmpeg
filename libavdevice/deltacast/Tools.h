@@ -34,5 +34,7 @@ BOOL32 Is4KInterface(ULONG Interface);
 BOOL32 SingleToQuadLinksInterface( ULONG RXStatus, ULONG *pInterface, ULONG *pVideoStandard);
 BOOL32 SingleToQuadLinksVideoStandard( ULONG *pVideoStandard);
 BOOL32 GetFrameST2022_6PacketNumber(ULONG VideoStandard, ULONG *pPacketNumber);
-int GetFPS(ULONG VideoStandard);
+BOOL32 GetCarriedVideoStandard(ULONG VideoStandard);
+void *PageAlignedAlloc(ULONG Size);
+void PageAlignedFree(void *pBuffer, ULONG Size);
 #endif //_Tools_
