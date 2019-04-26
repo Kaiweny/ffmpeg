@@ -6,7 +6,6 @@
 #include "Tools.h"
 
 #if defined (__linux__) || defined (__APPLE__)
-//#include "Keyboard.h"
 #include <string.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -20,15 +19,18 @@
 
 const char* GetChnTypeName(VHD_CHANNELTYPE ChnType_E)
 {
-   switch(ChnType_E)
+   switch (ChnType_E)
    {
-   case VHD_CHNTYPE_DISABLE : return "Not Present";
-   case VHD_CHNTYPE_SDSDI : return "SD-SDI";
-   case VHD_CHNTYPE_HDSDI : return "HD-SDI";
-   case VHD_CHNTYPE_3GSDI : return "3G-SDI";
-   case VHD_CHNTYPE_DVI : return "DVI";
-   case VHD_CHNTYPE_ASI : return "ASI";
-   default : return "?";
+   case VHD_CHNTYPE_DISABLE: return "Not Present";
+   case VHD_CHNTYPE_SDSDI: return "SD-SDI";
+   case VHD_CHNTYPE_HDSDI: return "HD-SDI";
+   case VHD_CHNTYPE_3GSDI: return "3G-SDI";
+   case VHD_CHNTYPE_DVI: return "DVI";
+   case VHD_CHNTYPE_ASI: return "ASI";
+   case VHD_CHNTYPE_HDMI: return "HDMI";
+   case VHD_CHNTYPE_DISPLAYPORT: return "DisplayPort";
+   case VHD_CHNTYPE_12GSDI: return "12G-SDI";
+   default: return "?";
    }
 }
 
@@ -36,52 +38,53 @@ const char * GetErrorDescription(ULONG CodeError)
 {
    switch (CodeError)
    {
-   case VHDERR_NOERROR :                              return "No error";
-   case VHDERR_FATALERROR :                           return "Fatal error occurred (should re-install)";
-   case VHDERR_OPERATIONFAILED :                      return "Operation failed (undefined error)";
-   case VHDERR_NOTENOUGHRESOURCE :                    return "Not enough resource to complete the operation";
-   case VHDERR_NOTIMPLEMENTED :                       return "Not implemented yet";
-   case VHDERR_NOTFOUND :                             return "Required element was not found";
-   case VHDERR_BADARG :                               return "Bad argument value";
-   case VHDERR_INVALIDPOINTER :                       return "Invalid pointer";
-   case VHDERR_INVALIDHANDLE :                        return "Invalid handle";
-   case VHDERR_INVALIDPROPERTY :                      return "Invalid property index";
-   case VHDERR_INVALIDSTREAM :                        return "Invalid stream or invalid stream type";
-   case VHDERR_RESOURCELOCKED :                       return "Resource is currently locked";
-   case VHDERR_BOARDNOTPRESENT :                      return "Board is not available";
-   case VHDERR_INCOHERENTBOARDSTATE :                 return "Incoherent board state or register value";
-   case VHDERR_INCOHERENTDRIVERSTATE :                return "Incoherent driver state";
-   case VHDERR_INCOHERENTLIBSTATE :                   return "Incoherent library state";
-   case VHDERR_SETUPLOCKED :                          return "Configuration is locked";
-   case VHDERR_CHANNELUSED :                          return "Requested channel is already used or doesn't exist";
-   case VHDERR_STREAMUSED :                           return "Requested stream is already used";
-   case VHDERR_READONLYPROPERTY :                     return "Property is read-only";
-   case VHDERR_OFFLINEPROPERTY :                      return "Property is off-line only";
-   case VHDERR_TXPROPERTY :                           return "Property is of TX streams";
-   case VHDERR_TIMEOUT :                              return "Time-out occurred";
-   case VHDERR_STREAMNOTRUNNING :                     return "Stream is not running";
-   case VHDERR_BADINPUTSIGNAL :                       return "Bad input signal, or unsupported standard";
-   case VHDERR_BADREFERENCESIGNAL :                   return "Bad genlock signal or unsupported standard";                                 
-   case VHDERR_FRAMELOCKED :                          return "Frame already locked";
-   case VHDERR_FRAMEUNLOCKED :                        return "Frame already unlocked";
-   case VHDERR_INCOMPATIBLESYSTEM :                   return "Selected video standard is incompatible with running clock system";
-   case VHDERR_ANCLINEISEMPTY :                       return "ANC line is empty";
-   case VHDERR_ANCLINEISFULL :                        return "ANC line is full";
-   case VHDERR_BUFFERTOOSMALL :                       return "Buffer too small";
-   case VHDERR_BADANC :                               return "Received ANC aren't standard";
-   case VHDERR_BADCONFIG :                            return "Invalid configuration";
-   case VHDERR_FIRMWAREMISMATCH :                     return "The loaded firmware is not compatible with the installed driver";
-   case VHDERR_LIBRARYMISMATCH :                      return "The loaded VideomasterHD library is not compatible with the installed driver";
-   case VHDERR_FAILSAFE :                             return "The fail safe firmware is loaded. You need to upgrade your firmware";
-   case VHDERR_RXPROPERTY :                           return "Property is of RX streams";
-   case VHDERR_LTCSOURCEUNLOCKED :                    return "LTC source unlocked";
-   case VHDERR_INVALIDACCESSRIGHT :                   return "Invalid access right";
-   case VHDERR_LICENSERESTRICTION :                   return "Not allowed by the provided license";
-   case VHDERR_SOFTWAREPROTECTION_FAILURE :           return "Error occured in the software protection module";
-   case VHDERR_SOFTWAREPROTECTION_IDNOTFOUND :        return "Host ID cannot be found";
-   case VHDERR_SOFTWAREPROTECTION_BADLICENSEINFO :    return "invalid provided License";
-   case VHDERR_SOFTWAREPROTECTION_UNAUTHORIZEDHOST :  return "Host unauthorized";
-   case VHDERR_SOFTWAREPROTECTION_STREAMSTARTED :     return "License providing requires all stream to be stopped";
+   case VHDERR_NOERROR:                              return "No error";
+   case VHDERR_FATALERROR:                           return "Fatal error occurred (should re-install)";
+   case VHDERR_OPERATIONFAILED:                      return "Operation failed (undefined error)";
+   case VHDERR_NOTENOUGHRESOURCE:                    return "Not enough resource to complete the operation";
+   case VHDERR_NOTIMPLEMENTED:                       return "Not implemented yet";
+   case VHDERR_NOTFOUND:                             return "Required element was not found";
+   case VHDERR_BADARG:                               return "Bad argument value";
+   case VHDERR_INVALIDPOINTER:                       return "Invalid pointer";
+   case VHDERR_INVALIDHANDLE:                        return "Invalid handle";
+   case VHDERR_INVALIDPROPERTY:                      return "Invalid property index";
+   case VHDERR_INVALIDSTREAM:                        return "Invalid stream or invalid stream type";
+   case VHDERR_RESOURCELOCKED:                       return "Resource is currently locked";
+   case VHDERR_BOARDNOTPRESENT:                      return "Board is not available";
+   case VHDERR_INCOHERENTBOARDSTATE:                 return "Incoherent board state or register value";
+   case VHDERR_INCOHERENTDRIVERSTATE:                return "Incoherent driver state";
+   case VHDERR_INCOHERENTLIBSTATE:                   return "Incoherent library state";
+   case VHDERR_SETUPLOCKED:                          return "Configuration is locked";
+   case VHDERR_CHANNELUSED:                          return "Requested channel is already used or doesn't exist";
+   case VHDERR_STREAMUSED:                           return "Requested stream is already used";
+   case VHDERR_READONLYPROPERTY:                     return "Property is read-only";
+   case VHDERR_OFFLINEPROPERTY:                      return "Property is off-line only";
+   case VHDERR_TXPROPERTY:                           return "Property is of TX streams";
+   case VHDERR_TIMEOUT:                              return "Time-out occurred";
+   case VHDERR_STREAMNOTRUNNING:                     return "Stream is not running";
+   case VHDERR_BADINPUTSIGNAL:                       return "Bad input signal, or unsupported standard";
+   case VHDERR_BADREFERENCESIGNAL:                   return "Bad genlock signal or unsupported standard";
+   case VHDERR_FRAMELOCKED:                          return "Frame already locked";
+   case VHDERR_FRAMEUNLOCKED:                        return "Frame already unlocked";
+   case VHDERR_INCOMPATIBLESYSTEM:                   return "Selected video standard is incompatible with running clock system";
+   case VHDERR_ANCLINEISEMPTY:                       return "ANC line is empty";
+   case VHDERR_ANCLINEISFULL:                        return "ANC line is full";
+   case VHDERR_BUFFERTOOSMALL:                       return "Buffer too small";
+   case VHDERR_BADANC:                               return "Received ANC aren't standard";
+   case VHDERR_BADCONFIG:                            return "Invalid configuration";
+   case VHDERR_FIRMWAREMISMATCH:                     return "The loaded firmware is not compatible with the installed driver";
+   case VHDERR_LIBRARYMISMATCH:                      return "The loaded VideomasterHD library is not compatible with the installed driver";
+   case VHDERR_FAILSAFE:                             return "The fail safe firmware is loaded. You need to upgrade your firmware";
+   case VHDERR_RXPROPERTY:                           return "Property is of RX streams";
+   case VHDERR_LTCSOURCEUNLOCKED:                    return "LTC source unlocked";
+   case VHDERR_INVALIDACCESSRIGHT:                   return "Invalid access right";
+   case VHDERR_LICENSERESTRICTION:                   return "Not allowed by the provided license";
+   case VHDERR_SOFTWAREPROTECTION_FAILURE:           return "Error occured in the software protection module";
+   case VHDERR_SOFTWAREPROTECTION_IDNOTFOUND:        return "Host ID cannot be found";
+   case VHDERR_SOFTWAREPROTECTION_BADLICENSEINFO:    return "invalid provided License";
+   case VHDERR_SOFTWAREPROTECTION_UNAUTHORIZEDHOST:  return "Host unauthorized";
+   case VHDERR_SOFTWAREPROTECTION_STREAMSTARTED:     return "License providing requires all stream to be stopped";
+   case VHDERR_INVALIDCAPABILITY:     				  return "Invalid capability index";
    default:                                           return "Unknown code error";
    }
 }
@@ -92,100 +95,110 @@ void PrintChnType(HANDLE BoardHandle)
 
 
    VHD_GetBoardProperty(BoardHandle, VHD_CORE_BP_NB_RXCHANNELS, &NbOfChn);
-   for(ULONG i=0; i<NbOfChn; i++)
+   for (ULONG i = 0; i < NbOfChn; i++)
    {
-      VHD_GetBoardProperty(BoardHandle, ChnIdx2BpChnType(TRUE,i), &ChnType);
-      printf("RX%d=%s / ",i, GetChnTypeName((VHD_CHANNELTYPE)ChnType));
+      VHD_GetBoardProperty(BoardHandle, ChnIdx2BpChnType(TRUE, i), &ChnType);
+      printf("RX%d=%s / ", i, GetChnTypeName((VHD_CHANNELTYPE)ChnType));
    }
 
    VHD_GetBoardProperty(BoardHandle, VHD_CORE_BP_NB_TXCHANNELS, &NbOfChn);
-   for(ULONG i=0; i<NbOfChn; i++)
+   for (ULONG i = 0; i < NbOfChn; i++)
    {
-      VHD_GetBoardProperty(BoardHandle, ChnIdx2BpChnType(FALSE,i), &ChnType);
-      printf("TX%d=%s / ",i, GetChnTypeName((VHD_CHANNELTYPE)ChnType));
+      VHD_GetBoardProperty(BoardHandle, ChnIdx2BpChnType(FALSE, i), &ChnType);
+      printf("TX%d=%s / ", i, GetChnTypeName((VHD_CHANNELTYPE)ChnType));
    }
 
    printf("\b\b\b   ");
 }
 
-VHD_CORE_BOARDPROPERTY ChnIdx2BpChnType( BOOL32 Rx_B, int Idx_i )
+VHD_CORE_BOARDPROPERTY ChnIdx2BpChnType(BOOL32 Rx_B, int Idx_i)
 {
-   switch(Idx_i)
+   switch (Idx_i)
    {
-   case 0 : return (Rx_B?VHD_CORE_BP_RX0_TYPE:VHD_CORE_BP_TX0_TYPE);
-   case 1 : return (Rx_B?VHD_CORE_BP_RX1_TYPE:VHD_CORE_BP_TX1_TYPE);
-   case 2 : return (Rx_B?VHD_CORE_BP_RX2_TYPE:VHD_CORE_BP_TX2_TYPE);
-   case 3 : return (Rx_B?VHD_CORE_BP_RX3_TYPE:VHD_CORE_BP_TX3_TYPE);
-   case 4 : return (Rx_B?VHD_CORE_BP_RX4_TYPE:NB_VHD_CORE_BOARDPROPERTIES);
-   case 5 : return (Rx_B?VHD_CORE_BP_RX5_TYPE:NB_VHD_CORE_BOARDPROPERTIES);
-   case 6 : return (Rx_B?VHD_CORE_BP_RX6_TYPE:NB_VHD_CORE_BOARDPROPERTIES);
-   case 7 : return (Rx_B?VHD_CORE_BP_RX7_TYPE:NB_VHD_CORE_BOARDPROPERTIES);
+   case 0: return (Rx_B ? VHD_CORE_BP_RX0_TYPE : VHD_CORE_BP_TX0_TYPE);
+   case 1: return (Rx_B ? VHD_CORE_BP_RX1_TYPE : VHD_CORE_BP_TX1_TYPE);
+   case 2: return (Rx_B ? VHD_CORE_BP_RX2_TYPE : VHD_CORE_BP_TX2_TYPE);
+   case 3: return (Rx_B ? VHD_CORE_BP_RX3_TYPE : VHD_CORE_BP_TX3_TYPE);
+   case 4: return (Rx_B ? VHD_CORE_BP_RX4_TYPE : VHD_CORE_BP_TX4_TYPE);
+   case 5: return (Rx_B ? VHD_CORE_BP_RX5_TYPE : VHD_CORE_BP_TX5_TYPE);
+   case 6: return (Rx_B ? VHD_CORE_BP_RX6_TYPE : VHD_CORE_BP_TX6_TYPE);
+   case 7: return (Rx_B ? VHD_CORE_BP_RX7_TYPE : VHD_CORE_BP_TX7_TYPE);
    default: return NB_VHD_CORE_BOARDPROPERTIES;
    }
 }
 
-VHD_STREAMTYPE GetRxStreamType( int Idx_i)
+VHD_STREAMTYPE GetRxStreamType(int Idx_i)
 {
-   switch(Idx_i)
+   switch (Idx_i)
    {
-   case 0 : return VHD_ST_RX0;
-   case 1 : return VHD_ST_RX1;
-   case 2 : return VHD_ST_RX2;
-   case 3 : return VHD_ST_RX3;
-   case 4 : return VHD_ST_RX4;
-   case 5 : return VHD_ST_RX5;
-   case 6 : return VHD_ST_RX6;
-   case 7 : return VHD_ST_RX7;
+   case 0: return VHD_ST_RX0;
+   case 1: return VHD_ST_RX1;
+   case 2: return VHD_ST_RX2;
+   case 3: return VHD_ST_RX3;
+   case 4: return VHD_ST_RX4;
+   case 5: return VHD_ST_RX5;
+   case 6: return VHD_ST_RX6;
+   case 7: return VHD_ST_RX7;
    default: return NB_VHD_STREAMTYPES;
    }
 }
 
-VHD_STREAMTYPE GetTxStreamType( int Idx_i)
+VHD_STREAMTYPE GetTxStreamType(int Idx_i)
 {
-   switch(Idx_i)
+   switch (Idx_i)
    {
-   case 0 : return VHD_ST_TX0;
-   case 1 : return VHD_ST_TX1;
-   case 2 : return VHD_ST_TX2;
-   case 3 : return VHD_ST_TX3;
+   case 0: return VHD_ST_TX0;
+   case 1: return VHD_ST_TX1;
+   case 2: return VHD_ST_TX2;
+   case 3: return VHD_ST_TX3;
+   case 4: return VHD_ST_TX4;
+   case 5: return VHD_ST_TX5;
+   case 6: return VHD_ST_TX6;
+   case 7: return VHD_ST_TX7;
    default: return NB_VHD_STREAMTYPES;
    }
 }
 
 VHD_ASI_BITRATESOURCE GetBitRateSrc(int RxIdx_i)
 {
-   switch(RxIdx_i)
+   switch (RxIdx_i)
    {
-   case 0 : return VHD_ASI_BR_SRC_RX0;
-   case 1 : return VHD_ASI_BR_SRC_RX1;
-   default: return NB_VHD_ASI_BITRATESOURCE;      
+   case 0: return VHD_ASI_BR_SRC_RX0;
+   case 1: return VHD_ASI_BR_SRC_RX1;
+   case 2: return VHD_ASI_BR_SRC_RX2;
+   case 3: return VHD_ASI_BR_SRC_RX3;
+   case 4: return VHD_ASI_BR_SRC_RX4;
+   case 5: return VHD_ASI_BR_SRC_RX5;
+   case 6: return VHD_ASI_BR_SRC_RX6;
+   case 7: return VHD_ASI_BR_SRC_RX7;
+   default: return NB_VHD_ASI_BITRATESOURCE;
    }
 }
 
-VHD_CORE_BOARDPROPERTY ChnIdx2BpStatus( BOOL32 Rx_B, int Idx_i )
+VHD_CORE_BOARDPROPERTY ChnIdx2BpStatus(BOOL32 Rx_B, int Idx_i)
 {
-   switch(Idx_i)
+   switch (Idx_i)
    {
-   case 0 : return (Rx_B?VHD_CORE_BP_RX0_STATUS:VHD_CORE_BP_TX0_STATUS);
-   case 1 : return (Rx_B?VHD_CORE_BP_RX1_STATUS:VHD_CORE_BP_TX1_STATUS);
-   case 2 : return (Rx_B?VHD_CORE_BP_RX2_STATUS:VHD_CORE_BP_TX2_STATUS);
-   case 3 : return (Rx_B?VHD_CORE_BP_RX3_STATUS:VHD_CORE_BP_TX3_STATUS);
-   case 4 : return (Rx_B?VHD_CORE_BP_RX4_STATUS:NB_VHD_CORE_BOARDPROPERTIES);
-   case 5 : return (Rx_B?VHD_CORE_BP_RX5_STATUS:NB_VHD_CORE_BOARDPROPERTIES);
-   case 6 : return (Rx_B?VHD_CORE_BP_RX6_STATUS:NB_VHD_CORE_BOARDPROPERTIES);
-   case 7 : return (Rx_B?VHD_CORE_BP_RX7_STATUS:NB_VHD_CORE_BOARDPROPERTIES);
+   case 0: return (Rx_B ? VHD_CORE_BP_RX0_STATUS : VHD_CORE_BP_TX0_STATUS);
+   case 1: return (Rx_B ? VHD_CORE_BP_RX1_STATUS : VHD_CORE_BP_TX1_STATUS);
+   case 2: return (Rx_B ? VHD_CORE_BP_RX2_STATUS : VHD_CORE_BP_TX2_STATUS);
+   case 3: return (Rx_B ? VHD_CORE_BP_RX3_STATUS : VHD_CORE_BP_TX3_STATUS);
+   case 4: return (Rx_B ? VHD_CORE_BP_RX4_STATUS : VHD_CORE_BP_TX4_STATUS);
+   case 5: return (Rx_B ? VHD_CORE_BP_RX5_STATUS : VHD_CORE_BP_TX5_STATUS);
+   case 6: return (Rx_B ? VHD_CORE_BP_RX6_STATUS : VHD_CORE_BP_TX6_STATUS);
+   case 7: return (Rx_B ? VHD_CORE_BP_RX7_STATUS : VHD_CORE_BP_TX7_STATUS);
    default: return NB_VHD_CORE_BOARDPROPERTIES;
    }
 }
 
 void PrintBoardInfo(int BoardIndex)
 {
-   ULONG             Result,DriverVersion,BoardType,SerialLsw,SerialMsw,SerialEx,NbOfLane;
-   ULONG             FirmwareVersion,Firmware2Version,Firmware3Version,LowProfile,NbRxChannels,NbTxChannels,Firmware4Version;
+   ULONG             Result, DriverVersion, BoardType, SerialLsw, SerialMsw, SerialEx, NbOfLane;
+   ULONG             BusType, FirmwareVersion, Firmware2Version, Firmware3Version, LowProfile, NbRxChannels, NbTxChannels, Firmware4Version, ProductVersion = 0;
    HANDLE            BoardHandle = NULL;
 
    /* Open a handle on first DELTA board */
-   Result = VHD_OpenBoardHandle(BoardIndex,&BoardHandle,NULL,0);
+   Result = VHD_OpenBoardHandle(BoardIndex, &BoardHandle, NULL, 0);
    if (Result == VHDERR_NOERROR)
    {
       VHD_GetBoardProperty(BoardHandle, VHD_CORE_BP_DRIVER_VERSION, &DriverVersion);
@@ -199,23 +212,29 @@ void PrintBoardInfo(int BoardIndex)
       VHD_GetBoardProperty(BoardHandle, VHD_CORE_BP_LOWPROFILE, &LowProfile);
       VHD_GetBoardProperty(BoardHandle, VHD_CORE_BP_NB_RXCHANNELS, &NbRxChannels);
       VHD_GetBoardProperty(BoardHandle, VHD_CORE_BP_NB_TXCHANNELS, &NbTxChannels);
+      VHD_GetBoardProperty(BoardHandle, VHD_CORE_BP_PRODUCT_VERSION, &ProductVersion);
+      VHD_GetBoardProperty(BoardHandle, VHD_CORE_BP_BUS_TYPE, &BusType);
 
-      printf("  Board %u :\n",BoardIndex);
-      printf("    - Driver v%02d.%02d.%04d\n",DriverVersion>>24,(DriverVersion>>16)&0xFF,DriverVersion&0xFFFF);
-      printf("    - Board fpga firmware v%02X (%02X-%02X-%02X)\n",FirmwareVersion&0xFF,(FirmwareVersion>>24)&0xFF,(FirmwareVersion>>16)&0xFF,(FirmwareVersion>>8)&0xFF);
-      printf("    - Board cpld v%08X\n",Firmware2Version);
-      if(BoardType==VHD_BOARDTYPE_DVI || BoardType==VHD_BOARDTYPE_3G || BoardType==VHD_BOARDTYPE_3GKEY || (BoardType==VHD_BOARDTYPE_HD && NbTxChannels==4))
+      printf("  Board %u :  [ %s ]\n", BoardIndex, VHD_GetBoardModel(BoardIndex));
+      printf("    - Driver v%02d.%02d.%04d\n", DriverVersion >> 24, (DriverVersion >> 16) & 0xFF, DriverVersion & 0xFFFF);
+      printf("    - Board fpga firmware v%02X (%02X-%02X-%02X)\n", FirmwareVersion & 0xFF, (FirmwareVersion >> 24) & 0xFF, (FirmwareVersion >> 16) & 0xFF, (FirmwareVersion >> 8) & 0xFF);
+      printf("    - Board cpld v%08X\n", Firmware2Version);
+      if (BoardType == VHD_BOARDTYPE_DVI || BoardType == VHD_BOARDTYPE_3G || BoardType == VHD_BOARDTYPE_3GKEY || (BoardType == VHD_BOARDTYPE_HD && NbTxChannels == 4))
       {
          VHD_GetBoardProperty(BoardHandle, VHD_CORE_BP_FIRMWARE3_VERSION, &Firmware3Version);
-         printf("    - Board micro-controller firmware v%02X (%02X-%02X-%02X)\n",Firmware3Version&0xFF,(Firmware3Version>>24)&0xFF,(Firmware3Version>>16)&0xFF,(Firmware3Version>>8)&0xFF);
+         printf("    - Board micro-controller firmware v%02X (%02X-%02X-%02X)\n", Firmware3Version & 0xFF, (Firmware3Version >> 24) & 0xFF, (Firmware3Version >> 16) & 0xFF, (Firmware3Version >> 8) & 0xFF);
       }
-      if(BoardType==VHD_BOARDTYPE_IP)
+      if (BoardType == VHD_BOARDTYPE_IP)
       {
          VHD_GetBoardProperty(BoardHandle, VHD_CORE_BP_FIRMWARE4_VERSION, &Firmware4Version);
-         printf("    - Board microblaze firmware v%02X (%02X-%02X-%02X)\n",Firmware4Version&0xFF,(Firmware4Version>>24)&0xFF,(Firmware4Version>>16)&0xFF,(Firmware4Version>>8)&0xFF);
+         printf("    - Board microcode firmware v%02X (%02X-%02X-%02X)\n", Firmware4Version & 0xFF, (Firmware4Version >> 24) & 0xFF, (Firmware4Version >> 16) & 0xFF, (Firmware4Version >> 8) & 0xFF);
       }
-      printf("    - Board serial# : 0x%08X%08X%08X\n",SerialEx,SerialMsw,SerialLsw);
-      switch(BoardType)
+      printf("    - Board serial# : 0x%08X%08X%08X\n", SerialEx, SerialMsw, SerialLsw);
+
+      if (ProductVersion != 0)
+         printf("    - Board product v%04X\n", ProductVersion);
+
+      switch (BoardType)
       {
       case VHD_BOARDTYPE_HD :    printf("    - HD board type"); break;
       case VHD_BOARDTYPE_HDKEY : printf("    - HD key board type"); break;
@@ -224,20 +243,33 @@ void PrintBoardInfo(int BoardIndex)
       case VHD_BOARDTYPE_DVI :   printf("    - DVI board type"); break;
       case VHD_BOARDTYPE_CODEC : printf("    - CODEC board type"); break;
       case VHD_BOARDTYPE_3G :    printf("    - 3G board type"); break;
-		case VHD_BOARDTYPE_3GKEY : printf("    - 3G key board type"); break;
-		case VHD_BOARDTYPE_ASI :   printf("    - ASI board type"); break;
-		case VHD_BOARDTYPE_FLEX :  printf("    - FLEX board type"); break;
+      case VHD_BOARDTYPE_3GKEY : printf("    - 3G key board type"); break;
+      case VHD_BOARDTYPE_ASI :   printf("    - ASI board type"); break;
       case VHD_BOARDTYPE_HDMI:   printf("    - H4K board type"); break;
+      case VHD_BOARDTYPE_HDMI20: printf("    - H4K2 board type"); break;
       case VHD_BOARDTYPE_IP:     printf("    - IP board type"); break;
-      default :                  printf("    - Unknown board type"); break;
+      case VHD_BOARDTYPE_FLEX_DP:printf("    - FLEX-dp board type"); break;
+      case VHD_BOARDTYPE_12G:    printf("    - 12G board type"); break;
+      default:                  printf("    - Unknown board type"); break;
       }
-      printf(" on %s bus",NbOfLane?"PCIe":"PCI");
-      if(NbOfLane)
-         printf(" (%d lane%s)\n",NbOfLane,(NbOfLane>1)?"s":"");
+
+      printf(" on ");
+      switch (BusType)
+      {
+      case VHD_BUSTYPE_PCI: printf("PCI"); break;
+      case VHD_BUSTYPE_PCIe: printf("PCIe gen 1"); break;
+      case VHD_BUSTYPE_PCIe_gen2: printf("PCIe gen 2"); break;
+      case VHD_BUSTYPE_PCIe_gen3: printf("PCIe gen 3"); break;
+      default: printf("Unknown bus type"); break;
+      }
+      printf(" bus");
+
+      if (NbOfLane)
+         printf(" (%d lane%s)\n", NbOfLane, (NbOfLane > 1) ? "s" : "");
       else
          printf("\n");
-      printf("    - %s\n",LowProfile?"Low profile":"Full height");
-      printf("    - %d In / %d Out\n",NbRxChannels,NbTxChannels);
+      printf("    - %s\n", LowProfile ? "Low profile" : "Full height");
+      printf("    - %d In / %d Out\n", NbRxChannels, NbTxChannels);
 
       printf("    - ");
       PrintChnType(BoardHandle);
@@ -246,7 +278,7 @@ void PrintBoardInfo(int BoardIndex)
       VHD_CloseBoardHandle(BoardHandle);
    }
    else
-      printf("ERROR : Cannot open DELTA board %u handle. Result = 0x%08X (%s)\n",BoardIndex,Result, GetErrorDescription(Result));
+      printf("ERROR : Cannot open DELTA board %u handle. Result = 0x%08X (%s)\n", BoardIndex, Result, GetErrorDescription(Result));
 }
 
 void WaitForChannelLocked(HANDLE BoardHandle, VHD_CORE_BOARDPROPERTY ChannelStatus_E)
@@ -255,22 +287,15 @@ void WaitForChannelLocked(HANDLE BoardHandle, VHD_CORE_BOARDPROPERTY ChannelStat
    ULONG Result = VHDERR_NOERROR;
 
    printf("\nWaiting for channel locked, press ESC to abort...\n");
-   
-   do 
+
+   do
    {
-#if 0
-      if (kbhit()) 
-      {
-         getch();
-         break;
-      }
- #endif     
       Result = VHD_GetBoardProperty(BoardHandle, ChannelStatus_E, &Status);
-      PAUSE(100); 
-      
+      PAUSE(100);
+
       if (Result != VHDERR_NOERROR)
          continue;
-      
+
    } while (Status & VHD_CORE_RXSTS_UNLOCKED);
 }
 
@@ -281,17 +306,10 @@ void WaitForGenlockRef(HANDLE BoardHandle)
 
    printf("\nWaiting for genlock reference, press ESC to abort...\n");
 
-   do 
+   do
    {
-#if 0
-      if (kbhit()) 
-      {
-         getch();
-         break;
-      }
-#endif
       Result = VHD_GetBoardProperty(BoardHandle, VHD_SDI_BP_GENLOCK_STATUS, &Status);
-      PAUSE(100); 
+      PAUSE(100);
 
       if (Result != VHDERR_NOERROR)
          continue;
@@ -301,7 +319,7 @@ void WaitForGenlockRef(HANDLE BoardHandle)
 
 void PrintVideoStandardInfo(ULONG VideoStandard)
 {
-   printf("\nIncoming video standard : %s\n",GetNameVideoStandard(VideoStandard));
+   printf("\nIncoming video standard : %s\n", GetNameVideoStandard(VideoStandard));
 }
 
 BOOL32 GetVideoCharacteristics(ULONG VideoStandard, int * pWidth, int * pHeight, BOOL32 * pInterlaced, BOOL32 * pIsHD)
@@ -318,8 +336,8 @@ BOOL32 GetVideoCharacteristics(ULONG VideoStandard, int * pWidth, int * pHeight,
    case VHD_VIDEOSTD_S296M_720p_30Hz:
    case VHD_VIDEOSTD_S296M_720p_50Hz:
    case VHD_VIDEOSTD_S296M_720p_60Hz: Width = 1280; Height = 720; Interlaced = FALSE; IsHD = TRUE; break;
-   case VHD_VIDEOSTD_S274M_1080i_50Hz: 
-   case VHD_VIDEOSTD_S274M_1080i_60Hz: 
+   case VHD_VIDEOSTD_S274M_1080i_50Hz:
+   case VHD_VIDEOSTD_S274M_1080i_60Hz:
    case VHD_VIDEOSTD_S274M_1080psf_24Hz:
    case VHD_VIDEOSTD_S274M_1080psf_25Hz:
    case VHD_VIDEOSTD_S274M_1080psf_30Hz: Width = 1920; Height = 1080; Interlaced = TRUE; IsHD = TRUE; break;
@@ -383,13 +401,13 @@ const char * GetNameVideoStandard(ULONG VideoStandard)
    switch (VideoStandard)
    {
    case VHD_VIDEOSTD_S259M_NTSC: return "SMPTE 259M - NTSC";
-   case VHD_VIDEOSTD_S259M_PAL: return "SMPTE 259M - PAL"; 
-   case VHD_VIDEOSTD_S274M_1080i_50Hz: return "SMPTE 274M - 1080i @ 50Hz"; 
-   case VHD_VIDEOSTD_S274M_1080i_60Hz: return "SMPTE 274M - 1080i @ 60Hz"; 
-   case VHD_VIDEOSTD_S274M_1080p_25Hz: return "SMPTE 274M - 1080p @ 25Hz"; 
-   case VHD_VIDEOSTD_S274M_1080p_30Hz: return "SMPTE 274M - 1080p @ 30Hz"; 
-   case VHD_VIDEOSTD_S296M_720p_50Hz: return "SMPTE 296M - 720p @ 50Hz"; 
-   case VHD_VIDEOSTD_S296M_720p_60Hz: return "SMPTE 296M - 720p @ 60Hz"; 
+   case VHD_VIDEOSTD_S259M_PAL: return "SMPTE 259M - PAL";
+   case VHD_VIDEOSTD_S274M_1080i_50Hz: return "SMPTE 274M - 1080i @ 50Hz";
+   case VHD_VIDEOSTD_S274M_1080i_60Hz: return "SMPTE 274M - 1080i @ 60Hz";
+   case VHD_VIDEOSTD_S274M_1080p_25Hz: return "SMPTE 274M - 1080p @ 25Hz";
+   case VHD_VIDEOSTD_S274M_1080p_30Hz: return "SMPTE 274M - 1080p @ 30Hz";
+   case VHD_VIDEOSTD_S296M_720p_50Hz: return "SMPTE 296M - 720p @ 50Hz";
+   case VHD_VIDEOSTD_S296M_720p_60Hz: return "SMPTE 296M - 720p @ 60Hz";
    case VHD_VIDEOSTD_S274M_1080p_24Hz: return "SMPTE 274M - 1080p @ 24Hz";
    case VHD_VIDEOSTD_S274M_1080p_60Hz: return "SMPTE 274M - 1080p @ 60Hz";
    case VHD_VIDEOSTD_S274M_1080p_50Hz: return "SMPTE 274M - 1080p @ 50Hz";
@@ -425,117 +443,87 @@ const char * GetNameVideoStandard(ULONG VideoStandard)
 
 const char * GetNameInterface(ULONG Interface)
 {
-   switch(Interface)
+   switch (Interface)
    {
    case VHD_INTERFACE_DEPRECATED: return "Deprecated";
    case VHD_INTERFACE_SD_259: return "SD SMPTE 259";
    case VHD_INTERFACE_HD_292_1: return "HD SMPTE 292-1";
    case VHD_INTERFACE_HD_DUAL_372: return "HD-Dual SMPTE 372";
    case VHD_INTERFACE_3G_A_425_1: return "3G Level A SMPTE 425-1";
-   case VHD_INTERFACE_4XHD: return "4xHD";
-   case VHD_INTERFACE_4X3G_A: return "4x3G Level A";
+   case VHD_INTERFACE_4XHD_QUADRANT: return "4xHD Quadrants";
+   case VHD_INTERFACE_4X3G_A_QUADRANT: return "4x3G Level A Quadrants";
    case VHD_INTERFACE_SD_DUAL: return "SD-Dual";
    case VHD_INTERFACE_3G_A_DUAL: return "3G Level A Dual";
-   case VHD_INTERFACE_3G_B_425_1_DL: return "3G Level B Dual-Link";
-   case VHD_INTERFACE_4X3G_B_DL_QUADRANT: return "4x3G Level B Dual-Link";  
-   case VHD_INTERFACE_2X3G_B_DS_425_3: return "2x3G Level B Dual-Stream 425-3";     
-   case VHD_INTERFACE_4X3G_A_425_5: return "4x3G Level A 425-5";        
-   case VHD_INTERFACE_4X3G_B_DL_425_5: return "4x3G Level B Dual-Link 425-5"; 
+   case VHD_INTERFACE_3G_B_DL_425_1: return "3G Level B Dual-Link";
+   case VHD_INTERFACE_4X3G_B_DL_QUADRANT: return "4x3G Level B Dual-Link";
+   case VHD_INTERFACE_2X3G_B_DS_425_3: return "2x3G Level B Dual-Stream 425-3";
+   case VHD_INTERFACE_4X3G_A_425_5: return "4x3G Level A 425-5";
+   case VHD_INTERFACE_4X3G_B_DL_425_5: return "4x3G Level B Dual-Link 425-5";
+   case VHD_INTERFACE_3G_B_DL_425_1_DUAL: return "3G Level B Dual-Link Dual";
+   case VHD_INTERFACE_2X3G_B_DS_425_3_DUAL: return "2x3G Level B Dual-Stream 425-3 Dual";
+   case VHD_INTERFACE_4XHD_QUADRANT_DUAL: return "4xHD Quadrants Dual";
+   case VHD_INTERFACE_4X3G_A_QUADRANT_DUAL: return "4x3G Level A Quadrants Dual";
+   case VHD_INTERFACE_4X3G_A_425_5_DUAL: return "4x3G Level A 425-5 Dual";
+   case VHD_INTERFACE_4X3G_B_DL_QUADRANT_DUAL: return "4x3G Level B Dual-Link Dual";
+   case VHD_INTERFACE_4X3G_B_DL_425_5_DUAL: return "4x3G Level B Dual-Link 425-5 Dual";
+   case VHD_INTERFACE_TICO_3G_A_425_1: return "3G Level A SMPTE 425-1 Tico";
+   case VHD_INTERFACE_TICO_HD_292_1: return "HD SMPTE 292-1 Tico";
    default: return "Unknown interface";
    }
 }
 
 void PrintInterfaceInfo(ULONG Interface)
 {
-   printf("\nIncoming interface : %s\n",GetNameInterface(Interface));
+   printf("\nIncoming interface : %s\n", GetNameInterface(Interface));
 }
-
-int GetFPS(ULONG VideoStandard) {
-	int fps = 0;
-
-	switch (VideoStandard)
-	{
-	  case VHD_VIDEOSTD_S259M_NTSC: fps = 0; break;
-	  case VHD_VIDEOSTD_S259M_PAL: fps = 0; break;
-	  case VHD_VIDEOSTD_S296M_720p_50Hz:
-	  case VHD_VIDEOSTD_S274M_1080i_50Hz:
-	  case VHD_VIDEOSTD_S274M_1080p_50Hz:
-	  case VHD_VIDEOSTD_S2048M_2048p_50Hz: fps = 50; break;
-	  case VHD_VIDEOSTD_S296M_720p_60Hz:
-	  case VHD_VIDEOSTD_S274M_1080i_60Hz:
-	  case VHD_VIDEOSTD_S274M_1080p_60Hz:
-	  case VHD_VIDEOSTD_S2048M_2048p_60Hz: fps = 60; break;
-	  case VHD_VIDEOSTD_S296M_720p_24Hz:
-	  case VHD_VIDEOSTD_S274M_1080p_24Hz:
-	  case VHD_VIDEOSTD_S274M_1080psf_24Hz:
-	  case VHD_VIDEOSTD_S2048M_2048p_24Hz:
-	  case VHD_VIDEOSTD_S2048M_2048psf_24Hz: fps = 24; break;
-	  case VHD_VIDEOSTD_S296M_720p_25Hz:
-	  case VHD_VIDEOSTD_S274M_1080p_25Hz:
-	  case VHD_VIDEOSTD_S274M_1080psf_25Hz:
-	  case VHD_VIDEOSTD_S2048M_2048p_25Hz:
-	  case VHD_VIDEOSTD_S2048M_2048psf_25Hz: fps = 25; break;
-	  case VHD_VIDEOSTD_S296M_720p_30Hz:
-	  case VHD_VIDEOSTD_S274M_1080p_30Hz:
-	  case VHD_VIDEOSTD_S274M_1080psf_30Hz:
-	  case VHD_VIDEOSTD_S2048M_2048p_30Hz:
-	  case VHD_VIDEOSTD_S2048M_2048psf_30Hz: fps = 30; break;
-	  case VHD_VIDEOSTD_S2048M_2048p_48Hz: fps = 48; break;
-	  default: fps = 0; break;
-	}
-
-	return fps;
-
-}
-
 
 int GetRawFrameHeight(ULONG VideoStandard)
 {
-	int RawFrameHeight=0;
+   int RawFrameHeight = 0;
 
-	switch (VideoStandard)
-	{
-	case VHD_VIDEOSTD_S259M_NTSC: RawFrameHeight=525; break;
-	case VHD_VIDEOSTD_S259M_PAL: RawFrameHeight=625; break;
-	case VHD_VIDEOSTD_S296M_720p_50Hz:
-	case VHD_VIDEOSTD_S296M_720p_60Hz:
-	case VHD_VIDEOSTD_S296M_720p_24Hz:
-	case VHD_VIDEOSTD_S296M_720p_25Hz:
-	case VHD_VIDEOSTD_S296M_720p_30Hz: RawFrameHeight=750; break;
-	case VHD_VIDEOSTD_S274M_1080i_50Hz:
-	case VHD_VIDEOSTD_S274M_1080i_60Hz:
-	case VHD_VIDEOSTD_S274M_1080p_25Hz:
-	case VHD_VIDEOSTD_S274M_1080p_30Hz:
-	case VHD_VIDEOSTD_S274M_1080p_24Hz:
-	case VHD_VIDEOSTD_S274M_1080p_60Hz:
-	case VHD_VIDEOSTD_S274M_1080p_50Hz:
-	case VHD_VIDEOSTD_S274M_1080psf_24Hz:
-	case VHD_VIDEOSTD_S274M_1080psf_25Hz:
-	case VHD_VIDEOSTD_S274M_1080psf_30Hz:
-	case VHD_VIDEOSTD_S2048M_2048p_24Hz:
-	case VHD_VIDEOSTD_S2048M_2048p_25Hz:
-	case VHD_VIDEOSTD_S2048M_2048p_30Hz:
-	case VHD_VIDEOSTD_S2048M_2048psf_24Hz:
-	case VHD_VIDEOSTD_S2048M_2048psf_25Hz:
-	case VHD_VIDEOSTD_S2048M_2048psf_30Hz:
-	case VHD_VIDEOSTD_S2048M_2048p_60Hz:
-	case VHD_VIDEOSTD_S2048M_2048p_50Hz:
-	case VHD_VIDEOSTD_S2048M_2048p_48Hz: RawFrameHeight=1125; break;
-	default: RawFrameHeight=0; break;
-	}
+   switch (VideoStandard)
+   {
+   case VHD_VIDEOSTD_S259M_NTSC: RawFrameHeight = 525; break;
+   case VHD_VIDEOSTD_S259M_PAL: RawFrameHeight = 625; break;
+   case VHD_VIDEOSTD_S296M_720p_50Hz:
+   case VHD_VIDEOSTD_S296M_720p_60Hz:
+   case VHD_VIDEOSTD_S296M_720p_24Hz:
+   case VHD_VIDEOSTD_S296M_720p_25Hz:
+   case VHD_VIDEOSTD_S296M_720p_30Hz: RawFrameHeight = 750; break;
+   case VHD_VIDEOSTD_S274M_1080i_50Hz:
+   case VHD_VIDEOSTD_S274M_1080i_60Hz:
+   case VHD_VIDEOSTD_S274M_1080p_25Hz:
+   case VHD_VIDEOSTD_S274M_1080p_30Hz:
+   case VHD_VIDEOSTD_S274M_1080p_24Hz:
+   case VHD_VIDEOSTD_S274M_1080p_60Hz:
+   case VHD_VIDEOSTD_S274M_1080p_50Hz:
+   case VHD_VIDEOSTD_S274M_1080psf_24Hz:
+   case VHD_VIDEOSTD_S274M_1080psf_25Hz:
+   case VHD_VIDEOSTD_S274M_1080psf_30Hz:
+   case VHD_VIDEOSTD_S2048M_2048p_24Hz:
+   case VHD_VIDEOSTD_S2048M_2048p_25Hz:
+   case VHD_VIDEOSTD_S2048M_2048p_30Hz:
+   case VHD_VIDEOSTD_S2048M_2048psf_24Hz:
+   case VHD_VIDEOSTD_S2048M_2048psf_25Hz:
+   case VHD_VIDEOSTD_S2048M_2048psf_30Hz:
+   case VHD_VIDEOSTD_S2048M_2048p_60Hz:
+   case VHD_VIDEOSTD_S2048M_2048p_50Hz:
+   case VHD_VIDEOSTD_S2048M_2048p_48Hz: RawFrameHeight = 1125; break;
+   default: RawFrameHeight = 0; break;
+   }
 
-	return RawFrameHeight;
+   return RawFrameHeight;
 }
 
 BOOL32 SetNbChannels(ULONG BrdId, ULONG NbRx, ULONG NbTx)
 {
    BOOL32 Result = FALSE;
    ULONG VhdResult = VHDERR_NOERROR;
-   ULONG NbRxOnBoard = 0, NbTxOnBoard = 0, NbChanOnBoard = 0; 
+   ULONG NbRxOnBoard = 0, NbTxOnBoard = 0, NbChanOnBoard = 0;
    HANDLE BoardHandle = NULL;
    BOOL32 IsBiDir = FALSE;
 
-   VhdResult = VHD_OpenBoardHandle(BrdId,&BoardHandle,NULL,0);
+   VhdResult = VHD_OpenBoardHandle(BrdId, &BoardHandle, NULL, 0);
    if (VhdResult == VHDERR_NOERROR)
    {
       VHD_GetBoardProperty(BoardHandle, VHD_CORE_BP_NB_RXCHANNELS, &NbRxOnBoard);
@@ -547,61 +535,52 @@ BOOL32 SetNbChannels(ULONG BrdId, ULONG NbRx, ULONG NbTx)
       NbChanOnBoard = NbRxOnBoard + NbTxOnBoard;
 
       if ((NbRxOnBoard >= NbRx) && (NbTxOnBoard >= NbTx))
-         Result = TRUE;    
-   
+         Result = TRUE;
+
       if (!Result)
       {
          if (IsBiDir)
          {
-            if ((NbRx+NbTx)<=NbChanOnBoard)
+            if ((NbRx + NbTx) <= NbChanOnBoard)
             {
                printf("\nChanging board configuration... ");
 
-               if (NbChanOnBoard == 2)
+               if (NbChanOnBoard == 4)
                {
                   switch (NbRx)
                   {
-                  case 0 :	VHD_SetBiDirCfg(BrdId, VHD_BIDIR_02);break;
-                  case 1 :	VHD_SetBiDirCfg(BrdId, VHD_BIDIR_11);break;
-                  case 2 :	VHD_SetBiDirCfg(BrdId, VHD_BIDIR_20);break;
-                  }
-               }
-               else if (NbChanOnBoard == 4)
-               {
-                  switch (NbRx)
-                  {
-                  case 0 :	VHD_SetBiDirCfg(BrdId, VHD_BIDIR_04);break;
-                  case 1 :	VHD_SetBiDirCfg(BrdId, VHD_BIDIR_13);break;
-                  case 2 :	VHD_SetBiDirCfg(BrdId, VHD_BIDIR_22);break;
-                  case 3 :	VHD_SetBiDirCfg(BrdId, VHD_BIDIR_31);break;
-                  case 4 :	VHD_SetBiDirCfg(BrdId, VHD_BIDIR_40);break;
+                  case 0:	VHD_SetBiDirCfg(BrdId, VHD_BIDIR_04); break;
+                  case 1:	VHD_SetBiDirCfg(BrdId, VHD_BIDIR_13); break;
+                  case 2:	VHD_SetBiDirCfg(BrdId, VHD_BIDIR_22); break;
+                  case 3:	VHD_SetBiDirCfg(BrdId, VHD_BIDIR_31); break;
+                  case 4:	VHD_SetBiDirCfg(BrdId, VHD_BIDIR_40); break;
                   }
                }
                else if (NbChanOnBoard == 8)
                {
                   switch (NbRx)
                   {
-                  case 0 :	VHD_SetBiDirCfg(BrdId, VHD_BIDIR_08);break;
-                  case 1 :	VHD_SetBiDirCfg(BrdId, VHD_BIDIR_17);break;
-                  case 2 :	VHD_SetBiDirCfg(BrdId, VHD_BIDIR_26);break;
-                  case 3 :	VHD_SetBiDirCfg(BrdId, VHD_BIDIR_35);break;
-                  case 4 :	VHD_SetBiDirCfg(BrdId, VHD_BIDIR_44);break;
-                  case 5 :	VHD_SetBiDirCfg(BrdId, VHD_BIDIR_53);break;
-                  case 6 :	VHD_SetBiDirCfg(BrdId, VHD_BIDIR_62);break;
-                  case 7 :	VHD_SetBiDirCfg(BrdId, VHD_BIDIR_71);break;
-                  case 8 :	VHD_SetBiDirCfg(BrdId, VHD_BIDIR_80);break;
+                  case 0:	VHD_SetBiDirCfg(BrdId, VHD_BIDIR_08); break;
+                  case 1:	VHD_SetBiDirCfg(BrdId, VHD_BIDIR_17); break;
+                  case 2:	VHD_SetBiDirCfg(BrdId, VHD_BIDIR_26); break;
+                  case 3:	VHD_SetBiDirCfg(BrdId, VHD_BIDIR_35); break;
+                  case 4:	VHD_SetBiDirCfg(BrdId, VHD_BIDIR_44); break;
+                  case 5:	VHD_SetBiDirCfg(BrdId, VHD_BIDIR_53); break;
+                  case 6:	VHD_SetBiDirCfg(BrdId, VHD_BIDIR_62); break;
+                  case 7:	VHD_SetBiDirCfg(BrdId, VHD_BIDIR_71); break;
+                  case 8:	VHD_SetBiDirCfg(BrdId, VHD_BIDIR_80); break;
                   }
                }
 
-               Result = TRUE;    
+               Result = TRUE;
 
-               printf("Set configuration %d In / %d Out\n", NbRx, NbChanOnBoard-NbRx);
-            }         
+               printf("Set configuration %d In / %d Out\n", NbRx, NbChanOnBoard - NbRx);
+            }
          }
       }
    }
-   
-   return Result;   
+
+   return Result;
 }
 
 BOOL32 Is4KInterface(ULONG Interface)
@@ -609,66 +588,73 @@ BOOL32 Is4KInterface(ULONG Interface)
    BOOL32 Result = FALSE;
    switch (Interface)
    {
-   case VHD_INTERFACE_4XHD: 
-   case VHD_INTERFACE_4X3G_A: 
-   case VHD_INTERFACE_4X3G_B_DL_QUADRANT: 
-   case VHD_INTERFACE_2X3G_B_DS_425_3: 
+   case VHD_INTERFACE_4XHD_QUADRANT:
+   case VHD_INTERFACE_4X3G_A_QUADRANT:
+   case VHD_INTERFACE_4X3G_B_DL_QUADRANT:
+   case VHD_INTERFACE_2X3G_B_DS_425_3:
    case VHD_INTERFACE_4X3G_A_425_5:
-   case VHD_INTERFACE_4X3G_B_DL_425_5: Result = TRUE; break;
+   case VHD_INTERFACE_4X3G_B_DL_425_5:
+   case VHD_INTERFACE_2X3G_B_DS_425_3_DUAL:
+   case VHD_INTERFACE_4XHD_QUADRANT_DUAL:
+   case VHD_INTERFACE_4X3G_A_QUADRANT_DUAL:
+   case VHD_INTERFACE_4X3G_A_425_5_DUAL:
+   case VHD_INTERFACE_4X3G_B_DL_QUADRANT_DUAL:
+   case VHD_INTERFACE_4X3G_B_DL_425_5_DUAL:
+      Result = TRUE; break;
    }
 
    return Result;
 }
 
-BOOL32 SingleToQuadLinksInterface( ULONG RXStatus, ULONG *pInterface, ULONG *pVideoStandard)
+BOOL32 SingleToQuadLinksInterface(ULONG RXStatus, ULONG *pInterface, ULONG *pVideoStandard)
 {
    BOOL32 Result = TRUE;
 
-   if(pInterface && pVideoStandard)
+   if (pInterface && pVideoStandard)
    {
-      switch(*pVideoStandard)
+      switch (*pVideoStandard)
       {
       case VHD_VIDEOSTD_S274M_1080p_24Hz: *pVideoStandard = VHD_VIDEOSTD_3840x2160p_24Hz;
-         *pInterface = VHD_INTERFACE_4XHD; break;
+         *pInterface = VHD_INTERFACE_4XHD_QUADRANT; break;
       case VHD_VIDEOSTD_S274M_1080p_25Hz: *pVideoStandard = VHD_VIDEOSTD_3840x2160p_25Hz;
-         *pInterface = VHD_INTERFACE_4XHD; break;
+         *pInterface = VHD_INTERFACE_4XHD_QUADRANT; break;
       case VHD_VIDEOSTD_S274M_1080p_30Hz: *pVideoStandard = VHD_VIDEOSTD_3840x2160p_30Hz;
-         *pInterface = VHD_INTERFACE_4XHD; break;
+         *pInterface = VHD_INTERFACE_4XHD_QUADRANT; break;
       case VHD_VIDEOSTD_S274M_1080p_50Hz: *pVideoStandard = VHD_VIDEOSTD_3840x2160p_50Hz;
-         if(RXStatus&VHD_SDI_RXSTS_LEVELB_3G)
-            *pInterface = VHD_INTERFACE_4X3G_B_DL;
+         if (RXStatus&VHD_SDI_RXSTS_LEVELB_3G)
+            *pInterface = VHD_INTERFACE_4X3G_B_DL_QUADRANT;
          else
-            *pInterface = VHD_INTERFACE_4X3G_A;
+            *pInterface = VHD_INTERFACE_4X3G_A_QUADRANT;
          break;
       case VHD_VIDEOSTD_S274M_1080p_60Hz:	*pVideoStandard = VHD_VIDEOSTD_3840x2160p_60Hz;
-         if(RXStatus&VHD_SDI_RXSTS_LEVELB_3G)
-            *pInterface = VHD_INTERFACE_4X3G_B_DL;
+         if (RXStatus&VHD_SDI_RXSTS_LEVELB_3G)
+            *pInterface = VHD_INTERFACE_4X3G_B_DL_QUADRANT;
          else
-            *pInterface = VHD_INTERFACE_4X3G_A;
+            *pInterface = VHD_INTERFACE_4X3G_A_QUADRANT;
          break;
       case VHD_VIDEOSTD_S2048M_2048p_24Hz:	*pVideoStandard = VHD_VIDEOSTD_4096x2160p_24Hz;
-         *pInterface = VHD_INTERFACE_4XHD; break;
+         *pInterface = VHD_INTERFACE_4XHD_QUADRANT; break;
       case VHD_VIDEOSTD_S2048M_2048p_25Hz:	*pVideoStandard = VHD_VIDEOSTD_4096x2160p_25Hz;
-         *pInterface = VHD_INTERFACE_4XHD; break;
+         *pInterface = VHD_INTERFACE_4XHD_QUADRANT; break;
       case VHD_VIDEOSTD_S2048M_2048p_30Hz:	*pVideoStandard = VHD_VIDEOSTD_4096x2160p_30Hz;
-         *pInterface = VHD_INTERFACE_4XHD; break;
+         *pInterface = VHD_INTERFACE_4XHD_QUADRANT; break;
       case VHD_VIDEOSTD_S2048M_2048p_48Hz:	*pVideoStandard = VHD_VIDEOSTD_4096x2160p_48Hz;
-         if(RXStatus&VHD_SDI_RXSTS_LEVELB_3G)
-            *pInterface = VHD_INTERFACE_4X3G_B_DL;
+         if (RXStatus&VHD_SDI_RXSTS_LEVELB_3G)
+            *pInterface = VHD_INTERFACE_4X3G_B_DL_QUADRANT;
          else
-            *pInterface = VHD_INTERFACE_4X3G_A;
+            *pInterface = VHD_INTERFACE_4X3G_A_QUADRANT;
          break;
       case VHD_VIDEOSTD_S2048M_2048p_50Hz:	*pVideoStandard = VHD_VIDEOSTD_4096x2160p_50Hz;
-         if(RXStatus&VHD_SDI_RXSTS_LEVELB_3G)
-            *pInterface = VHD_INTERFACE_4X3G_B_DL;
+         if (RXStatus&VHD_SDI_RXSTS_LEVELB_3G)
+            *pInterface = VHD_INTERFACE_4X3G_B_DL_QUADRANT;
          else
-            *pInterface = VHD_INTERFACE_4X3G_A;
+            *pInterface = VHD_INTERFACE_4X3G_A_QUADRANT;
          break;
       case VHD_VIDEOSTD_S2048M_2048p_60Hz:	*pVideoStandard = VHD_VIDEOSTD_4096x2160p_60Hz;
-         if(RXStatus&VHD_SDI_RXSTS_LEVELB_3G)
-            *pInterface = VHD_INTERFACE_4X3G_B_DL;
+         if (RXStatus&VHD_SDI_RXSTS_LEVELB_3G)
+            *pInterface = VHD_INTERFACE_4X3G_B_DL_QUADRANT;
          else
-            *pInterface = VHD_INTERFACE_4X3G_A;
+            *pInterface = VHD_INTERFACE_4X3G_A_QUADRANT;
          break;
       default: Result = FALSE; break;
       }
@@ -679,13 +665,13 @@ BOOL32 SingleToQuadLinksInterface( ULONG RXStatus, ULONG *pInterface, ULONG *pVi
    return Result;
 }
 
-BOOL32 SingleToQuadLinksVideoStandard( ULONG *pVideoStandard)
+BOOL32 SingleToQuadLinksVideoStandard(ULONG *pVideoStandard)
 {
    BOOL32 Result = TRUE;
 
-   if(pVideoStandard)
+   if (pVideoStandard)
    {
-      switch(*pVideoStandard)
+      switch (*pVideoStandard)
       {
       case VHD_VIDEOSTD_S274M_1080p_24Hz: *pVideoStandard = VHD_VIDEOSTD_3840x2160p_24Hz; break;
       case VHD_VIDEOSTD_S274M_1080p_25Hz: *pVideoStandard = VHD_VIDEOSTD_3840x2160p_25Hz; break;
@@ -713,20 +699,20 @@ BOOL32 GetFrameST2022_6PacketNumber(ULONG VideoStandard, ULONG *pPacketNumber)
 
    switch (VideoStandard)
    {
-   case VHD_VIDEOSTD_S259M_NTSC:PacketNumber=819 ;break;
-   case VHD_VIDEOSTD_S259M_PAL:PacketNumber=982 ;break;
-   case VHD_VIDEOSTD_S296M_720p_60Hz:PacketNumber=2249 ;break;
-   case VHD_VIDEOSTD_S296M_720p_50Hz:PacketNumber=2699 ;break;
-   case VHD_VIDEOSTD_S274M_1080i_50Hz:PacketNumber= 5397; break;
-   case VHD_VIDEOSTD_S274M_1080i_60Hz: PacketNumber= 4497; break;
-   case VHD_VIDEOSTD_S274M_1080psf_25Hz:PacketNumber= 5397; break;
-   case VHD_VIDEOSTD_S274M_1080psf_30Hz: PacketNumber= 4497; break;
-   case VHD_VIDEOSTD_S274M_1080p_25Hz:PacketNumber= 5397;break;
-   case VHD_VIDEOSTD_S274M_1080p_30Hz: PacketNumber= 4497;break;
-   case VHD_VIDEOSTD_S274M_1080p_50Hz:PacketNumber= 5397; break;
-   case VHD_VIDEOSTD_S274M_1080p_60Hz: PacketNumber= 4497; break;
-   case VHD_VIDEOSTD_S274M_1080p_24Hz:PacketNumber= 5621;break;
-   case VHD_VIDEOSTD_S274M_1080psf_24Hz:PacketNumber= 5621;break;
+   case VHD_VIDEOSTD_S259M_NTSC:PacketNumber = 819; break;
+   case VHD_VIDEOSTD_S259M_PAL:PacketNumber = 982; break;
+   case VHD_VIDEOSTD_S296M_720p_60Hz:PacketNumber = 2249; break;
+   case VHD_VIDEOSTD_S296M_720p_50Hz:PacketNumber = 2699; break;
+   case VHD_VIDEOSTD_S274M_1080i_50Hz:PacketNumber = 5397; break;
+   case VHD_VIDEOSTD_S274M_1080i_60Hz: PacketNumber = 4497; break;
+   case VHD_VIDEOSTD_S274M_1080psf_25Hz:PacketNumber = 5397; break;
+   case VHD_VIDEOSTD_S274M_1080psf_30Hz: PacketNumber = 4497; break;
+   case VHD_VIDEOSTD_S274M_1080p_25Hz:PacketNumber = 5397; break;
+   case VHD_VIDEOSTD_S274M_1080p_30Hz: PacketNumber = 4497; break;
+   case VHD_VIDEOSTD_S274M_1080p_50Hz:PacketNumber = 5397; break;
+   case VHD_VIDEOSTD_S274M_1080p_60Hz: PacketNumber = 4497; break;
+   case VHD_VIDEOSTD_S274M_1080p_24Hz:PacketNumber = 5621; break;
+   case VHD_VIDEOSTD_S274M_1080psf_24Hz:PacketNumber = 5621; break;
    default: return FALSE;
    }
 
@@ -735,5 +721,51 @@ BOOL32 GetFrameST2022_6PacketNumber(ULONG VideoStandard, ULONG *pPacketNumber)
    return TRUE;
 }
 
+BOOL32 GetCarriedVideoStandard(ULONG VideoStandard)
+{
+   ULONG ExpectedVideoStandard = NB_VHD_VIDEOSTANDARDS;
 
+   switch (VideoStandard)
+   {
+   case VHD_VIDEOSTD_S274M_1080p_50Hz:
+      ExpectedVideoStandard = VHD_VIDEOSTD_S274M_1080i_50Hz;  break;
+   case VHD_VIDEOSTD_S274M_1080p_60Hz:
+      ExpectedVideoStandard = VHD_VIDEOSTD_S274M_1080i_60Hz;  break;
+   case VHD_VIDEOSTD_S2048M_2048p_48Hz:
+      ExpectedVideoStandard = VHD_VIDEOSTD_S2048M_2048psf_24Hz;  break;
+   case VHD_VIDEOSTD_S2048M_2048p_50Hz:
+      ExpectedVideoStandard = VHD_VIDEOSTD_S2048M_2048psf_25Hz;  break;
+   case VHD_VIDEOSTD_S2048M_2048p_60Hz:
+      ExpectedVideoStandard = VHD_VIDEOSTD_S2048M_2048psf_30Hz;  break;
+   default: ExpectedVideoStandard = VideoStandard; break;
+   }
+
+   return ExpectedVideoStandard;
+}
+
+void *PageAlignedAlloc(ULONG Size)
+{
+   void *pBuffer = NULL;
+   int Error_i = 0;
+
+#ifdef WIN32 
+   pBuffer = VirtualAlloc(NULL, Size, MEM_COMMIT | MEM_TOP_DOWN, PAGE_EXECUTE_READWRITE);
+#else
+   Error_i = posix_memalign(&pBuffer, 4096, Size);
+   if (Error_i != 0)
+   {
+      printf("posix_memalign failed to alloc %d bytes (error = %d)\n", Size, Error_i);
+   }
+#endif
+   return pBuffer;
+}
+
+void PageAlignedFree(void *pBuffer, ULONG Size)
+{
+#ifdef WIN32 
+   VirtualFree(pBuffer, 0, MEM_RELEASE);
+#else
+   free(pBuffer);
+#endif
+}
 

@@ -50,11 +50,11 @@ OBJS-$(CONFIG_V4L2_OUTDEV)               += v4l2enc.o v4l2-common.o
 OBJS-$(CONFIG_VFWCAP_INDEV)              += vfwcap.o
 OBJS-$(CONFIG_XCBGRAB_INDEV)             += xcbgrab.o
 OBJS-$(CONFIG_XV_OUTDEV)                 += xv.o
-OBJS-$(CONFIG_DELTACAST_INDEV)           += deltacast_dec.o deltacast/Tools.o
 
 # external libraries
 OBJS-$(CONFIG_LIBCDIO_INDEV)             += libcdio.o
 OBJS-$(CONFIG_LIBDC1394_INDEV)           += libdc1394.o
+OBJS-$(CONFIG_DELTACAST_INDEV)           += deltacast_dec.o deltacast/Tools.o
 
 # Windows resource file
 SLIBOBJS-$(HAVE_GNU_WINDRES)             += avdeviceres.o
