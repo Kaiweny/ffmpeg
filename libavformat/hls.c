@@ -1567,7 +1567,7 @@ reload:
         }
 
         // replace mpegts parser callback mechanism
-        if(interal && urlc && v->input) {
+        if(interal && urlc && v->input && (!c->http_persistent || !v->input_read_done))  {
             interal = (struct AVIOInternal*)v->input->opaque;
             urlc = (URLContext*)interal->h;
             urlc->mpegts_parser_injection = v->mpegts_parser_input_backup;
