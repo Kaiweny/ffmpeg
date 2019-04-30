@@ -1430,7 +1430,7 @@ static int read_data(void *opaque, uint8_t *buf, int buf_size)
     URLContext* urlc = NULL;
 
     // keep reference of mpegts parser callback mechanism
-    if(v->input) {
+    if(v->input && (!c->http_persistent || !v->input_read_done)) {
         interal = (struct AVIOInternal*)v->input->opaque;
         urlc = (URLContext*)interal->h;
         struct segment *seg = current_segment(v);
@@ -1567,7 +1567,7 @@ reload:
         }
 
         // replace mpegts parser callback mechanism
-        if(interal && urlc && v->input) {
+        if(interal && urlc && v->input && (!c->http_persistent || !v->input_read_done))  {
             interal = (struct AVIOInternal*)v->input->opaque;
             urlc = (URLContext*)interal->h;
             urlc->mpegts_parser_injection = v->mpegts_parser_input_backup;
