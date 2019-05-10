@@ -75,7 +75,7 @@ static void set_spdif(AVFormatContext *s, WAVDemuxContext *wav)
                 int64_t pos = avio_tell(s->pb);
                 len = ret = avio_read(s->pb, buf, len);
                 if (len >= 0) {
-                    ret = ff_spdif_probe(buf, len, &codec);
+                    ret = ff_spdif_probe(s, buf, len, &codec);
                     if (ret > AVPROBE_SCORE_EXTENSION) {
                         s->streams[0]->codecpar->codec_id = codec;
                         wav->spdif = 1;
