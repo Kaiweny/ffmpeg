@@ -2814,6 +2814,12 @@ typedef struct AVCodecContext {
     int thread_safe_callbacks;
 
     /**
+     * User-supplied callback called in a new decode thread's context when it starts up.
+     * Can be used to apply thread scheduling policy.
+     */
+    int (*decode_thread_init_callback)(struct AVCodecContext *c);
+
+    /**
      * The codec may call this to execute several independent things.
      * It will return only after finishing all tasks.
      * The user may replace this with some multithreaded implementation,

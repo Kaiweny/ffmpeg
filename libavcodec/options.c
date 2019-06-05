@@ -114,6 +114,7 @@ static int init_context_defaults(AVCodecContext *s, const AVCodec *codec)
     s->pkt_timebase        = (AVRational){ 0, 1 };
     s->get_buffer2         = avcodec_default_get_buffer2;
     s->get_format          = avcodec_default_get_format;
+    s->decode_thread_init_callback  = NULL;
     s->execute             = avcodec_default_execute;
     s->execute2            = avcodec_default_execute2;
     s->sample_aspect_ratio = (AVRational){0,1};

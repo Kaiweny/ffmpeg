@@ -33,6 +33,7 @@ typedef struct AVSliceThread AVSliceThread;
 int avpriv_slicethread_create(AVSliceThread **pctx, void *priv,
                               void (*worker_func)(void *priv, int jobnr, int threadnr, int nb_jobs, int nb_threads),
                               void (*main_func)(void *priv),
+                              void (*decode_thread_init_callback)(void *priv),
                               int nb_threads);
 
 /**

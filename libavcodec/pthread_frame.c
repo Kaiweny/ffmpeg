@@ -171,6 +171,9 @@ static attribute_align_arg void *frame_worker_thread(void *arg)
     AVCodecContext *avctx = p->avctx;
     const AVCodec *codec = avctx->codec;
 
+    if (avctx->decode_thread_init_callback) {
+        avctx->decode_thread_init_callback(avctx);
+    }
     pthread_mutex_lock(&p->mutex);
     while (1) {
         while (atomic_load(&p->state) == STATE_INPUT_READY && !p->die)
