@@ -48,6 +48,7 @@ struct AVSliceThread {
     void            *priv;
     void            (*worker_func)(void *priv, int jobnr, int threadnr, int nb_jobs, int nb_threads);
     void            (*main_func)(void *priv);
+    void            (*decode_thread_init_callback)(void *priv);
 };
 
 static int run_jobs(AVSliceThread *ctx)
@@ -68,6 +69,11 @@ static void *attribute_align_arg thread_worker(void *v)
 {
     WorkerContext *w = v;
     AVSliceThread *ctx = w->ctx;
+
+    if (ctx->decode_thread_init_callback) {
+        /* ctx->priv is an AVCodecContext* */
+        ctx->decode_thread_init_callback(ctx->priv);
+    }
 
     pthread_mutex_lock(&w->mutex);
     pthread_cond_signal(&w->cond);
@@ -94,6 +100,7 @@ static void *attribute_align_arg thread_worker(void *v)
 int avpriv_slicethread_create(AVSliceThread **pctx, void *priv,
                               void (*worker_func)(void *priv, int jobnr, int threadnr, int nb_jobs, int nb_threads),
                               void (*main_func)(void *priv),
+                              void (*decode_thread_init_callback)(void *priv),
                               int nb_threads)
 {
     AVSliceThread *ctx;
@@ -124,6 +131,7 @@ int avpriv_slicethread_create(AVSliceThread **pctx, void *priv,
     ctx->priv        = priv;
     ctx->worker_func = worker_func;
     ctx->main_func   = main_func;
+    ctx->decode_thread_init_callback = decode_thread_init_callback;
     ctx->nb_threads  = nb_threads;
     ctx->nb_active_threads = 0;
     ctx->nb_jobs     = 0;
