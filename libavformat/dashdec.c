@@ -1381,7 +1381,7 @@ static int parse_manifest(AVFormatContext *s, const char *url, AVIOContext *in)
 cleanup:
         /*free the document */
         xmlFreeDoc(doc);
-        xmlCleanupParser();
+        /* xmlCleanupParser(); Removed since it causes memory corruption in multithreaded environments */
         xmlFreeNode(mpd_baseurl_node);
     }
 
