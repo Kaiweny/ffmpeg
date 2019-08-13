@@ -37,3 +37,4 @@
 /src
 /mapfile
 tags
+/tools/python/__pycache__/
