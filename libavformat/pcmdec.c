@@ -25,12 +25,46 @@
 #include "libavutil/log.h"
 #include "libavutil/opt.h"
 #include "libavutil/avassert.h"
+#include "avio_internal.h"
+#include "spdif.h"
 
 typedef struct PCMAudioDemuxerContext {
     AVClass *class;
     int sample_rate;
     int channels;
+    int spdif;
 } PCMAudioDemuxerContext;
+
+static void set_spdif(AVFormatContext *s, PCMAudioDemuxerContext *wav)
+{
+    if (CONFIG_SPDIF_DEMUXER && s->streams[0]->codecpar->codec_tag == 1) {
+        enum AVCodecID codec;
+        int len = 1<<16;
+        int ret = ffio_ensure_seekback(s->pb, len);
+
+        if (ret >= 0) {
+            uint8_t *buf = av_malloc(len);
+            if (!buf) {
+                ret = AVERROR(ENOMEM);
+            } else {
+                int64_t pos = avio_tell(s->pb);
+                len = ret = avio_read(s->pb, buf, len);
+                if (len >= 0) {
+                    ret = ff_spdif_probe(buf, len, &codec);
+                    if (ret > AVPROBE_SCORE_EXTENSION) {
+                        s->streams[0]->codecpar->codec_id = codec;
+                        wav->spdif = 1;
+                    }
+                }
+                avio_seek(s->pb, pos, SEEK_SET);
+                av_free(buf);
+            }
+        }
+
+        if (ret < 0)
+            av_log(s, AV_LOG_WARNING, "Cannot check for SPDIF\n");
+    }
+}
 
 static int pcm_read_header(AVFormatContext *s)
 {
@@ -95,7 +129,39 @@ static int pcm_read_header(AVFormatContext *s)
         st->codecpar->bits_per_coded_sample * st->codecpar->channels / 8;
 
     avpriv_set_pts_info(st, 64, 1, st->codecpar->sample_rate);
+
+    set_spdif(s, s1);
+
     return 0;
+}
+
+#define RAW_SAMPLES     1024
+
+static int pcm_read_packet(AVFormatContext *s, AVPacket *pkt)
+{
+    AVCodecParameters *par = s->streams[0]->codecpar;
+    PCMAudioDemuxerContext *s1 = s->priv_data;
+    int ret, size;
+
+    if (CONFIG_SPDIF_DEMUXER && s1->spdif == 1)
+        return ff_spdif_read_packet(s, pkt);
+
+    if (par->block_align <= 0)
+        return AVERROR(EINVAL);
+
+    /*
+     * Compute read size to complete a read every 62ms.
+     * Clamp to RAW_SAMPLES if larger.
+     */
+    size = FFMAX(par->sample_rate/25, 1);
+    size = FFMIN(size, RAW_SAMPLES) * par->block_align;
+
+    ret = av_get_packet(s->pb, pkt, size);
+
+    pkt->flags &= ~AV_PKT_FLAG_CORRUPT;
+    pkt->stream_index = 0;
+
+    return ret;
 }
 
 static const AVOption pcm_options[] = {
@@ -116,7 +182,7 @@ AVInputFormat ff_pcm_ ## name_ ## _demuxer = {              \
     .long_name      = NULL_IF_CONFIG_SMALL(long_name_),     \
     .priv_data_size = sizeof(PCMAudioDemuxerContext),       \
     .read_header    = pcm_read_header,                      \
-    .read_packet    = ff_pcm_read_packet,                   \
+    .read_packet    = pcm_read_packet,                   \
     .read_seek      = ff_pcm_read_seek,                     \
     .flags          = AVFMT_GENERIC_INDEX,                  \
     .extensions     = ext,                                  \
@@ -206,7 +272,7 @@ AVInputFormat ff_sln_demuxer = {
     .long_name      = NULL_IF_CONFIG_SMALL("Asterisk raw pcm"),
     .priv_data_size = sizeof(PCMAudioDemuxerContext),
     .read_header    = pcm_read_header,
-    .read_packet    = ff_pcm_read_packet,
+    .read_packet    = pcm_read_packet,
     .read_seek      = ff_pcm_read_seek,
     .flags          = AVFMT_GENERIC_INDEX,
     .extensions     = "sln",
