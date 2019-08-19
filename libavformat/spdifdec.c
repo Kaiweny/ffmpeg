@@ -110,10 +110,10 @@ static int spdif_get_offset_and_codec(AVFormatContext *s,
 static int spdif_probe(const AVProbeData *p)
 {
     enum AVCodecID codec;
-    return ff_spdif_probe (p->buf, p->buf_size, &codec);
+    return ff_spdif_probe (NULL, p->buf, p->buf_size, &codec);
 }
 
-int ff_spdif_probe(const uint8_t *p_buf, int buf_size, enum AVCodecID *codec)
+int ff_spdif_probe(AVFormatContext *s, const uint8_t *p_buf, int buf_size, enum AVCodecID *codec)
 {
     const uint8_t *buf = p_buf;
     const uint8_t *probe_end = p_buf + FFMIN(2 * SPDIF_MAX_OFFSET, buf_size - 1);
@@ -123,14 +123,22 @@ int ff_spdif_probe(const uint8_t *p_buf, int buf_size, enum AVCodecID *codec)
     int consecutive_codes = 0;
     int offset;
 
+    const uint8_t *old_buf = buf;
+    const uint8_t *old_buf2 = buf;
+
+    if (s) av_log(s, AV_LOG_WARNING, "PROBE input_addr:%p expected_addr:%p buf_size:%d\n", buf, expected_code, buf_size);
+
     for (; buf < probe_end; buf++) {
         state = (state << 8) | *buf;
 
         if (state == (AV_BSWAP16C(SYNCWORD1) << 16 | AV_BSWAP16C(SYNCWORD2))
                 && buf[1] < 0x37) {
+            if (s) av_log(s, AV_LOG_WARNING, "Sync Code addr:%p %d/%d\n", buf, buf - old_buf2, buf - old_buf);
+            old_buf = buf;
             sync_codes++;
 
             if (buf == expected_code) {
+                if (s) av_log(s, AV_LOG_WARNING, "Found Start Coded at addr:%p\n", buf);
                 if (++consecutive_codes >= 2)
                     return AVPROBE_SCORE_MAX;
             } else
@@ -143,12 +151,14 @@ int ff_spdif_probe(const uint8_t *p_buf, int buf_size, enum AVCodecID *codec)
             probe_end = FFMIN(buf + SPDIF_MAX_OFFSET, p_buf + buf_size - 1);
 
             /* skip directly to the next sync code */
+            if (s) av_log(s, AV_LOG_WARNING, "Skipping for type 0x%02x\n", (buf[2] << 8) | buf[1]);
             if (!spdif_get_offset_and_codec(NULL, (buf[2] << 8) | buf[1],
                                             &buf[5], &offset, codec)) {
                 if (buf + offset >= p_buf + buf_size)
                     break;
                 expected_code = buf + offset;
                 buf = expected_code - 7;
+                if (s) av_log(s, AV_LOG_WARNING, "Next Code %p %p %d %s\n", buf, expected_code, offset, avcodec_get_name(*codec));
             }
         }
     }

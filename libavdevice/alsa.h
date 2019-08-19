@@ -32,6 +32,7 @@
 
 #include <alsa/asoundlib.h>
 #include "config.h"
+#include "libavutil/fifo.h"
 #include "libavutil/log.h"
 #include "timefilter.h"
 #include "avdevice.h"
@@ -44,6 +45,15 @@
 typedef void (*ff_reorder_func)(const void *, void *, int);
 
 #define ALSA_BUFFER_SIZE_MAX 131072
+
+typedef struct SpdifData {
+    int enabled;
+    uint8_t *avio_ctx_buffer;
+    size_t avio_ctx_buffer_size;
+    uint8_t *buffer;
+    uint32_t read_offset;
+    uint32_t write_offset;
+} SpdifData;
 
 typedef struct AlsaData {
     AVClass *class;
@@ -58,6 +68,7 @@ typedef struct AlsaData {
     void *reorder_buf;
     int reorder_buf_size; ///< in frames
     int64_t timestamp; ///< current timestamp, without latency applied.
+    SpdifData spdif;
 } AlsaData;
 
 /**

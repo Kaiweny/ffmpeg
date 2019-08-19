@@ -53,13 +53,102 @@
 #include "libavutil/time.h"
 
 #include "libavformat/internal.h"
+#include "libavformat/spdif.h"
+#include "libavformat/avio_internal.h"
 
 #include "avdevice.h"
 #include "alsa.h"
 
+static int write_spdif_packet(AlsaData *s, uint8_t *buf, int buf_size)
+{
+    SpdifData *spdif = &s->spdif;
+
+    uint32_t used_space = spdif->write_offset;
+    uint32_t free_space = ALSA_BUFFER_SIZE_MAX - spdif->write_offset;
+    av_log(s, AV_LOG_WARNING, "Write: Amount:%d,Used Space:%d,Free Space:%d\n", buf_size, used_space, free_space);
+
+    if (0 == free_space) {
+        return AVERROR(ENOMEM);
+    }
+
+    buf_size = FFMIN(buf_size, free_space);
+
+    //av_fifo_generic_write(spdif->buffer, buf, buf_size, NULL);
+    memcpy(spdif->buffer + spdif->write_offset, buf, buf_size);
+    spdif->write_offset += buf_size;
+
+    return buf_size;
+}
+
+static void print_buffer(AVFormatContext *s, uint8_t *buf, int buf_size) {
+    av_log(s, AV_LOG_WARNING, "\n +   0 | ");
+    for (int i = 0; i < buf_size; i++) {
+        av_log(s, AV_LOG_WARNING, "%02x ", buf[i]);
+        if (((i+1) % 16) == 0) {
+            av_log(s, AV_LOG_WARNING, "\n +%4d | ", i+1);
+        }
+    }
+    av_log(s, AV_LOG_WARNING, "\n");
+}
+
+static void set_spdif(AVFormatContext *s, SpdifData *spdif, AVPacket* pkt)
+{
+    AlsaData *alsa = s->priv_data;
+    AVIOContext *pb;
+    enum AVCodecID codec;
+    int len = 1<<16;
+    int ret = write_spdif_packet(alsa, pkt->data, pkt->size);
+    av_log(s, AV_LOG_WARNING, "SPDIF writing %d bytes\n", pkt->size);
+    if (ret >= 0) {
+        uint8_t *buf = av_malloc(len);
+        pb = avio_alloc_context(spdif->buffer,
+                                spdif->write_offset,
+                                0, NULL, NULL, NULL, NULL);
+        //print_buffer(s, spdif->buffer, spdif->write_offset);
+        //print_buffer(s, pkt->data, pkt->size);
+        if (!buf) {
+            ret = AVERROR(ENOMEM);
+        } else {
+            int64_t pos = avio_tell(pb);
+            //av_log(s, AV_LOG_WARNING, "SPDIF buffer at position:%"PRIi64", len:%d\n", pos, len);
+            av_log(s, AV_LOG_WARNING, "SPDIF pb size %d\n", pb->buf_end - pb->buf_ptr);
+            len = ret = avio_read(pb, buf, len);
+            av_log(s, AV_LOG_WARNING, "SPDIF Read %d %p\n", len, buf);
+            if (len >= 0) {
+                //print_buffer(s, buf, len);
+                ret = ff_spdif_probe(s, buf, len, &codec);
+                if (ret > AVPROBE_SCORE_EXTENSION) {
+                    s->streams[0]->codecpar->codec_id = codec;
+                    spdif->enabled = 1;
+                    av_log(s, AV_LOG_WARNING, "Setting SPDIF to format %d\n", codec);
+                }
+                else {
+                    av_log(s, AV_LOG_WARNING, "SPDIF check returns %d vs %d\n", ret, AVPROBE_SCORE_EXTENSION);
+                    //print_buffer(s, buf, len);
+                }
+                if (AVPROBE_SCORE_EXTENSION == ret) {
+                    print_buffer(s, buf, len);
+                    exit(-1);
+                }
+            }
+            else {
+                av_log(s, AV_LOG_WARNING, "SPDIF Failed reading %d\n", len);
+            }
+            avio_seek(pb, pos, SEEK_SET);
+            av_free(buf);
+        }
+        avio_context_free(&pb);
+    }
+
+    if (ret < 0)
+        av_log(s, AV_LOG_WARNING, "Cannot check for SPDIF\n");
+}
+
 static av_cold int audio_read_header(AVFormatContext *s1)
 {
     AlsaData *s = s1->priv_data;
+    SpdifData *spdif = &s->spdif;
+
     AVStream *st;
     int ret;
     enum AVCodecID codec_id;
@@ -91,6 +180,14 @@ static av_cold int audio_read_header(AVFormatContext *s1)
     if (!s->timefilter)
         goto fail;
 
+    if (CONFIG_SPDIF_DEMUXER) {
+        spdif->buffer = av_malloc(ALSA_BUFFER_SIZE_MAX);
+        // Initialize read length
+        spdif->read_offset = 0;
+        spdif->write_offset = 0;
+        av_log(s, AV_LOG_WARNING, "Alloc'd spdif buffer %p in %p\n", spdif->buffer, spdif);
+    }
+
     return 0;
 
 fail:
@@ -101,6 +198,7 @@ fail:
 static int audio_read_packet(AVFormatContext *s1, AVPacket *pkt)
 {
     AlsaData *s  = s1->priv_data;
+    SpdifData *spdif  = &s->spdif;
     int res;
     int64_t dts;
     snd_pcm_sframes_t delay = 0;
@@ -125,6 +223,28 @@ static int audio_read_packet(AVFormatContext *s1, AVPacket *pkt)
         ff_timefilter_reset(s->timefilter);
     }
 
+    if (CONFIG_SPDIF_DEMUXER) {
+        if (spdif->enabled == 1) {
+            AVPacket *spdif_pkt = NULL;
+            // Copy it to pb
+            // Do logic to update buffer state (copy buffers, etc)
+            int ret = ff_spdif_read_packet(s1, spdif_pkt);
+            av_log(s, AV_LOG_WARNING, "Copying SPDIF to packet %d\n", pkt->size);
+            //av_packet_unref(pkt);
+
+            //av_fifo_drain(spdif->buffer, spdif->read_len);
+            spdif->read_offset = 0;
+
+            av_log(s, AV_LOG_WARNING, "Created spdif packet %p\n", spdif_pkt);
+
+            exit(-1);
+            return ret;
+        }
+        else {
+            set_spdif(s1, spdif, pkt);
+        }
+    }
+
     dts = av_gettime();
     snd_pcm_delay(s->h, &delay);
     dts -= av_rescale(delay + res, 1000000, s->sample_rate);
@@ -132,6 +252,7 @@ static int audio_read_packet(AVFormatContext *s1, AVPacket *pkt)
     s->last_period = res;
 
     pkt->size = res * s->frame_size;
+
 
     return 0;
 }
