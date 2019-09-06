@@ -29,9 +29,9 @@
 
 struct smpte2110_timestamp;
 
-struct smpte2110_timestamp* smpte2110_alloc(void);
+struct smpte2110_timestamp* av_smpte2110_alloc(void);
 
-int64_t smpte2110_compute_pts(void *avlc, struct smpte2110_timestamp *ts,
+int64_t av_smpte2110_compute_pts(void *avlc, struct smpte2110_timestamp *ts,
                               uint32_t current_timestamp, AVRational time_base);
 
 #endif

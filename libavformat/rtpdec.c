@@ -598,7 +598,7 @@ static void finalize_packet(RTPDemuxContext *s, AVPacket *pkt, uint32_t timestam
         return;
 
     if (s->smpte2110_ts) {
-        pkt->pts = smpte2110_compute_pts(s->ic, s->smpte2110_ts, timestamp,
+        pkt->pts = av_smpte2110_compute_pts(s->ic, s->smpte2110_ts, timestamp,
                                          s->st->time_base);
         if (pkt->pts != AV_NOPTS_VALUE)
             return;
@@ -730,7 +730,7 @@ void ff_rtp_reset_packet_queue(RTPDemuxContext *s)
 
 int ff_rtp_enable_smpte2110_timestamp(RTPDemuxContext *s)
 {
-    s->smpte2110_ts = smpte2110_alloc();
+    s->smpte2110_ts = av_smpte2110_alloc();
     if (!s->smpte2110_ts)
         return AVERROR(ENOMEM);
 

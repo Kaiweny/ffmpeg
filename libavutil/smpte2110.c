@@ -44,7 +44,7 @@ static int64_t time_to_timebase(int64_t time, AVRational timebase)
 
 #define RTP_TIMESTAMP_WRAP (1LL << 32)
 
-struct smpte2110_timestamp* smpte2110_alloc(void)
+struct smpte2110_timestamp* av_smpte2110_alloc(void)
 {
     return av_mallocz(sizeof(struct smpte2110_timestamp));
 }
@@ -131,7 +131,7 @@ static int __smpte2110_compute_pts(void *avlc, int64_t *last_sync,
     return 0;
 }
 
-int64_t smpte2110_compute_pts(void *avlc, struct smpte2110_timestamp *ts,
+int64_t av_smpte2110_compute_pts(void *avlc, struct smpte2110_timestamp *ts,
                               uint32_t current_timestamp, AVRational time_base)
 {
     int64_t pts;
