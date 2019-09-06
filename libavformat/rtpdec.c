@@ -22,6 +22,7 @@
 #include "libavutil/mathematics.h"
 #include "libavutil/avstring.h"
 #include "libavutil/intreadwrite.h"
+#include "libavutil/smpte2110.h"
 #include "libavutil/time.h"
 
 #include "avformat.h"
