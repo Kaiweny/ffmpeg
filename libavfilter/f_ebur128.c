@@ -669,6 +669,9 @@ static int filter_frame(AVFilterLink *inlink, AVFrame *insamples)
             ebur128->i3000.cache[ch][bin_id_3000] = bin;
         }
 
+        double last_integrated_sum = 0;
+        int last_nb_integrated = 0;
+
         /* For integrated loudness, gating blocks are 400ms long with 75%
          * overlap (see BS.1770-2 p5), so a re-computation is needed each 100ms
          * (4800 samples at 48kHz). */
@@ -711,6 +714,9 @@ static int filter_frame(AVFilterLink *inlink, AVFrame *insamples)
                     nb_integrated  += nb_v;
                     integrated_sum += nb_v * ebur128->i400.histogram[i].energy;
                 }
+                for (i = 0; i < HIST_SIZE; i++) {
+                    ebur128->i400.histogram[i].count = 0;
+                }
                 if (nb_integrated) {
                     ebur128->integrated_loudness = LOUDNESS(integrated_sum / nb_integrated);
                     /* dual-mono correction */
@@ -718,6 +724,8 @@ static int filter_frame(AVFilterLink *inlink, AVFrame *insamples)
                         ebur128->integrated_loudness -= ebur128->pan_law;
                     }
                 }
+                last_integrated_sum = integrated_sum;
+                last_nb_integrated = nb_integrated;
             }
 
             /* LRA */
@@ -865,6 +873,8 @@ static int filter_frame(AVFilterLink *inlink, AVFrame *insamples)
                          SET_META(key, ebur128->true_peaks_per_frame[ch]);
                     }
                 }
+                SET_META(META_PREFIX "I_sum", last_integrated_sum);
+                SET_META(META_PREFIX "I_nb", last_nb_integrated);
             }
 
             if (ebur128->scale == SCALE_TYPE_ABSOLUTE) {
