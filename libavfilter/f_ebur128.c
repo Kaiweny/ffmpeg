@@ -732,7 +732,6 @@ static int filter_frame(AVFilterLink *inlink, AVFrame *insamples)
                     }
                     ebur128->last_integrated_sum = integrated_sum;
                     ebur128->last_nb_integrated = nb_integrated;
-                    printf("NB integrated sum %f count %d\n", integrated_sum, nb_integrated);
                 }
             }
 
@@ -853,6 +852,16 @@ static int filter_frame(AVFilterLink *inlink, AVFrame *insamples)
     av_dict_set(&insamples->metadata, name, metabuf, 0);                    \
 } while (0)
 
+#define SET_META_LONG_PRECISION(name, var) do {                             \
+    snprintf(metabuf, sizeof(metabuf), "%.9f", var);                        \
+    av_dict_set(&insamples->metadata, name, metabuf, 0);                    \
+} while (0)
+
+#define SET_META_INT(name, var) do {                                        \
+    snprintf(metabuf, sizeof(metabuf), "%d", var);                          \
+    av_dict_set(&insamples->metadata, name, metabuf, 0);                    \
+} while (0)
+
 #define SET_META_PEAK(name, ptype) do {                                     \
     if (ebur128->peak_mode & PEAK_MODE_ ## ptype ## _PEAKS) {               \
         char key[64];                                                       \
@@ -880,9 +889,9 @@ static int filter_frame(AVFilterLink *inlink, AVFrame *insamples)
                                   META_PREFIX AV_STRINGIFY(TRUE) "_peaks_per_frame_ch%d", ch);
                          SET_META(key, ebur128->true_peaks_per_frame[ch]);
                     }
-                }
-                SET_META(META_PREFIX "I_sum", ebur128->last_integrated_sum);
-                SET_META(META_PREFIX "I_nb", ebur128->last_nb_integrated);
+                j}
+                SET_META_LONG_PRECISION(META_PREFIX "I_sum", ebur128->last_integrated_sum);
+                SET_META_INT(META_PREFIX "I_nb", ebur128->last_nb_integrated);
             }
 
             if (ebur128->scale == SCALE_TYPE_ABSOLUTE) {
