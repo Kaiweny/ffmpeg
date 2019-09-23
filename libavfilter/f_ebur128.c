@@ -714,9 +714,11 @@ static int filter_frame(AVFilterLink *inlink, AVFrame *insamples)
                     nb_integrated  += nb_v;
                     integrated_sum += nb_v * ebur128->i400.histogram[i].energy;
                 }
+                #if 0
                 for (i = 0; i < HIST_SIZE; i++) {
                     ebur128->i400.histogram[i].count = 0;
                 }
+                #endif
                 if (nb_integrated) {
                     ebur128->integrated_loudness = LOUDNESS(integrated_sum / nb_integrated);
                     /* dual-mono correction */
