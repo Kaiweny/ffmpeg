@@ -889,7 +889,7 @@ static int filter_frame(AVFilterLink *inlink, AVFrame *insamples)
                                   META_PREFIX AV_STRINGIFY(TRUE) "_peaks_per_frame_ch%d", ch);
                          SET_META(key, ebur128->true_peaks_per_frame[ch]);
                     }
-                j}
+                }
                 SET_META_LONG_PRECISION(META_PREFIX "I_sum", ebur128->last_integrated_sum);
                 SET_META_INT(META_PREFIX "I_nb", ebur128->last_nb_integrated);
             }
