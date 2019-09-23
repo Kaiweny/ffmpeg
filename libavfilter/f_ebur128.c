@@ -844,7 +844,7 @@ static int filter_frame(AVFilterLink *inlink, AVFrame *insamples)
             }
 
             if (ebur128->metadata) { /* happens only once per filter_frame call */
-                char metabuf[128];
+                char metabuf[256];
 #define META_PREFIX "lavfi.r128."
 
 #define SET_META(name, var) do {                                            \
