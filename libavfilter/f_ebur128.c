@@ -732,6 +732,7 @@ static int filter_frame(AVFilterLink *inlink, AVFrame *insamples)
                     }
                     ebur128->last_integrated_sum = integrated_sum;
                     ebur128->last_nb_integrated = nb_integrated;
+                    printf("NB integrated sum %f count %d\n", integrated_sum, nb_integrated);
                 }
             }
 
