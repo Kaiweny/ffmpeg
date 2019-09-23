@@ -136,6 +136,8 @@ typedef struct EBUR128Context {
 
     /* I and LRA specific */
     double integrated_loudness;     ///< integrated loudness in LUFS (I)
+    double last_integrated_sum;
+    int last_nb_integrated;
     double loudness_range;          ///< loudness range in LU (LRA)
     double lra_low, lra_high;       ///< low and high LRA values
 
@@ -522,6 +524,8 @@ static av_cold int init(AVFilterContext *ctx)
         return AVERROR(ENOMEM);
 
     ebur128->integrated_loudness = ABS_THRES;
+    ebur128->last_integrated_sum = 0;
+    ebur128->last_nb_integrated = 1;
     ebur128->loudness_range = 0;
 
     /* insert output pads */
@@ -615,6 +619,10 @@ static int filter_frame(AVFilterLink *inlink, AVFrame *insamples)
     }
 #endif
 
+    // Reset every filter frame
+    ebur128->last_integrated_sum = 0;
+    ebur128->last_nb_integrated = 1;
+
     for (idx_insample = 0; idx_insample < nb_samples; idx_insample++) {
         const int bin_id_400  = ebur128->i400.cache_pos;
         const int bin_id_3000 = ebur128->i3000.cache_pos;
@@ -669,9 +677,6 @@ static int filter_frame(AVFilterLink *inlink, AVFrame *insamples)
             ebur128->i3000.cache[ch][bin_id_3000] = bin;
         }
 
-        double last_integrated_sum = 0;
-        int last_nb_integrated = 0;
-
         /* For integrated loudness, gating blocks are 400ms long with 75%
          * overlap (see BS.1770-2 p5), so a re-computation is needed each 100ms
          * (4800 samples at 48kHz). */
@@ -725,9 +730,9 @@ static int filter_frame(AVFilterLink *inlink, AVFrame *insamples)
                     if (nb_channels == 1 && ebur128->dual_mono) {
                         ebur128->integrated_loudness -= ebur128->pan_law;
                     }
+                    ebur128->last_integrated_sum = integrated_sum;
+                    ebur128->last_nb_integrated = nb_integrated;
                 }
-                last_integrated_sum = integrated_sum;
-                last_nb_integrated = nb_integrated;
             }
 
             /* LRA */
@@ -875,8 +880,8 @@ static int filter_frame(AVFilterLink *inlink, AVFrame *insamples)
                          SET_META(key, ebur128->true_peaks_per_frame[ch]);
                     }
                 }
-                SET_META(META_PREFIX "I_sum", last_integrated_sum);
-                SET_META(META_PREFIX "I_nb", last_nb_integrated);
+                SET_META(META_PREFIX "I_sum", ebur128->last_integrated_sum);
+                SET_META(META_PREFIX "I_nb", ebur128->last_nb_integrated);
             }
 
             if (ebur128->scale == SCALE_TYPE_ABSOLUTE) {
