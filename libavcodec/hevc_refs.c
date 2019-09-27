@@ -112,6 +112,11 @@ static HEVCFrame *alloc_frame(HEVCContext *s)
         frame->frame->top_field_first  = s->sei.picture_timing.picture_struct == AV_PICTURE_STRUCTURE_TOP_FIELD;
         frame->frame->interlaced_frame = (s->sei.picture_timing.picture_struct == AV_PICTURE_STRUCTURE_TOP_FIELD) || (s->sei.picture_timing.picture_struct == AV_PICTURE_STRUCTURE_BOTTOM_FIELD);
 
+        AVDictionary* metadata = av_frame_get_metadata(frame->frame);
+        if (metadata) {
+            av_dict_set_int(&metadata, "picture_struct", s->sei.picture_timing.raw_picture_struct);
+        }
+
         if (s->avctx->hwaccel) {
             const AVHWAccel *hwaccel = s->avctx->hwaccel;
             av_assert0(!frame->hwaccel_picture_private);

@@ -93,6 +93,9 @@ static int hevc_parse_slice_header(AVCodecParserContext *s, H2645NAL *nal,
     s->coded_height = ps->sps->height;
     s->width        = ps->sps->width  - ow->left_offset - ow->right_offset;
     s->height       = ps->sps->height - ow->top_offset  - ow->bottom_offset;
+    if (sei->picture_timing.raw_picture_struct > 8) {
+        s->height *= 2;
+    }
     s->format       = ps->sps->pix_fmt;
     avctx->profile  = ps->sps->ptl.general_ptl.profile_idc;
     avctx->level    = ps->sps->ptl.general_ptl.level_idc;
@@ -108,6 +111,10 @@ static int hevc_parse_slice_header(AVCodecParserContext *s, H2645NAL *nal,
     if (num != 0 && den != 0)
         av_reduce(&avctx->framerate.den, &avctx->framerate.num,
                   num, den, 1 << 30);
+
+    if (sei->picture_timing.raw_picture_struct > 8) {
+        avctx->framerate.num /= 2;
+    }
 
     if (!sh->first_slice_in_pic_flag) {
         int slice_address_length;
