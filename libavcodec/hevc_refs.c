@@ -114,7 +114,7 @@ static HEVCFrame *alloc_frame(HEVCContext *s)
 
         AVDictionary* metadata = av_frame_get_metadata(frame->frame);
         if (metadata) {
-            av_dict_set_int(&metadata, "picture_struct", s->sei.picture_timing.raw_picture_struct);
+            av_dict_set_int(&metadata, "picture_struct", s->sei.picture_timing.raw_picture_struct, 0);
         }
 
         if (s->avctx->hwaccel) {
