@@ -323,6 +323,9 @@ static void export_stream_params(HEVCContext *s, const HEVCSPS *sps)
     avctx->coded_height        = sps->height;
     avctx->width               = sps->width  - ow->left_offset - ow->right_offset;
     avctx->height              = sps->height - ow->top_offset  - ow->bottom_offset;
+    if (s->sei.picture_timing.raw_picture_struct > 8) {
+        avctx->height <<= 1;
+    }
     avctx->has_b_frames        = sps->temporal_layer[sps->max_sub_layers - 1].num_reorder_pics;
     avctx->profile             = sps->ptl.general_ptl.profile_idc;
     avctx->level               = sps->ptl.general_ptl.level_idc;
@@ -357,6 +360,9 @@ static void export_stream_params(HEVCContext *s, const HEVCSPS *sps)
         av_reduce(&avctx->framerate.den, &avctx->framerate.num,
                   num, den, 1 << 30);
 
+    if (s->sei.picture_timing.raw_picture_struct > 8) {
+        avctx->framerate.num >>= 1;
+    }
     if (s->sei.alternative_transfer.present &&
         av_color_transfer_name(s->sei.alternative_transfer.preferred_transfer_characteristics) &&
         s->sei.alternative_transfer.preferred_transfer_characteristics != AVCOL_TRC_UNSPECIFIED) {
