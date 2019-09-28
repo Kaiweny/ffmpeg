@@ -363,6 +363,7 @@ static void export_stream_params(HEVCContext *s, const HEVCSPS *sps)
     if (s->sei.picture_timing.raw_picture_struct > 8) {
         avctx->framerate.num >>= 1;
     }
+
     if (s->sei.alternative_transfer.present &&
         av_color_transfer_name(s->sei.alternative_transfer.preferred_transfer_characteristics) &&
         s->sei.alternative_transfer.preferred_transfer_characteristics != AVCOL_TRC_UNSPECIFIED) {

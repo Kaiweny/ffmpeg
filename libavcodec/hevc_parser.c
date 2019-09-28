@@ -52,6 +52,23 @@ typedef struct HEVCParserContext {
     int pocTid0;
 } HEVCParserContext;
 
+#define HEVC_MAX_PIC_STRUCT 13
+static AVFieldOrder hevc_pic_struct_to_field_order[HEVC_MAX_PIC_STRUCT] = {
+    AV_FIELD_PROGRESSIVE,
+    AV_FIELD_TT,
+    AV_FIELD_BB,
+    AV_FIELD_TT,
+    AV_FIELD_BB,
+    AV_FIELD_TT,
+    AV_FIELD_BB,
+    AV_FIELD_PROGRESSIVE,
+    AV_FIELD_PROGRESSIVE,
+    AV_FIELD_BB,
+    AV_FIELD_TT,
+    AV_FIELD_TT,
+    AV_FIELD_BB
+}
+
 static int hevc_parse_slice_header(AVCodecParserContext *s, H2645NAL *nal,
                                    AVCodecContext *avctx)
 {
@@ -65,7 +82,12 @@ static int hevc_parse_slice_header(AVCodecParserContext *s, H2645NAL *nal,
 
     sh->first_slice_in_pic_flag = get_bits1(gb);
     s->picture_structure = sei->picture_timing.picture_struct;
-    s->field_order = sei->picture_timing.picture_struct;
+    if (sei->picture_timing.picture_struct < HEVC_MAX_PIC_STRUCT) {
+        s->field_order = hevc_pic_struct_to_field_order[sei->picture_timing.picture_struct];
+    }
+    else {
+        s->field_order = AV_FIELD_UNKNOWN;
+    }
 
     if (IS_IRAP_NAL(nal)) {
         s->key_frame = 1;
@@ -108,6 +130,10 @@ static int hevc_parse_slice_header(AVCodecParserContext *s, H2645NAL *nal,
     if (num != 0 && den != 0)
         av_reduce(&avctx->framerate.den, &avctx->framerate.num,
                   num, den, 1 << 30);
+
+    if (sei->picture_timing.raw_picture_struct > 8) {
+        avctx->framerate.num /= 2;
+    }
 
     if (!sh->first_slice_in_pic_flag) {
         int slice_address_length;
