@@ -22,6 +22,7 @@
 
 #include "libavutil/common.h"
 
+#include "avcodec.h"
 #include "golomb.h"
 #include "hevc.h"
 #include "hevc_parse.h"
