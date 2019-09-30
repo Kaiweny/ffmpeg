@@ -78,8 +78,8 @@ static enum AVFieldOrder hevc_pic_struct_to_av_picture_structure[HEVC_MAX_PIC_ST
     AV_PICTURE_STRUCTURE_BOTTOM_FIELD,
     AV_PICTURE_STRUCTURE_TOP_FIELD,
     AV_PICTURE_STRUCTURE_BOTTOM_FIELD,
-    AV_FIELD_PROGRESSIVE,
-    AV_FIELD_PROGRESSIVE,
+    AV_PICTURE_STRUCTURE_FRAME,
+    AV_PICTURE_STRUCTURE_FRAME,
     AV_PICTURE_STRUCTURE_TOP_FIELD,
     AV_PICTURE_STRUCTURE_BOTTOM_FIELD,
     AV_PICTURE_STRUCTURE_TOP_FIELD,
@@ -106,6 +106,9 @@ static int hevc_parse_slice_header(AVCodecParserContext *s, H2645NAL *nal,
         s->picture_structure = sei->picture_timing.picture_struct;
         s->field_order = AV_FIELD_UNKNOWN;
     }
+
+    // Override the avctx field_order 
+    avctx->field_order = s->field_order;
 
     if (IS_IRAP_NAL(nal)) {
         s->key_frame = 1;
@@ -148,10 +151,6 @@ static int hevc_parse_slice_header(AVCodecParserContext *s, H2645NAL *nal,
     if (num != 0 && den != 0)
         av_reduce(&avctx->framerate.den, &avctx->framerate.num,
                   num, den, 1 << 30);
-
-    if (sei->picture_timing.raw_picture_struct > 8) {
-        avctx->framerate.num /= 2;
-    }
 
     if (!sh->first_slice_in_pic_flag) {
         int slice_address_length;
