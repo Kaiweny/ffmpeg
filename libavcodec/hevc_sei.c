@@ -136,17 +136,18 @@ static int decode_nal_sei_pic_timing(HEVCSEI *s, GetBitContext *gb, const HEVCPa
     sps = (HEVCSPS*)ps->sps_list[s->active_seq_parameter_set_id]->data;
 
     if (sps->vui.frame_field_info_present_flag) {
-        h->raw_picture_struct = get_bits(gb, 4);
+        h->hevc_picture_struct = get_bits(gb, 4);
         h->picture_struct = AV_PICTURE_STRUCTURE_UNKNOWN;
-        if (h->raw_picture_struct == 2 || h->raw_picture_struct == 10 || h->raw_picture_struct == 12) {
+        if (h->hevc_picture_struct == 2 || h->hevc_picture_struct == 10 || h->hevc_picture_struct == 12) {
             av_log(logctx, AV_LOG_DEBUG, "BOTTOM Field\n");
             h->picture_struct = AV_PICTURE_STRUCTURE_BOTTOM_FIELD;
-        } else if (h->raw_picture_struct == 1 || h->raw_picture_struct == 9 || h->raw_picture_struct == 11) {
+        } else if (h->hevc_picture_struct == 1 || h->hevc_picture_struct == 9 || h->hevc_picture_struct == 11) {
             av_log(logctx, AV_LOG_DEBUG, "TOP Field\n");
             h->picture_struct = AV_PICTURE_STRUCTURE_TOP_FIELD;
         }
-        get_bits(gb, 2);                   // source_scan_type
-        get_bits(gb, 1);                   // duplicate_flag
+        int source_scan_type = get_bits(gb, 2);                   // source_scan_type
+        int duplicate_flag = get_bits(gb, 1);                   // duplicate_flag
+        printf("Source Scan Type %d, Duplicate %d\n", source_scan_type, duplicate_flag);
         skip_bits1(gb);
         size--;
     }

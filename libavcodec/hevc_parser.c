@@ -22,7 +22,6 @@
 
 #include "libavutil/common.h"
 
-#include "avcodec.h"
 #include "golomb.h"
 #include "hevc.h"
 #include "hevc_parse.h"
@@ -53,39 +52,6 @@ typedef struct HEVCParserContext {
     int pocTid0;
 } HEVCParserContext;
 
-#define HEVC_MAX_PIC_STRUCT 13
-static enum AVFieldOrder hevc_pic_struct_to_av_field_order[HEVC_MAX_PIC_STRUCT] = {
-    AV_FIELD_PROGRESSIVE,
-    AV_FIELD_TT,
-    AV_FIELD_BB,
-    AV_FIELD_TT,
-    AV_FIELD_BB,
-    AV_FIELD_TT,
-    AV_FIELD_BB,
-    AV_FIELD_PROGRESSIVE,
-    AV_FIELD_PROGRESSIVE,
-    AV_FIELD_BB,
-    AV_FIELD_TT,
-    AV_FIELD_TT,
-    AV_FIELD_BB
-};
-
-static enum AVFieldOrder hevc_pic_struct_to_av_picture_structure[HEVC_MAX_PIC_STRUCT] = {
-    AV_PICTURE_STRUCTURE_FRAME,
-    AV_PICTURE_STRUCTURE_TOP_FIELD,
-    AV_PICTURE_STRUCTURE_BOTTOM_FIELD,
-    AV_PICTURE_STRUCTURE_TOP_FIELD,
-    AV_PICTURE_STRUCTURE_BOTTOM_FIELD,
-    AV_PICTURE_STRUCTURE_TOP_FIELD,
-    AV_PICTURE_STRUCTURE_BOTTOM_FIELD,
-    AV_PICTURE_STRUCTURE_FRAME,
-    AV_PICTURE_STRUCTURE_FRAME,
-    AV_PICTURE_STRUCTURE_TOP_FIELD,
-    AV_PICTURE_STRUCTURE_BOTTOM_FIELD,
-    AV_PICTURE_STRUCTURE_TOP_FIELD,
-    AV_PICTURE_STRUCTURE_BOTTOM_FIELD
-};
-
 static int hevc_parse_slice_header(AVCodecParserContext *s, H2645NAL *nal,
                                    AVCodecContext *avctx)
 {
@@ -98,17 +64,13 @@ static int hevc_parse_slice_header(AVCodecParserContext *s, H2645NAL *nal,
     int i, num = 0, den = 0;
 
     sh->first_slice_in_pic_flag = get_bits1(gb);
-    if (sei->picture_timing.picture_struct < HEVC_MAX_PIC_STRUCT) {
-        s->picture_structure = hevc_pic_struct_to_av_picture_structure[sei->picture_timing.picture_struct];
-        s->field_order = hevc_pic_struct_to_av_field_order[sei->picture_timing.picture_struct];
+    s->picture_structure = sei->picture_timing.picture_struct;
+    if (sei->picture_timing.hevc_picture_struct > 8) {
+        s->field_order = AV_FIELD_PAIRED;
     }
     else {
-        s->picture_structure = sei->picture_timing.picture_struct;
-        s->field_order = AV_FIELD_UNKNOWN;
+        s->field_order = sei->picture_timing.picture_struct;
     }
-
-    // Override the avctx field_order 
-    avctx->field_order = s->field_order;
 
     if (IS_IRAP_NAL(nal)) {
         s->key_frame = 1;

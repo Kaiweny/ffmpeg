@@ -2786,7 +2786,7 @@ static int set_side_data(HEVCContext *s)
     }
 
     // Store picture structure
-    av_dict_set_int(out->metadata, "hevc_picture_struct", s->sei.picture_timing.raw_picture_struct, 0);
+    av_dict_set_int(&out->metadata, "hevc_picture_struct", s->sei.picture_timing.hevc_picture_struct, 0);
 
     return 0;
 }

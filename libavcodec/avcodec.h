@@ -1547,6 +1547,7 @@ enum AVFieldOrder {
     AV_FIELD_BB,          //< Bottom coded first, bottom displayed first
     AV_FIELD_TB,          //< Top coded first, bottom displayed first
     AV_FIELD_BT,          //< Bottom coded first, top displayed first
+    AV_FIELD_PAIRED,      //< Fields are paired with previous or next pictures
 };
 
 /**
