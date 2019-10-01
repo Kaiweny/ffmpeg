@@ -2785,8 +2785,10 @@ static int set_side_data(HEVCContext *s)
         s->avctx->properties |= FF_CODEC_PROPERTY_CLOSED_CAPTIONS;
     }
 
-    // Store picture structure
-    av_dict_set_int(&out->metadata, "hevc_picture_struct", s->sei.picture_timing.hevc_picture_struct, 0);
+    // Store picture_structure, source_scan_type, and duplicate_flag
+    av_dict_set_int(&out->metadata, "picture_struct", s->sei.picture_timing.hevc_picture_struct, 0);
+    av_dict_set_int(&out->metadata, "source_scan_type", s->sei.picture_timing.hevc_picture_struct, 0);
+    av_dict_set_int(&out->metadata, "duplicate_flag", s->sei.picture_timing.duplicate_flag, 0);
 
     return 0;
 }
