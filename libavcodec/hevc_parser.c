@@ -66,7 +66,12 @@ static int hevc_parse_slice_header(AVCodecParserContext *s, H2645NAL *nal,
     sh->first_slice_in_pic_flag = get_bits1(gb);
     s->picture_structure = sei->picture_timing.picture_struct;
     if (sei->picture_timing.hevc_picture_struct > 8) {
-        s->field_order = AV_FIELD_PAIRED;
+        if (sei->picture_timing.hevc_picture_struct == 9 || sei->picture_timing.hevc_picture_struct == 12) {
+            s->field_order = AV_FIELD_PAIRED_BT;
+        }
+        else if (sei->picture_timing.hevc_picture_struct == 10 || sei->picture_timing.hevc_picture_struct == 11) {
+            s->field_order = AV_FIELD_PAIRED_TB;
+        }
     }
     else {
         s->field_order = sei->picture_timing.picture_struct;

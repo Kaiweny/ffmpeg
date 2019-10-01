@@ -1262,8 +1262,10 @@ void avcodec_string(char *buf, int buf_size, AVCodecContext *enc, int encode)
                     field_order = "top coded first (swapped)";
                 else if (enc->field_order == AV_FIELD_BT)
                     field_order = "bottom coded first (swapped)";
-                else if (enc->field_order == AV_FIELD_PAIRED) 
-                    field_order = "interleaved pair";
+                else if (enc->field_order == AV_FIELD_PAIRED_TB)
+                    field_order = "interleaved pair (top first)";
+                else if (enc->field_order == AV_FIELD_PAIRED_BT)
+                    field_order = "interleaved pair (bottom first)";
 
                 av_strlcatf(detail, sizeof(detail), "%s, ", field_order);
             }
