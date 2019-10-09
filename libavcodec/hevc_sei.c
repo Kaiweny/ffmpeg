@@ -136,17 +136,17 @@ static int decode_nal_sei_pic_timing(HEVCSEI *s, GetBitContext *gb, const HEVCPa
     sps = (HEVCSPS*)ps->sps_list[s->active_seq_parameter_set_id]->data;
 
     if (sps->vui.frame_field_info_present_flag) {
-        int pic_struct = get_bits(gb, 4);
+        h->hevc_picture_struct = get_bits(gb, 4);
         h->picture_struct = AV_PICTURE_STRUCTURE_UNKNOWN;
-        if (pic_struct == 2 || pic_struct == 10 || pic_struct == 12) {
+        if (h->hevc_picture_struct == 2 || h->hevc_picture_struct == 10 || h->hevc_picture_struct == 12) {
             av_log(logctx, AV_LOG_DEBUG, "BOTTOM Field\n");
             h->picture_struct = AV_PICTURE_STRUCTURE_BOTTOM_FIELD;
-        } else if (pic_struct == 1 || pic_struct == 9 || pic_struct == 11) {
+        } else if (h->hevc_picture_struct == 1 || h->hevc_picture_struct == 9 || h->hevc_picture_struct == 11) {
             av_log(logctx, AV_LOG_DEBUG, "TOP Field\n");
             h->picture_struct = AV_PICTURE_STRUCTURE_TOP_FIELD;
         }
-        get_bits(gb, 2);                   // source_scan_type
-        get_bits(gb, 1);                   // duplicate_flag
+        h->source_scan_type = get_bits(gb, 2); // source_scan_type
+        h->duplicate_flag = get_bits(gb, 1);   // duplicate_flag
         skip_bits1(gb);
         size--;
     }

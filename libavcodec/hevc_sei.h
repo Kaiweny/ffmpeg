@@ -79,7 +79,10 @@ typedef struct HEVCSEIDisplayOrientation {
 } HEVCSEIDisplayOrientation;
 
 typedef struct HEVCSEIPictureTiming {
+    int hevc_picture_struct;
     int picture_struct;
+    int source_scan_type;
+    int duplicate_flag;
 } HEVCSEIPictureTiming;
 
 typedef struct HEVCSEIA53Caption {
