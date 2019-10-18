@@ -426,7 +426,7 @@ static int deltacast_read_header(AVFormatContext *avctx) {
         // Give the deltacast ctx the allocated Audio info
         ctx->AudioInfo = AudioInfo;
 
-        ULONG NbOfSamples, AudioBufferSize;
+        ULONG NbOfSamples;
         /* Get the biggest audio frame size */
         NbOfSamples = VHD_GetNbSamples((VHD_VIDEOSTANDARD)ctx->VideoStandard, CLOCK_SYSTEM, VHD_ASR_48000, 0);
 
@@ -553,7 +553,7 @@ static int read_video_data(AVFormatContext *avctx, struct deltacast_ctx* ctx, AV
             int afdDictSize = 0;
             uint8_t *afdDictData = av_packet_pack_dictionary(afdDict, &afdDictSize);
             av_dict_free(&afdDict);
-            av_packet_add_side_data(pkt, AVPacketSideData::AV_PKT_DATA_STRINGS_METADATA, afdDictData, afdDictSize);
+            av_packet_add_side_data(pkt, AV_PKT_DATA_STRINGS_METADATA, afdDictData, afdDictSize);
         }
     }
 
