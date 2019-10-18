@@ -435,9 +435,6 @@ static int deltacast_read_header(AVFormatContext *avctx) {
 
             /* Create audio buffer */
             pAudioChn[pair]->pData = (BYTE*)malloc(sizeof(BYTE) * ctx->audioBufferSize[pair]);
-
-            /* Set the audio buffer size */
-            pAudioChn[pair]->DataSize = ctx->audioBufferSize[pair];
         }
 
         // Give the deltacast ctx the allocated audio channel pointers
@@ -598,8 +595,7 @@ static int read_audio_data(AVFormatContext *avctx, struct deltacast_ctx* ctx, AV
         result = VHD_SlotExtractAudio(ctx->SlotHandle, ctx->AudioInfo);
         if(result==VHDERR_NOERROR) {
             // TODO-Mitch: only read first stereo pair for now
-            err = alloc_packet_from_buffer(pkt,
-                                           ctx->pAudioChn[selected_audio_pair]->pData,
+            err = av_packet_from_data(pkt, ctx->pAudioChn[selected_audio_pair]->pData,
                                            ctx->pAudioChn[selected_audio_pair]->DataSize);
             if (err) {
                 //log error
