@@ -409,7 +409,7 @@ static int deltacast_read_header(AVFormatContext *avctx) {
         } else {
             av_log(avctx, AV_LOG_ERROR, "ERROR : Invalid number of Audio Channels. %d Channels Requested > 16 Channel Limit\n", ctx->channels);
             status = VHDERR_BADARG;
-            goto error:
+            goto error;
         }
 
         // Configure Audio info: 48kHz - 16 bits audio reception on required channels
@@ -551,9 +551,9 @@ static int read_video_data(AVFormatContext *avctx, struct deltacast_ctx* ctx, AV
             snprintf(afdFlag, sizeof(afdFlag), "%d", ctx->afd_ARCode);
             av_dict_set(&afdDict, "afdFlag", afdFlag, 0);
             int afdDictSize = 0;
-            uint8_t *afdDictData = av_packet_pack_dicitonary(afdDict, &afdDictSize);
+            uint8_t *afdDictData = av_packet_pack_dictionary(afdDict, &afdDictSize);
             av_dict_free(&afdDict);
-            av_packet_add_side_Data(&pkt, AVPacketSideData::AV_PKT_DATA_STRINGS_METADATA, afdDictData, afdDictSize);
+            av_packet_add_side_data(pkt, AVPacketSideData::AV_PKT_DATA_STRINGS_METADATA, afdDictData, afdDictSize);
         }
     }
 
