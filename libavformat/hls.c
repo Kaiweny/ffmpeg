@@ -736,6 +736,7 @@ static int parse_playlist(HLSContext *c, const char *url,
     struct segment **prev_segments = NULL;
     int prev_n_segments = 0;
     int prev_start_seq_no = -1;
+    int variant_count = 0;
 
     if (is_http && !in && c->http_persistent && c->playlist_pb) {
         in = c->playlist_pb;
@@ -877,10 +878,11 @@ static int parse_playlist(HLSContext *c, const char *url,
             av_log(c->ctx, AV_LOG_INFO, "Skip ('%s')\n", line);
             continue;
         } else if (line[0]) {
-            if ( is_variant &&
-                ( (c->selected_variant_index == -1 && c->n_variants == 0)
-                ||(variant_count++ == c->selected_variant_index))) {
-                av_log(c, AV_LOG_INFO, "Variant with bandwidth=%s selected\n", variant_info.bandwidth);
+            if (is_variant &&
+                ((c->selected_variant_index == -1 && c->n_variants == 0) ||
+                 (variant_count++ == c->selected_variant_index))) {
+                av_log(c, AV_LOG_INFO, "Variant with bandwidth=%s selected\n",
+                       variant_info.bandwidth);
                 if (!new_variant(c, &variant_info, line, url)) {
                     ret = AVERROR(ENOMEM);
                     goto fail;
@@ -2384,7 +2386,7 @@ static const AVOption hls_options[] = {
         OFFSET(http_persistent), AV_OPT_TYPE_BOOL, {.i64 = 1}, 0, 1, FLAGS },
     {"http_multiple", "Use multiple HTTP connections for fetching segments",
         OFFSET(http_multiple), AV_OPT_TYPE_BOOL, {.i64 = -1}, -1, 1, FLAGS},
-    {"selected_variant_index", "bandwidth of selected variant",
+    {"selected_variant_index", "selected index of EXT-X-STREAM-INF",
         OFFSET(selected_variant_index), AV_OPT_TYPE_INT,
         {.i64 = -1}, INT_MIN, INT_MAX, FLAGS},
     {NULL}
