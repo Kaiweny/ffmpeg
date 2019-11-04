@@ -211,7 +211,7 @@ typedef struct HLSContext {
 
     int cur_seq_no;
     int live_start_index;
-    char *selected_bandwidth;
+    int selected_variant_index;
     int first_packet;
     int64_t first_timestamp;
     int64_t cur_timestamp;
@@ -750,6 +750,7 @@ static int parse_playlist(HLSContext *c, const char *url,
     struct segment **prev_segments = NULL;
     int prev_n_segments = 0;
     int prev_start_seq_no = -1;
+    int variant_count = 0;
 
     if (is_http && !in && c->http_persistent && c->playlist_pb) {
         in = c->playlist_pb;
@@ -891,7 +892,11 @@ static int parse_playlist(HLSContext *c, const char *url,
             av_log(c->ctx, AV_LOG_INFO, "Skip ('%s')\n", line);
             continue;
         } else if (line[0]) {
-            if ( is_variant && is_selected_by_bandwidth(variant_info.bandwidth, c->selected_bandwidth) ) {
+            if (is_variant
+                   // We haven't set the selected variant index so pick the first
+                && ((c->selected_variant_index == -1 && c->n_variants == 0)
+                   // We have selected the variant index so pick that one
+                     || variant_count++ == c->selected_variant_index)) {
                 av_log(c, AV_LOG_INFO, "Variant with bandwidth=%s selected\n", variant_info.bandwidth);
                 if (!new_variant(c, &variant_info, line, url)) {
                     ret = AVERROR(ENOMEM);
@@ -1948,7 +1953,6 @@ static int hls_read_header(AVFormatContext *s)
                 break;
             }
             av_dict_set_int(&program->metadata, "target_duration", v->playlists[0]->target_duration, 0);
-            av_dict_set_int(&program->metadata, "number_main_streams", v->playlists[0]->n_main_streams, 0);
             av_dict_set(&program->metadata, "url", v->playlists[0]->url, 0);
         }
     }
@@ -2066,6 +2070,14 @@ static int hls_read_header(AVFormatContext *s)
         add_metadata_from_renditions(s, pls, AVMEDIA_TYPE_AUDIO);
         add_metadata_from_renditions(s, pls, AVMEDIA_TYPE_VIDEO);
         add_metadata_from_renditions(s, pls, AVMEDIA_TYPE_SUBTITLE);
+    }
+
+    // Now that we've gone through each stream let's add some details about it
+    for (i = 0; i < c->n_variants; i++) {
+        struct variant *v = c->variants[i];
+        if (v->n_playlists > 0) {
+            av_dict_set_int(&c->ctx->programs[i]->metadata, "number_of_streams", v->playlists[0]->n_main_streams, 0);
+        }
     }
 
     update_noheader_flag(s);
@@ -2413,9 +2425,9 @@ static const AVOption hls_options[] = {
         OFFSET(http_persistent), AV_OPT_TYPE_BOOL, {.i64 = 1}, 0, 1, FLAGS },
     {"http_multiple", "Use multiple HTTP connections for fetching segments",
         OFFSET(http_multiple), AV_OPT_TYPE_BOOL, {.i64 = -1}, -1, 1, FLAGS},
-    {"selected_bandwidth", "bandwidth of selected variant",
-        OFFSET(selected_bandwidth), AV_OPT_TYPE_STRING,
-        {.str = ""}, INT_MIN, INT_MAX, FLAGS},
+    {"selected_variant_index", "index of selected variant",
+        OFFSET(selected_variant_index), AV_OPT_TYPE_INT,
+        {.i64 = -1}, INT_MIN, INT_MAX, FLAGS},
     {NULL}
 };
 
