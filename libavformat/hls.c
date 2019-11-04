@@ -879,7 +879,9 @@ static int parse_playlist(HLSContext *c, const char *url,
             continue;
         } else if (line[0]) {
             if (is_variant &&
+                // We haven't set the selected variant index so pick the first
                 ((c->selected_variant_index == -1 && c->n_variants == 0) ||
+                 // We have selected the variant index so pick that one
                  (variant_count++ == c->selected_variant_index))) {
                 av_log(c, AV_LOG_INFO, "Variant with bandwidth=%s selected\n",
                        variant_info.bandwidth);
