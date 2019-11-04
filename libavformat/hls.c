@@ -1935,7 +1935,6 @@ static int hls_read_header(AVFormatContext *s)
         if (!program)
             goto fail;
         av_dict_set_int(&program->metadata, "variant_bitrate", v->bandwidth, 0);
-        printf("!!!!!!!!!! v->n_playlists %d\n", v->n_playlists);
         if (v->n_playlists > 0) {
             switch(v->playlists[0]->type) {
             case PLS_TYPE_UNSPECIFIED:
@@ -1948,8 +1947,8 @@ static int hls_read_header(AVFormatContext *s)
                 av_dict_set(&program->metadata, "playlist_type", "EVENT", 0);
                 break;
             }
-            av_dict_set(&program->metadata, "target_duration", v->playlists[0]->target_duration, 0);
-            av_dict_set(&program->metadata, "number_main_streams", v->playlists[0]->n_main_streams, 0);
+            av_dict_set_int(&program->metadata, "target_duration", v->playlists[0]->target_duration, 0);
+            av_dict_set_int(&program->metadata, "number_main_streams", v->playlists[0]->n_main_streams, 0);
         }
     }
 
