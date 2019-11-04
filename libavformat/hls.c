@@ -1497,6 +1497,7 @@ reload:
                    "skipping %d segments ahead, expired from playlists\n",
                    v->start_seq_no - v->cur_seq_no);
             v->cur_seq_no = v->start_seq_no;
+            av_dict_set_int(&v->parent->metadata, "start_seq_no", v->start_seq_no, 0);
         }
         if (v->cur_seq_no >= v->start_seq_no + v->n_segments) {
             if (v->finished)
@@ -1532,6 +1533,7 @@ reload:
                    v->cur_seq_no,
                    v->index);
             v->cur_seq_no += 1;
+            av_dict_set_int(&v->parent->metadata, "cur_seq_no", v->start_seq_no, 0);
             goto reload;
         }
         just_opened = 1;
@@ -1587,6 +1589,19 @@ reload:
             urlc->mpegts_parser_injection_context = v->mpegts_parser_input_context_backup;
         }
 
+        av_dict_set_int(&v->parent->metadata, "segment_size", seg->actual_size, 0);
+        av_dict_set_int(&v->parent->metadata, "segment_duration", seg->duration, 0);
+        switch(seg->key_type) {
+        case KEY_NONE:
+            av_dict_set(&v->parent->metadata, "segment_key_type", "NONE", 0);
+            break;
+        case KEY_AES_128:
+            av_dict_set(&v->parent->metadata, "segment_key_type", "AES_128", 0);
+            break;
+        case KEY_SAMPLE_AES:
+            av_dict_set(&v->parent->metadata, "segment_key_type", "SAMPLE_AES", 0);
+            break;
+        }
         return ret;
     }
     if (c->http_persistent &&
