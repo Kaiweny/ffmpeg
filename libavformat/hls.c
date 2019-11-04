@@ -211,7 +211,7 @@ typedef struct HLSContext {
 
     int cur_seq_no;
     int live_start_index;
-    char *selected_bandwidth;
+    int64_t selected_variant_index;
     int first_packet;
     int64_t first_timestamp;
     int64_t cur_timestamp;
@@ -223,20 +223,6 @@ typedef struct HLSContext {
     int http_multiple;
     AVIOContext *playlist_pb;
 } HLSContext;
-
-static int is_selected_by_bandwidth(const char * current_bandwidth, const char *selected_bandwidth)
-{
-    if (!selected_bandwidth) {
-        // if no selected_bandwidth specified, select all
-        return 1;
-    }
-
-    if (!current_bandwidth) {
-        return 0;
-    }
-
-    return strcmp(selected_bandwidth, current_bandwidth) == 0;
-}
 
 static void free_segment_dynarray(struct segment **segments, int n_segments)
 {
@@ -891,7 +877,9 @@ static int parse_playlist(HLSContext *c, const char *url,
             av_log(c->ctx, AV_LOG_INFO, "Skip ('%s')\n", line);
             continue;
         } else if (line[0]) {
-            if ( is_variant && is_selected_by_bandwidth(variant_info.bandwidth, c->selected_bandwidth) ) {
+            if ( is_variant &&
+                ( (c->selected_variant_index == -1 && c->n_variants == 0)
+                ||(variant_count++ == c->selected_variant_index))) {
                 av_log(c, AV_LOG_INFO, "Variant with bandwidth=%s selected\n", variant_info.bandwidth);
                 if (!new_variant(c, &variant_info, line, url)) {
                     ret = AVERROR(ENOMEM);
@@ -2396,9 +2384,9 @@ static const AVOption hls_options[] = {
         OFFSET(http_persistent), AV_OPT_TYPE_BOOL, {.i64 = 1}, 0, 1, FLAGS },
     {"http_multiple", "Use multiple HTTP connections for fetching segments",
         OFFSET(http_multiple), AV_OPT_TYPE_BOOL, {.i64 = -1}, -1, 1, FLAGS},
-    {"selected_bandwidth", "bandwidth of selected variant",
-        OFFSET(selected_bandwidth), AV_OPT_TYPE_STRING,
-        {.str = ""}, INT_MIN, INT_MAX, FLAGS},
+    {"selected_variant_index", "bandwidth of selected variant",
+        OFFSET(selected_variant_index), AV_OPT_TYPE_INT,
+        {.i64 = -1}, INT_MIN, INT_MAX, FLAGS},
     {NULL}
 };
 
