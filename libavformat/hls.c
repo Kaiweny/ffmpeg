@@ -1949,6 +1949,7 @@ static int hls_read_header(AVFormatContext *s)
             }
             av_dict_set_int(&program->metadata, "target_duration", v->playlists[0]->target_duration, 0);
             av_dict_set_int(&program->metadata, "number_main_streams", v->playlists[0]->n_main_streams, 0);
+            av_dict_set(&program->metadata, "url", v->playlists[0]->url, 0);
         }
     }
 
