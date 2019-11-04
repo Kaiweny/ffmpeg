@@ -1533,7 +1533,6 @@ reload:
                    v->cur_seq_no,
                    v->index);
             v->cur_seq_no += 1;
-            av_dict_set_int(&v->parent->metadata, "cur_seq_no", v->start_seq_no, 0);
             goto reload;
         }
         just_opened = 1;
@@ -1589,6 +1588,7 @@ reload:
             urlc->mpegts_parser_injection_context = v->mpegts_parser_input_context_backup;
         }
 
+        av_dict_set_int(&v->parent->metadata, "cur_seq_no", v->cur_seq_no, 0);
         av_dict_set_int(&v->parent->metadata, "segment_size", seg->actual_size, 0);
         av_dict_set_int(&v->parent->metadata, "segment_duration", seg->duration, 0);
         switch(seg->key_type) {
