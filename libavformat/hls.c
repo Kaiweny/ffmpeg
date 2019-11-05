@@ -768,7 +768,7 @@ static int parse_playlist(HLSContext *c, const char *url,
     int prev_start_seq_no = -1;
 
     // Reset variant count
-    c-variant_count = 0;
+    c->variant_count = 0;
 
     if (is_http && !in && c->http_persistent && c->playlist_pb) {
         in = c->playlist_pb;
@@ -910,7 +910,7 @@ static int parse_playlist(HLSContext *c, const char *url,
             av_log(c->ctx, AV_LOG_INFO, "Skip ('%s')\n", line);
             continue;
         } else if (line[0]) {
-            if (is_variant && is_variant_selected(variant_info, c)) {
+            if (is_variant && is_variant_selected(&variant_info, c)) {
                 av_log(c, AV_LOG_INFO,
                        "Variant %d with bandwidth=%s selected\n",
                        c->variant_count, variant_info.bandwidth);
