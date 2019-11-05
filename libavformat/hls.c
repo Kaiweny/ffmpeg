@@ -226,9 +226,7 @@ typedef struct HLSContext {
     int variant_count;
 } HLSContext;
 
-static int is_variant_selected(const HLSContext* c, const struct variant_info* variant_info) {
-    bool selected_by_bandwidth = false;
-    bool selected_by_index = false;
+static int is_variant_selected(HLSContext* c, const struct variant_info* variant_info) {
     // If both selected bandwidth and selected variant are default, then add this program
     if (c->selected_bandwidth == "" && c->selected_variant_index == -1) {
         return 1;
