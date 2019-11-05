@@ -211,7 +211,7 @@ typedef struct HLSContext {
 
     int cur_seq_no;
     int live_start_index;
-    int64_t selected_variant_index;
+    char *selected_bandwidth;
     int first_packet;
     int64_t first_timestamp;
     int64_t cur_timestamp;
@@ -222,6 +222,7 @@ typedef struct HLSContext {
     int http_persistent;
     int http_multiple;
     AVIOContext *playlist_pb;
+    int64_t selected_variant_index;
     int variant_count;
 } HLSContext;
 
