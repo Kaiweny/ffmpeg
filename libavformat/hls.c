@@ -226,7 +226,7 @@ typedef struct HLSContext {
     int variant_count;
 } HLSContext;
 
-static int is_variant_selected(const struct variant_info* variant_info, const HLSContext* c) {
+static int is_variant_selected(const HLSContext* c, const struct variant_info* variant_info) {
     bool selected_by_bandwidth = false;
     bool selected_by_index = false;
     // If both selected bandwidth and selected variant are default, then add this program
@@ -240,12 +240,12 @@ static int is_variant_selected(const struct variant_info* variant_info, const HL
     // If a bandwidth is selected, but the variant doesn't list a bandwidth
     else if (c->selected_bandwidth != "") {
         // If a bandwidth is selected, but the variant doesn't list a bandwidth
-        if (variant_info.bandwidh == "") {
+        if (variant_info->bandwidh == "") {
             return 0;
         }
         else {
             // If a bandwidth is selected, check to see if we match
-            return (strcmp(selected_bandwidth, current_bandwidth) == 0);
+            return (strcmp(c->selected_bandwidth, variant_info->bandwidth) == 0);
         }
     }
 
@@ -910,7 +910,7 @@ static int parse_playlist(HLSContext *c, const char *url,
             av_log(c->ctx, AV_LOG_INFO, "Skip ('%s')\n", line);
             continue;
         } else if (line[0]) {
-            if (is_variant && is_variant_selected(&variant_info, c)) {
+            if (is_variant && is_variant_selected(c, &variant_info)) {
                 av_log(c, AV_LOG_INFO,
                        "Variant %d with bandwidth=%s selected\n",
                        c->variant_count, variant_info.bandwidth);
