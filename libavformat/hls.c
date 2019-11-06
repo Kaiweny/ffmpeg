@@ -235,7 +235,6 @@ static int is_variant_selected(HLSContext* c, const char* current_bandwidth) {
     else if (c->selected_variant_index != -1 && c->variant_count++ == c->selected_variant_index) {
         return 1;
     }
-    // If a bandwidth is selected, but the variant doesn't list a bandwidth
     else if (c->selected_bandwidth) {
         // If a bandwidth is selected, but the variant doesn't list a bandwidth
         if (!current_bandwidth) {
