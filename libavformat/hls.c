@@ -471,13 +471,11 @@ static struct segment *new_init_section(struct playlist *pls,
 
     // Actual Segment Size
     URLContext* urlCtx;
-    //int ret = ffurl_alloc(&urlCtx, "", 0, 0);
     if (ffurl_open(&urlCtx, sec->url, 0, 0, NULL) >= 0)
         sec->actual_size = ffurl_seek(urlCtx, 0, AVSEEK_SIZE);
     else
         sec->actual_size = -1;
     ffurl_close(urlCtx);
-    av_log(NULL, AV_LOG_INFO, "Init Segment: url: %s,  size = %d / %d\n", sec->url, sec->size, sec->actual_size);
 
     dynarray_add(&pls->init_sections, &pls->n_init_sections, sec);
 
