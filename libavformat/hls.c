@@ -222,20 +222,33 @@ typedef struct HLSContext {
     int http_persistent;
     int http_multiple;
     AVIOContext *playlist_pb;
+    int64_t selected_variant_index;
+    int variant_count;
 } HLSContext;
 
-static int is_selected_by_bandwidth(const char * current_bandwidth, const char *selected_bandwidth)
-{
-    if (!selected_bandwidth) {
-        // if no selected_bandwidth specified, select all
+static int is_variant_selected(HLSContext* c, const char* current_bandwidth) {
+    // If both selected bandwidth and selected variant are default, then add this program
+    if (!c->selected_bandwidth && c->selected_variant_index == -1) {
         return 1;
     }
-
-    if (!current_bandwidth) {
-        return 0;
+    // If a variant is selected and we've counted enough variants
+    else if (c->selected_variant_index != -1 && c->variant_count++ == c->selected_variant_index) {
+        return 1;
+    }
+    else if (c->selected_bandwidth) {
+        // If a bandwidth is selected, but the variant doesn't list a bandwidth
+        if (!current_bandwidth) {
+            return 0;
+        }
+        else {
+            // If a bandwidth is selected, check to see if we match
+            return (strcmp(c->selected_bandwidth, current_bandwidth) == 0);
+        }
     }
 
-    return strcmp(selected_bandwidth, current_bandwidth) == 0;
+    // If we've gotten here this must mean that we've selected a variant but
+    // the index doesn't match
+    return 0;
 }
 
 static void free_segment_dynarray(struct segment **segments, int n_segments)
@@ -458,13 +471,11 @@ static struct segment *new_init_section(struct playlist *pls,
 
     // Actual Segment Size
     URLContext* urlCtx;
-    //int ret = ffurl_alloc(&urlCtx, "", 0, 0);
     if (ffurl_open(&urlCtx, sec->url, 0, 0, NULL) >= 0)
         sec->actual_size = ffurl_seek(urlCtx, 0, AVSEEK_SIZE);
     else
         sec->actual_size = -1;
     ffurl_close(urlCtx);
-    //av_log(NULL, AV_LOG_INFO, "Init Segment: url: %s,  size = %d / %d\n", sec->url, sec->size, sec->actual_size);
 
     dynarray_add(&pls->init_sections, &pls->n_init_sections, sec);
 
@@ -751,6 +762,9 @@ static int parse_playlist(HLSContext *c, const char *url,
     int prev_n_segments = 0;
     int prev_start_seq_no = -1;
 
+    // Reset variant count
+    c->variant_count = 0;
+
     if (is_http && !in && c->http_persistent && c->playlist_pb) {
         in = c->playlist_pb;
         ret = open_url_keepalive(c->ctx, &c->playlist_pb, url);
@@ -891,8 +905,10 @@ static int parse_playlist(HLSContext *c, const char *url,
             av_log(c->ctx, AV_LOG_INFO, "Skip ('%s')\n", line);
             continue;
         } else if (line[0]) {
-            if ( is_variant && is_selected_by_bandwidth(variant_info.bandwidth, c->selected_bandwidth) ) {
-                av_log(c, AV_LOG_INFO, "Variant with bandwidth=%s selected\n", variant_info.bandwidth);
+            if (is_variant && is_variant_selected(c, variant_info.bandwidth)) {
+                av_log(c, AV_LOG_INFO,
+                       "Variant %d with bandwidth=%s selected\n",
+                       c->variant_count, variant_info.bandwidth);
                 if (!new_variant(c, &variant_info, line, url)) {
                     ret = AVERROR(ENOMEM);
                     goto fail;
@@ -2396,6 +2412,9 @@ static const AVOption hls_options[] = {
         OFFSET(http_persistent), AV_OPT_TYPE_BOOL, {.i64 = 1}, 0, 1, FLAGS },
     {"http_multiple", "Use multiple HTTP connections for fetching segments",
         OFFSET(http_multiple), AV_OPT_TYPE_BOOL, {.i64 = -1}, -1, 1, FLAGS},
+    {"selected_variant_index", "selected index of EXT-X-STREAM-INF",
+        OFFSET(selected_variant_index), AV_OPT_TYPE_INT,
+        {.i64 = -1}, INT_MIN, INT_MAX, FLAGS},
     {"selected_bandwidth", "bandwidth of selected variant",
         OFFSET(selected_bandwidth), AV_OPT_TYPE_STRING,
         {.str = ""}, INT_MIN, INT_MAX, FLAGS},
