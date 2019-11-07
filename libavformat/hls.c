@@ -222,7 +222,7 @@ typedef struct HLSContext {
     int http_persistent;
     int http_multiple;
     AVIOContext *playlist_pb;
-    int64_t selected_variant_index;
+    int selected_variant_index;
     int variant_count;
 } HLSContext;
 
@@ -2407,6 +2407,9 @@ static int hls_probe(const AVProbeData *p)
 static const AVOption hls_options[] = {
     {"live_start_index", "segment index to start live streams at (negative values are from the end)",
         OFFSET(live_start_index), AV_OPT_TYPE_INT, {.i64 = -3}, INT_MIN, INT_MAX, FLAGS},
+    {"selected_bandwidth", "bandwidth of selected variant",
+        OFFSET(selected_bandwidth), AV_OPT_TYPE_STRING,
+        {.str = ""}, INT_MIN, INT_MAX, FLAGS},
     {"allowed_extensions", "List of file extensions that hls is allowed to access",
         OFFSET(allowed_extensions), AV_OPT_TYPE_STRING,
         {.str = "3gp,aac,avi,flac,mkv,m3u8,m4a,m4s,m4v,mpg,mov,mp2,mp3,mp4,mpeg,mpegts,ogg,ogv,oga,ts,vob,wav"},
@@ -2420,9 +2423,6 @@ static const AVOption hls_options[] = {
     {"selected_variant_index", "selected index of EXT-X-STREAM-INF",
         OFFSET(selected_variant_index), AV_OPT_TYPE_INT,
         {.i64 = -1}, INT_MIN, INT_MAX, FLAGS},
-    {"selected_bandwidth", "bandwidth of selected variant",
-        OFFSET(selected_bandwidth), AV_OPT_TYPE_STRING,
-        {.str = ""}, INT_MIN, INT_MAX, FLAGS},
     {NULL}
 };
 
