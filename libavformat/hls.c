@@ -226,10 +226,22 @@ typedef struct HLSContext {
     int variant_count;
 } HLSContext;
 
+// If both index and bandwidth are selected, the ensure both match
 static int is_variant_selected(HLSContext* c, const char* current_bandwidth) {
     // If both selected bandwidth and selected variant are default, then add this program
     if (!c->selected_bandwidth && c->selected_variant_index == -1) {
         return 1;
+    }
+    // If a variant is selected and we've counted enough variants
+    // and the bandwidth is selected
+    else if (c->selected_variant_index != -1 && c->selected_bandwidth &&
+             !current_bandwidth) {
+        if (c->variant_count++ == c->selected_variant_index &&
+            (strcmp(c->selected_bandwidth, current_bandwidth) == 0)) {
+            return 1;
+        } else {
+            return 0;
+        }
     }
     // If a variant is selected and we've counted enough variants
     else if (c->selected_variant_index != -1) {
